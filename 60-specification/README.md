@@ -43,6 +43,7 @@ themselves.
 - [Agent Manifests Artifacts Schemas And Registries](03-agent-manifests-artifacts-schemas-and-registries.md) — Phase 3 of Milestone 1; defines immutable artifacts, reviewable manifests, schema identifiers, registry lookup, validation order, and cache keys.
 - [Turn Lifecycle Protocols And Canonical Encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md) — Phase 4 of Milestone 1; specifies the complete bytes-in/bytes-out lifecycle for describe, initialize, reduce, and migrate exports, plus canonical JSON encoding rules.
 - [Guest SDK Contracts Fixtures And Milestone Acceptance](05-guest-sdk-contracts-fixtures-and-milestone-acceptance.md) — Phase 5 of Milestone 1; turns the protocol into language-neutral fixtures and guest SDK responsibilities without choosing initial SDK languages.
+- [Signal Envelopes Causality Routing And Delivery Vocabulary](10-signals-causality-routing-and-delivery.md) — Phase 1 of Milestone 2; defines the event fabric through which users, effects, timers, sensors, and agents enter deterministic turns.
 
 ## Maintaining this index
 

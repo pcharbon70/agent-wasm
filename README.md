@@ -18,6 +18,13 @@ documents are normative and how conflicts are handled. The
 [Conformance Vocabulary](CONFORMANCE-VOCABULARY.md) defines requirement force,
 failure classes, variability, limits, and implementation-profile obligations.
 
+## Implementation planning
+
+The [Jido-Inspired Agentic System Roadmap](.spec/planning/agentic-system/README.md)
+turns the current research into nine architecture-neutral implementation
+milestones. The hidden `.spec/` workspace is operational planning rather than
+research evidence or normative specification.
+
 ## Structure
 
 - [`00-inbox/`](00-inbox/README.md) — unprocessed captures
