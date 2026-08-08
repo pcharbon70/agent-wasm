@@ -399,7 +399,9 @@ target the same architectures.
 Additional architectures MAY be added when both primary runtime families
 provide equivalent support and conformance evidence.
 
-## Failure modes
+## Failure Evidence And Operational Notes
+
+### Failure modes
 
 ### Malformed
 
@@ -516,6 +518,135 @@ this chapter and would require normative revision:
 5. A stable Component Model interface provides materially stronger
    portability with less application protocol than Extism for the target
    deployment.
+
+## Integration Test Expectations
+
+This section defines the observable behavior that the Phase 1 integration
+tests MUST verify.
+These expectations are normative; passing the test suite is a prerequisite
+for promoting this chapter to `status: normative`.
+
+### Successful flow
+
+The host MUST accept a well-formed signal, resolve the agent, invoke the
+plug-in reducer, validate the output, commit the state+journal+outbox
+atomically, release the turn lease, and acknowledge the input.
+The test MUST record and retain:
+
+1. The input signal envelope and its causal identifiers.
+2. The artifact digest and manifest version used.
+3. The protocol version and schema versions validated.
+4. The resolved route and action.
+5. The capability grants supplied to the guest.
+6. The resource limits and measured usage.
+7. The prior and committed state revisions.
+8. The directive identifiers and their disposition.
+9. The trace context and timestamps.
+10. The diagnostic family code (none for success).
+
+### Malformed input
+
+The host MUST reject inputs that fail to decode or violate required
+structural rules.
+The test MUST verify that:
+
+1. Each malformed input family produces a `profile.vocabulary.malformed`
+   diagnostic.
+2. No state, journal, or outbox entries are created for the failed turn.
+3. The turn lease is released even on failure.
+4. The diagnostic identifies the specific field or schema that failed.
+5. The diagnostic does not expose secrets or implementation internals.
+
+### Incompatible input
+
+The host MUST reject artifacts that declare a protocol version, feature
+set, or capability requirement outside the accepted profile.
+The test MUST verify that:
+
+1. An artifact with an unsupported protocol version is rejected at
+   admission with a `profile.vocabulary.incompatible` diagnostic.
+2. An artifact requiring an excluded Wasm feature is rejected with the
+   same diagnostic family.
+3. The diagnostic identifies the version or feature mismatch.
+
+### Stale input
+
+The host MUST detect and reject stale state revisions.
+The test MUST verify that:
+
+1. A turn request with a state revision older than the current committed
+   revision is rejected.
+2. The rejection diagnostic identifies the stale revision and the
+   expected revision.
+
+### Duplicate input
+
+The host MUST deduplicate signal invocations according to its delivery
+contract.
+The test MUST verify that:
+
+1. A duplicate signal with the same correlation and causation identifiers
+   is identified and handled according to the delivery contract.
+2. No duplicate state revisions are created.
+3. No duplicate outbox entries are created.
+
+### Boundary-limit inputs
+
+The host MUST enforce size, depth, and collection limits.
+The test MUST verify that:
+
+1. Input exceeding declared size limits is rejected with a
+   `profile.vocabulary.exhausted` diagnostic.
+2. Output exceeding declared size limits is rejected with the same
+   diagnostic.
+3. Nested structures exceeding depth limits are rejected.
+4. Collections exceeding size limits are rejected.
+
+### Timeout behavior
+
+The host MUST enforce call deadlines.
+The test MUST verify that:
+
+1. A reducer that exceeds its deadline is interrupted.
+2. No state, journal, or outbox entries are created for the timed-out turn.
+3. The turn lease is released.
+4. The diagnostic identifies the timeout event.
+
+### Cancellation behavior
+
+The host MUST support turn cancellation.
+The test MUST verify that:
+
+1. A cancellation signal interrupts an in-progress turn.
+2. No state, journal, or outbox entries are created for the cancelled turn.
+3. The turn lease is released.
+
+### Unavailable dependency
+
+The host MUST handle missing dependencies gracefully.
+The test MUST verify that:
+
+1. A missing artifact is rejected with a `profile.vocabulary.unavailable`
+   diagnostic.
+2. A missing capability grant is rejected with a
+   `profile.vocabulary.unauthorized` diagnostic.
+3. No partial state is committed.
+
+### Retry behavior
+
+The host MUST retry failed effects according to their idempotency contract.
+The test MUST verify that:
+
+1. Effects with at-least-once semantics are retried until success or
+   maximum attempts.
+2. Idempotency keys prevent duplicate external delivery.
+3. No unauthorized state is visible during retry.
+
+### Cross-milestone fixture regression
+
+The test suite MUST include fixtures from earlier milestones that are
+affected by this phase.
+Any regression MUST be recorded with its approval status.
 
 ## Variability register
 
