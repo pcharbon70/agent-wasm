@@ -12,6 +12,13 @@ aliases:
 This is the selective entry point to the archive. See the
 [archive guide](../README.md) for its structure and authoring conventions.
 
+## Implementation roadmap
+
+- [Jido-Inspired Agentic System Roadmap](../.spec/planning/agentic-system/README.md)
+  — nine production-oriented milestones covering contracts, agent semantics,
+  host lifecycle, durability, security and plugins, multi-agent topology, AI,
+  assurance, and platform operations.
+
 ## Active inquiries
 
 - [How Should Agent WASM Assure a Jido-Like Extism Runtime?](../40-inquiries/how-should-agent-wasm-assure-a-jido-like-extism-runtime.md)
