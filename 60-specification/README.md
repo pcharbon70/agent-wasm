@@ -47,6 +47,7 @@ themselves.
 - [Actions Instructions Validation Plans And Results](11-actions-instructions-validation-plans-and-results.md) — Phase 2 of Milestone 2; separates reusable operation definitions from concrete invocations and deterministic execution plans.
 - [State Operations Patches Revisions And Conflicts](12-state-operations-patches-revisions-and-conflicts.md) — Phase 3 of Milestone 2; defines safe internal state transitions against host-owned snapshots and optimistic revisions.
 - [Directives Strategies Continuations And Terminal States](13-directives-strategies-continuations-and-terminal-states.md) — Phase 4 of Milestone 2; defines external requests and replaceable decision policies without hiding mutable runtime authority in the guest.
+- [Deterministic Reducer Semantics And Milestone Acceptance](14-deterministic-reducer-semantics-and-milestone-acceptance.md) — Phase 5 of Milestone 2; assembles signals, actions, state operations, directives, and strategies into one replayable decision kernel.
 
 ## Maintaining this index
 
