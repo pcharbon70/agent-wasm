@@ -901,3 +901,126 @@ The following work is deferred to future milestones:
 
 4. **Performance benchmarks**: Performance benchmarks will be developed
    in future milestones to validate resource limits and retry policies.
+
+## Phase 5 integration tests
+
+### Successful flow
+
+> **Normative definition.**
+The successful flow integration test validates the complete lifecycle:
+describe -> initialize -> reduce (direct) -> reduce (continuation) ->
+reduce (terminal) -> migrate.
+
+Expected behavior:
+
+1. `describe` returns all declared capabilities.
+2. `initialize` calculates initial state with revision 1.
+3. `reduce` processes direct instruction, returns state_patch with revision 2.
+4. `reduce` processes FSM continuation, returns state_patch with revision 3.
+5. `reduce` processes terminal instruction, returns terminal domain_status.
+6. `migrate` transforms state from schema version 1.0.0 to 2.0.0.
+
+### Malformed input
+
+> **Normative definition.**
+The malformed input integration test validates that the host rejects
+invalid JSON syntax with a `protocol.decode.syntax_error` diagnostic.
+
+Expected behavior:
+
+- Input: malformed JSON string.
+- Expected output: null.
+- Expected error: `protocol.decode.syntax_error`.
+
+### Schema mismatch
+
+> **Normative definition.**
+The schema mismatch integration test validates that the host rejects
+inputs that violate the declared state schema.
+
+Expected behavior:
+
+- Input: state with counter as string instead of number.
+- Expected output: null.
+- Expected error: `protocol.schema.type_mismatch`.
+
+### Duplicate keys
+
+> **Normative definition.**
+The duplicate keys integration test validates that the host rejects
+inputs with duplicate object keys.
+
+Expected behavior:
+
+- Input: JSON with duplicate "protocol_version" key.
+- Expected output: null.
+- Expected error: `protocol.decode.duplicate_key`.
+
+### Stale revision
+
+> **Normative definition.**
+The stale revision integration test validates that the host rejects
+inputs with out-of-order state revisions.
+
+Expected behavior:
+
+- Input: expected_state_revision of 5 when current revision is 1.
+- Expected output: null.
+- Expected error: `protocol.semantic.revision_stale`.
+
+### Oversized value
+
+> **Normative definition.**
+The oversized value integration test validates that the host rejects
+inputs that exceed resource limits.
+
+Expected behavior:
+
+- Input: state with value exceeding maximum allowed size.
+- Expected output: null.
+- Expected error: `runtime.resource.oversized_value`.
+
+### Timeout and cancellation
+
+> **Normative definition.**
+The timeout and cancellation integration test validates that the host
+handles deadline violations and cancellation requests correctly.
+
+Expected behavior:
+
+- Input: instruction that exceeds deadline_ms.
+- Expected output: null.
+- Expected error: `runtime.resource.timeout`.
+
+The host MUST NOT leave unauthorized or partial state after a timeout.
+
+### Retry behavior
+
+> **Normative definition.**
+The retry behavior integration test validates that the host retries
+transient dependency failures according to the configured retry policy.
+
+Expected behavior:
+
+- Input: instruction requiring external dependency that fails once.
+- Expected output: success after retry.
+- Expected error: null.
+
+The host MUST NOT leave unauthorized or partial state after exhausting
+retries.
+
+### Cross-milestone fixture regression
+
+> **Normative definition.**
+All earlier milestone fixtures MUST be re-run after Phase 5 to verify
+no regressions.
+
+Expected behavior:
+
+- All Phase 1 fixtures: PASS.
+- All Phase 2 fixtures: PASS.
+- All Phase 3 fixtures: PASS.
+- All Phase 4 fixtures: PASS.
+- All Phase 5 fixtures: PASS.
+
+Any approved variability MUST be documented in the Milestone 1 exit report.
