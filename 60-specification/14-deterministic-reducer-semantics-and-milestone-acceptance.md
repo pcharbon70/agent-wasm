@@ -179,3 +179,64 @@ The Milestone 2 exit report MUST include:
 
 > **Normative definition.**
 The exit report MUST be signed off by the milestone owner before Milestone 2 is considered complete.
+
+## 5.3 Failure Evidence And Operational Notes
+
+### Diagnostics
+
+> **Normative definition.**
+All diagnostics emitted by the host MUST conform to the `Diagnostic` type
+defined in
+[Turn Lifecycle Protocols And Canonical Encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md#diagnostics).
+
+Diagnostics MUST identify the phase contract, profile, and failed boundary
+without exposing secrets or implementation internal state.
+
+### Diagnostic families
+
+| Family | Purpose | Example codes |
+|--------|---------|---------------|
+| `reducer.resolution` | Turn resolution failures | `signal_invalid`, `routing_ambiguous`, `patch_rejected` |
+| `reducer.determinism` | Determinism violations | `result_mismatch`, `encoding_mismatch` |
+| `reducer.replay` | Replay failures | `stale_revision`, `corrupt_snapshot` |
+| `acceptance.exit` | Exit report issues | `fixture_failed`, `variability_unresolved` |
+
+### Failure modes
+
+| Mode | Description | Conditions |
+|------|-------------|------------|
+| Malformed | Invalid turn request structure | Failed JSON parsing or schema validation |
+| Incompatible | Reducer profile incompatible with turn | Profile version mismatch |
+| Conflicting | Concurrent turns on same revision | Same state revision targeted |
+| Unauthorized | Missing capability for directive | Required capability not granted |
+| Exhausted | Resource limits exceeded | Timeout, memory, or iteration limit |
+| Unavailable | Reducer or strategy unavailable | Reducer not found or strategy corrupt |
+
+### Implementation-defined choices
+
+> **Normative implementation-defined choice.**
+The following choices are implementation-defined and do not create
+conformance obligations.
+The Variability register below catalogs all such choices.
+
+1. **Canonical encoding**: The host MAY choose the canonical JSON encoding algorithm. The algorithm MUST produce byte-identical output for canonically equivalent inputs.
+
+2. **Hash algorithm**: The host MAY choose the hash algorithm for state and revision computation. The algorithm MUST be documented in the conformance profile.
+
+3. **Conflict resolution**: The host MAY implement conflict resolution strategies. The strategy is implementation-defined.
+
+4. **Reducer loading**: The host MAY choose how to load and validate reducers. The loading mechanism is implementation-defined.
+
+### Deferred work
+
+> **Non-normative note.**
+The following work is deferred to future milestones and creates no
+conformance obligation for current implementations:
+
+1. **Reducer composition API**: A formal reducer composition API will be implemented in future milestones. The protocol is language-neutral and does not require reducer composition for base conformance.
+
+2. **Reducer debugging API**: A formal reducer debugging API will be implemented in future milestones. The protocol is language-neutral and does not require reducer debugging for base conformance.
+
+3. **Reducer monitoring API**: A formal reducer monitoring API will be implemented in future milestones. The protocol is language-neutral and does not require reducer monitoring for base conformance.
+
+4. **Milestone 3 planning**: Future milestones will build on Milestone 2 contracts and may introduce additional phases and chapters.
