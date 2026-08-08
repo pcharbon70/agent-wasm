@@ -60,7 +60,7 @@ deterministic reducer scope.
 ```
 Directive {
   id: string,
-  kind: DirectiveKind,
+  kind: DirectiveKindName,
   payload: JsonObject?,
   requested_capability: CapabilityRef,
   causal_metadata: CausalMetadata,
@@ -68,6 +68,8 @@ Directive {
   retry_class: RetryClass?,
   result_contract: ResultContract?
 }
+
+DirectiveKindName = "emit" | "timer" | "effect" | "child-lifecycle" | "approval" | "topology"
 
 CausalMetadata {
   turn_id: string,
@@ -96,7 +98,7 @@ ResultContract {
 | Field | Type | Required | Purpose |
 |-------|------|----------|---------|
 | `id` | string | Yes | Directive identifier |
-| `kind` | DirectiveKind | Yes | Directive category |
+| `kind` | DirectiveKindName | Yes | Directive category |
 | `payload` | JsonObject? | No | Directive-specific data |
 | `requested_capability` | CapabilityRef | Yes | Capability required to fulfill |
 | `causal_metadata` | CausalMetadata | Yes | Turn causality context |
@@ -209,6 +211,23 @@ StrategySnapshot {
 | `started_at` | timestamp | Yes | Strategy start timestamp |
 | `last_transitioned_at` | timestamp | Yes | Last transition timestamp |
 
+### Type definitions
+
+> **Normative definition.**
+The following types are used across this chapter.
+
+- **timestamp**: ISO 8601 UTC datetime string (e.g., `2026-08-08T10:00:00Z`).
+  Defined in [Signal Envelopes Causality Routing And Delivery](10-signals-causality-routing-and-delivery.md).
+
+- **JsonValue**: Any valid JSON value (string, number, boolean, null, object, array).
+
+- **JsonObject**: A JSON object (key-value pairs).
+
+- **JsonSchema**: A JSON Schema document (draft-07 or later).
+
+- **ActionRef**: Defined in
+  [Actions Instructions Validation Plans And Results](11-actions-instructions-validation-plans-and-results.md).
+
 ## 4.2 Behavior And Integration
 
 ### Strategy transitions
@@ -230,8 +249,18 @@ Each transition evaluates:
 3. **Prior result filter**: Match against previous action result.
 4. **Condition**: Evaluate custom condition expression (if provided).
 
+> **Normative definition.**
+The `condition` field on `TransitionRule` is an implementation-defined expression language.
+Implementations MUST document the expression syntax and evaluation model in their conformance profile.
+The expression MUST evaluate to a boolean given the current signal, state data, and prior result.
+If the expression cannot be evaluated (e.g., syntax error, undefined variable), the transition MUST NOT match.
+
 The first matching transition is executed.
 If no transition matches, the strategy enters a terminal state.
+
+> **Non-normative note.**
+A common expression syntax is JSONPath-like predicates (e.g., `$.state.counter > 5`) or simple comparison operators.
+Implementations are free to choose any syntax as long as it is documented.
 
 ### Direct strategy
 
@@ -275,6 +304,10 @@ State A → [Signal/Condition] → State B → [Signal/Condition] → State C (t
 > **Normative definition.**
 A bounded loop strategy repeats a state transition up to a maximum iteration count.
 
+> **Normative definition.**
+Bounded loop strategies MUST set `max_iterations` on the `StrategyDescriptor`.
+Strategies without `max_iterations` are classified as FSM strategies.
+
 > **Non-normative diagram.**
 
 ```
@@ -307,6 +340,13 @@ actor activation:
 State transitions MUST be validated against the strategy's transition rules.
 Invalid transitions MUST be rejected with a diagnostic.
 
+> **Normative definition.**
+The `failed` → `running` transition is triggered by the directive retry mechanism.
+When a directive fails and its `RetryClass.max_attempts` has not been exceeded,
+the host transitions the strategy back to `running` to retry the directive.
+If `max_attempts` is exceeded, the strategy transitions to `failed` and remains there
+unless explicitly cancelled.
+
 ### Directive processing
 
 > **Normative definition.**
@@ -314,7 +354,7 @@ After a turn completes, the host MUST process all emitted directives in
 the following order:
 
 1. **Validation**: Verify each directive's structure and required capability.
-2. **Scheduling**: Queue directives for execution based on kind and priority.
+2. **Scheduling**: Queue directives for execution based on kind.
 3. **Execution**: Execute directives outside the deterministic reducer scope.
 4. **Completion signal**: Emit completion signal if specified.
 5. **Retry**: Re-queue directives that failed based on retry class.
@@ -373,6 +413,7 @@ without exposing secrets or implementation internal state.
 | `strategy.snapshot` | Strategy snapshot issues | `incompatible_version`, `corruption` |
 | `strategy.transition` | Strategy transition failures | `invalid_state`, `no_matching_rule`, `iteration_exceeded` |
 | `strategy.termination` | Terminal state issues | `already_terminal`, `timeout_exceeded` |
+| `strategy.conflicting` | Concurrent strategy modifications | `concurrent_modification` |
 | `continuation.invalid` | Invalid continuation | `missing_snapshot`, `invalid_state_data` |
 
 ### Failure modes
@@ -417,7 +458,7 @@ conformance obligation for current implementations:
 
 ### Successful directive emission
 
-> **Normative definition.**
+> **Normative test scenario.**
 The successful directive emission integration test validates that a valid
 directive is emitted and processed.
 
@@ -429,7 +470,7 @@ Expected behavior:
 
 ### Directive with retry
 
-> **Normative definition.**
+> **Normative test scenario.**
 The directive with retry integration test validates that a failing directive
 is retried according to its retry class.
 
@@ -441,7 +482,7 @@ Expected behavior:
 
 ### FSM strategy transition
 
-> **Normative definition.**
+> **Normative test scenario.**
 The FSM strategy transition integration test validates that a finite state
 machine strategy transitions correctly.
 
@@ -453,7 +494,7 @@ Expected behavior:
 
 ### Bounded loop strategy
 
-> **Normative definition.**
+> **Normative test scenario.**
 The bounded loop strategy integration test validates that a bounded loop
 strategy respects iteration limits.
 
@@ -465,7 +506,7 @@ Expected behavior:
 
 ### Strategy suspension and resumption
 
-> **Normative definition.**
+> **Normative test scenario.**
 The strategy suspension and resumption integration test validates that a
 strategy can be suspended and resumed with preserved state.
 
@@ -477,7 +518,7 @@ Expected behavior:
 
 ### Terminal state rejection
 
-> **Normative definition.**
+> **Normative test scenario.**
 The terminal state rejection integration test validates that transitions
 from terminal states are rejected.
 
@@ -489,7 +530,7 @@ Expected behavior:
 
 ### Invalid continuation rejection
 
-> **Normative definition.**
+> **Normative test scenario.**
 The invalid continuation rejection integration test validates that a
 continuation with invalid state data is rejected.
 
@@ -501,7 +542,7 @@ Expected behavior:
 
 ### Incompatible strategy version
 
-> **Normative definition.**
+> **Normative test scenario.**
 The incompatible strategy version integration test validates that a strategy
 snapshot from an incompatible version is rejected.
 
@@ -513,7 +554,7 @@ Expected behavior:
 
 ### Directive without capability
 
-> **Normative definition.**
+> **Normative test scenario.**
 The directive without capability integration test validates that a directive
 requiring an ungranted capability is rejected.
 
@@ -525,7 +566,7 @@ Expected behavior:
 
 ### Cross-milestone fixture regression
 
-> **Normative definition.**
+> **Normative test scenario.**
 All earlier milestone fixtures MUST be re-run after Phase 4 to verify
 no regressions.
 
