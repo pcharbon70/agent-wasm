@@ -136,3 +136,46 @@ The following representative reducers illustrate the contract:
 These reducers are illustrative.
 Implementations MAY define additional reducer types as long as they satisfy
 the determinism requirement and turn resolution order.
+
+## 5.2 Behavior And Integration
+
+### Metamorphic cases
+
+> **Normative definition.**
+The following metamorphic cases verify deterministic behavior:
+
+1. **Irrelevant field ordering**: Signals with fields in different orders MUST produce identical results.
+2. **Canonical re-encoding**: Re-encoding the turn request via canonical JSON MUST produce identical results.
+3. **Replay from same revision**: Replaying a turn from the same state revision MUST produce identical results.
+
+> **Normative definition.**
+Each metamorphic case MUST be verified by the Phase 5 integration tests.
+If any case fails, the reducer is non-conformant.
+
+### Negative cases
+
+> **Normative definition.**
+The following negative cases verify failure handling:
+
+1. **Stale state**: Turn with state revision older than current MUST be rejected with `state.revision.stale`.
+2. **Ambiguous route**: Signal with no matching action or strategy transition MUST be rejected with `signal.routing.ambiguous`.
+3. **Invalid patch**: Patch that fails validation MUST be rejected with appropriate diagnostic.
+4. **Unauthorized directive**: Directive requiring ungranted capability MUST be rejected with `directive.missing.missing_capability`.
+5. **Corrupt strategy snapshot**: Snapshot that fails validation MUST be rejected with `strategy.snapshot.corruption`.
+
+> **Normative definition.**
+Each negative case MUST be verified by the Phase 5 integration tests.
+The reducer MUST emit a diagnostic identifying the failed boundary.
+
+### Milestone 2 exit report
+
+> **Normative definition.**
+The Milestone 2 exit report MUST include:
+
+1. **Semantic clauses**: Summary of normative requirements satisfied.
+2. **Fixtures**: List of all integration tests with pass/fail status.
+3. **Replay results**: Evidence that canonical re-encoding and replay produce identical results.
+4. **Unresolved variability**: Any implementation-defined choices not yet documented.
+
+> **Normative definition.**
+The exit report MUST be signed off by the milestone owner before Milestone 2 is considered complete.
