@@ -40,6 +40,8 @@ themselves.
 
 - [Profile Vocabulary And Architectural Boundaries](01-profile-vocabulary-and-architectural-boundaries.md) — Phase 1 of Milestone 1; establishes the language-neutral vocabulary, ownership assignments, host--guest interface, and bootstrap profile for the agent system.
 - [Stable Identities Versions Errors And Limits](02-stable-identities-versions-errors-and-limits.md) — Phase 2 of Milestone 1; defines stable identity types, canonical representations, version fields, error categories, limits, and compatibility diagnostics.
+- [Agent Manifests Artifacts Schemas And Registries](03-agent-manifests-artifacts-schemas-and-registries.md) — Phase 3 of Milestone 1; defines immutable artifacts, reviewable manifests, schema identifiers, registry lookup, validation order, and cache keys.
+- [Turn Lifecycle Protocols And Canonical Encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md) — Phase 4 of Milestone 1; specifies the complete bytes-in/bytes-out lifecycle for describe, initialize, reduce, and migrate exports, plus canonical JSON encoding rules.
 
 ## Maintaining this index
 
