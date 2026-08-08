@@ -41,6 +41,10 @@ open workbenches in inquiries, and session evidence in the journal.
   — deep synthesis of the standards stack, runtime architectures, research
   evidence, layered security model, provisional architecture, and evaluation
   program for agent tools.
+- [WebAssembly Testing, Verification, and Agent Runtime Assurance](webassembly-testing-verification-and-agent-runtime-assurance.md)
+  — surveys conformance suites, plug-in frameworks, fuzzing, differential
+  methods, replay, reduction, formal work, and a layered assurance design for
+  the Jido-like Extism host.
 
 ## Maintaining this index
 

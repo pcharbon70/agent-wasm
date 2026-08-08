@@ -24,6 +24,9 @@ how Agent WASM should use the ecosystem.
   research findings, security layers, and a proposed evaluation program.
 - [How Should Agent WASM Use WebAssembly?](../40-inquiries/how-should-agent-wasm-use-webassembly.md)
   — converts the survey into falsifiable architecture and runtime questions.
+- [WebAssembly Testing and Verification](webassembly-testing-and-verification.md)
+  — continues from architecture into conformance, fuzzing, differential,
+  replay, formal, Extism-contract, and host-state assurance.
 
 ## Trails
 
@@ -75,6 +78,9 @@ how Agent WASM should use the ecosystem.
 
 ### Security and assurance
 
+- [Testing and Verification Synthesis](../20-notes/webassembly-testing-verification-and-agent-runtime-assurance.md)
+  — explains why engine conformance, plug-in correctness, and Jido-like host
+  durability require distinct but connected evidence layers.
 - [Binary Security of WebAssembly](../30-sources/lehmann-et-al-2020-binary-security-of-webassembly.md)
   — guest source vulnerabilities survive inside linear memory.
 - [RLBox](../30-sources/narayan-et-al-2020-rlbox.md) — production

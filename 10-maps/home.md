@@ -14,6 +14,10 @@ This is the selective entry point to the archive. See the
 
 ## Active inquiries
 
+- [How Should Agent WASM Assure a Jido-Like Extism Runtime?](../40-inquiries/how-should-agent-wasm-assure-a-jido-like-extism-runtime.md)
+  — defines the profiles, equivalence rules, state/effect invariants, fault
+  boundaries, isolation matrix, replay records, and evidence needed before
+  implementation claims are credible.
 - [How Should Agent WASM Construct a Jido-Like Framework?](../40-inquiries/how-should-agent-wasm-construct-a-jido-like-framework.md)
   — tests a versioned reducer protocol, host-owned actor cell, durable outbox,
   state isolation, capability composition, topology reconciliation, and
@@ -37,9 +41,16 @@ This is the selective entry point to the archive. See the
 - [WebAssembly Foundations and Ecosystem](webassembly-foundations-and-ecosystem.md)
   — routes through the current standards stack, representative implementations,
   foundational and corrective research, and Agent WASM implications.
+- [WebAssembly Testing and Verification](webassembly-testing-and-verification.md)
+  — routes through official suites, testing tools, fuzzing, differential
+  methods, replay, reduction, Extism contracts, and host assurance.
 
 ## Recently developed
 
+- [WebAssembly Testing, Verification, and Agent Runtime Assurance](../20-notes/webassembly-testing-verification-and-agent-runtime-assurance.md)
+  — separates standards, engine, plug-in, reducer, host-state, isolation, and
+  operational evidence, then designs a non-normative assurance stack around the
+  proposed Jido-like Extism host.
 - [Jido Agent Architecture and a Wasm/Extism Construction](../20-notes/jido-agent-architecture-and-wasm-extism-construction.md)
   — separates decision, messaging, runtime, lifecycle, composition, and
   durability responsibilities, then defines the proposed host–guest boundary.
@@ -58,6 +69,8 @@ This is the selective entry point to the archive. See the
 
 ## Unsettled threads
 
+- Freeze the first Core/WASI/Extism/PDK profile and define semantic equivalence
+  for cross-runtime `TurnResult` values before selecting an executable harness.
 - Determine whether a host-owned, revisioned actor cell with disposable Extism
   reducers and a directive outbox survives cross-runtime, crash, isolation, and
   performance tests.

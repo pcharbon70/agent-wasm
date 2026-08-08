@@ -30,6 +30,9 @@ host–guest design.
 - [How Should Agent WASM Construct a Jido-Like Framework?](../40-inquiries/how-should-agent-wasm-construct-a-jido-like-framework.md)
   — converts the proposal into conformance, isolation, crash, performance,
   composition, topology, and WIT-comparison experiments.
+- [How Should Agent WASM Assure a Jido-Like Extism Runtime?](../40-inquiries/how-should-agent-wasm-assure-a-jido-like-extism-runtime.md)
+  — defines the evidence model for cross-runtime reducer equivalence,
+  state/outbox correctness, crash recovery, resource limits, and tenant erasure.
 
 ## Trails
 
@@ -79,6 +82,9 @@ host–guest design.
   beneath the proposed guest boundary.
 - [WebAssembly Foundations, Ecosystem, and Agent Runtime Implications](../20-notes/webassembly-foundations-ecosystem-and-agent-runtime-implications.md)
   — standards, runtimes, research evidence, and the layered security model.
+- [WebAssembly Testing, Verification, and Agent Runtime Assurance](../20-notes/webassembly-testing-verification-and-agent-runtime-assurance.md)
+  — translates the proposed architecture into layered evidence and explicit
+  falsification criteria without yet creating an executable harness.
 
 ## Primary evidence
 

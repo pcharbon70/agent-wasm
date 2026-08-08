@@ -27,6 +27,9 @@ and the open decision about its role in Agent WASM.
 - [Should Agent WASM Adopt Extism?](../40-inquiries/should-agent-wasm-adopt-extism.md)
   — converts the survey into a pinned profile, differential tests, benchmarks,
   threat-model work, and falsifiable adoption criteria.
+- [WebAssembly Testing and Verification](webassembly-testing-and-verification.md)
+  — locates XTP and native SDK tests inside the broader engine, protocol,
+  state-machine, fault, and isolation assurance stack.
 
 ## Trails
 
@@ -61,6 +64,9 @@ and the open decision about its role in Agent WASM.
 - [Runtime C API](../30-sources/dylibso-2026-extism-runtime-apis.md) — creation,
   calls, output/errors, reset, cancellation, host callbacks, and the basis for
   FFI-backed SDKs.
+- [Testing Extism Plug-ins with XTP](../30-sources/dylibso-2026-extism-plugin-testing.md)
+  — tests compiled plug-ins, persistent state, fixture input, timing, and Wasm
+  mock implementations of imported host functions.
 
 ### Runtime families
 

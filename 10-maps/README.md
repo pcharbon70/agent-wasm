@@ -39,6 +39,10 @@ documents belong together instead of duplicating directory inventories.
 - [WebAssembly Foundations and Ecosystem](webassembly-foundations-and-ecosystem.md)
   — routes through standards, runtime families, formal semantics, performance,
   security research, agent-tool evidence, and the initial design inquiry.
+- [WebAssembly Testing and Verification](webassembly-testing-and-verification.md)
+  — routes through conformance, compiler and runtime testing, fuzzing,
+  differential methods, replay and reduction, Extism testing, and host-level
+  assurance.
 
 ## Maintaining this index
 
