@@ -32,10 +32,7 @@ This chapter is normative by default within its stated scope.
 Material visibly marked non-normative does not create conformance
 obligations.
 Promotion to `status: normative` requires evidence from the Phase 4
-integration tests in
-Section 4.4
-and a passing cross-milestone fixture run recorded in
-Section 4.4.1.4.
+integration tests and a passing cross-milestone fixture run.
 
 Governing policies:
 [Specification Authority](../SPECIFICATION-AUTHORITY.md)
@@ -74,8 +71,7 @@ The host MAY cache results indefinitely.
 
 ```
 DescribeRequest {
-  protocol_version: string,
-  requested_fields: string[]
+  protocol_version: string
 }
 
 DescribeResponse {
@@ -89,12 +85,8 @@ DescribeResponse {
   required_wasm_features: string[],
   supported_protocol_versions: string[]
 }
-> **Normative definition.**
-
 ```
 
-The `requested_fields` field MAY be omitted or empty.
-The host MAY ignore it and return all available fields.
 The artifact MUST include all fields listed in the manifest.
 
 ### Initialize export
@@ -121,8 +113,6 @@ InitializeResponse {
   startup_directives: Directive[],
   diagnostics: Diagnostic[]
 }
-> **Normative definition.**
-
 ```
 
 The returned state MUST conform to the declared state schema.
@@ -168,8 +158,6 @@ TurnResult {
   domain_status: DomainStatus,
   diagnostics: Diagnostic[]
 }
-> **Normative definition.**
-
 ```
 
 ### Migrate export
@@ -186,6 +174,7 @@ MigrationRequest {
   protocol_version: string,
   source_schema_version: string,
   target_schema_version: string,
+  source_state_revision: int,
   source_state: JsonObject,
   migration_id: string
 }
@@ -193,17 +182,17 @@ MigrationRequest {
 MigrationResult {
   protocol_version: string,
   target_schema_version: string,
+  target_state_revision: int,
   target_state: JsonObject,
   migration_id: string,
   diagnostics: Diagnostic[]
 }
-> **Normative definition.**
-
 ```
 
 The returned state MUST conform to the target schema.
 The migration_id MUST match the request.
 Migrations are executed by the host; guest code does not commit them.
+The host MUST verify source_state_revision matches the current committed revision.
 
 ## TurnRequest fields
 
@@ -246,12 +235,12 @@ SignalEnvelope {
   subject: string,
   correlation_id: string,
   causation_id: string?,
-  timestamp: ISO 8601,
+  timestamp: ISO 8601 (UTC),
   data: JsonObject?
 }
-> **Normative definition.**
-
 ```
+
+The timestamp MUST be in UTC (Z suffix per ISO 8601).
 
 ### Instruction
 
@@ -267,9 +256,14 @@ Instruction {
   idempotency_key: string?,
   context_refs: ContextRef[]
 }
-> **Normative definition.**
 
+ContextRef {
+  id: string,
+  type: "state" | "signal" | "directive"
+}
 ```
+
+Context references identify prior values for the action to consume.
 
 ### State and strategy state
 
@@ -291,13 +285,12 @@ Sensitive values MUST NOT be included.
 RuntimeContext {
   tenant_id: string,
   principal_id: string?,
-  invocation_id: string,
   turn_number: int,
   is_retry: bool
 }
-> **Normative definition.**
-
 ```
+
+The invocation_id is not included here; it is already at the top level of TurnRequest.
 
 ### Grants
 
@@ -313,8 +306,6 @@ Grant {
   purpose: string,
   deadline_ms: int?
 }
-> **Normative definition.**
-
 ```
 
 The host enforces grants independently.
@@ -341,8 +332,6 @@ TraceContext {
   span_id: string,
   parent_span_id: string?
 }
-> **Normative definition.**
-
 ```
 
 ## TurnResult fields
@@ -362,12 +351,24 @@ StatePatch {
   delete?: string[],
   merge?: JsonObject
 }
-> **Normative definition.**
-
 ```
 
-The host validates patches against the current schema and revision.
+> **Normative implementation-defined choice.**
+The host applies state patches in the following order:
+
+1. `replace`: Replaces the entire state. Other patch fields are ignored.
+2. `delete`: Removes the listed paths from the current state.
+3. `merge`: Deep-merges the provided object into the current state.
+4. `set`: Sets the value at each specified path.
+
+If multiple patch types are present, `replace` takes priority and the other
+fields are silently ignored.
+The host MUST validate the resulting state against the current schema and revision.
 Unknown paths, reserved namespaces, and size violations are rejected.
+
+> **Normative unspecified presentation.**
+The host MAY apply patches in a different order if the resulting state is
+semantically equivalent.
 
 ### Directives
 
@@ -386,12 +387,18 @@ Directive {
   causation_id: string,
   completion_signal: CompletionSignal?
 }
-> **Normative definition.**
 
+CompletionSignal {
+  type: string,
+  subject: string?,
+  correlation_id: string
+}
 ```
 
 Each directive MUST have a unique id within the turn.
 Unknown directive kinds are rejected.
+The completion_signal is optional and, if present, specifies how the host
+should emit the result-bearing signal after the effect completes.
 
 ### Domain status
 
@@ -406,12 +413,88 @@ DomainStatus {
   message: string?,
   details: JsonObject?
 }
-> **Normative definition.**
-
 ```
+
+| Code | Meaning |
+| --- | --- |
+| `ok` | Turn completed successfully. State patch applied, all directives processed. |
+| `error` | Turn failed. No state change committed. |
+| `partial` | Turn completed but some directives failed or were rejected. State patch applied; failed directives are recorded in diagnostics. |
+| `terminal` | Agent has reached a final state. No further turns will be processed for this instance. |
 
 Terminal status indicates the agent has reached a final state.
 The host SHOULD record terminal status durably.
+
+## Diagnostics
+
+> **Normative definition.**
+Diagnostics are structured error and status reports emitted by the host or
+guest during protocol execution.
+Every diagnostic contains the following fields:
+
+> **Normative definition.**
+
+```
+Diagnostic {
+  family: string,
+  code: string,
+  severity: "error" | "warning" | "info",
+  message: string,
+  details: JsonObject?
+}
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `family` | `string` | Diagnostic family code (e.g., `protocol.decode`, `protocol.limit`). |
+| `code` | `string` | Specific diagnostic code within the family. |
+| `severity` | `string` | `error`, `warning`, or `info`. |
+| `message` | `string` | Human-readable description. Must not expose secrets. |
+| `details` | `JsonObject?` | Optional additional context. |
+
+### Diagnostic family codes
+
+> **Normative definition.**
+The following diagnostic family codes are defined:
+
+| Family | Description |
+| --- | --- |
+| `protocol.decode` | JSON decode failures. |
+| `protocol.schema` | Schema validation failures. |
+| `protocol.semantic` | Semantic validation failures. |
+| `protocol.limit` | Resource limit violations. |
+| `protocol.encode` | Canonical encoding failures. |
+| `protocol.timeout` | Deadline exceeded. |
+| `protocol.cancel` | Cancellation requested. |
+
+### Diagnostic codes
+
+> **Normative definition.**
+The following diagnostic codes are defined:
+
+| Family | Code | Description |
+| --- | --- | --- |
+| `protocol.decode` | `syntax_error` | Invalid JSON syntax. |
+| `protocol.decode` | `utf8_error` | Invalid UTF-8 sequence. |
+| `protocol.decode` | `duplicate_key` | Duplicate object keys. |
+| `protocol.decode` | `number_format` | Invalid number representation. |
+| `protocol.decode` | `string_escape` | Invalid string escape sequence. |
+| `protocol.schema` | `missing_required` | Required field missing. |
+| `protocol.schema` | `type_mismatch` | Field type does not match schema. |
+| `protocol.schema` | `format_invalid` | Field format does not match pattern. |
+| `protocol.schema` | `size_exceeded` | Field size exceeds maximum. |
+| `protocol.semantic` | `causation_invalid` | Causation reference invalid. |
+| `protocol.semantic` | `deadline_expired` | Deadline in the past. |
+| `protocol.semantic` | `revision_stale` | State revision out of order. |
+| `protocol.limit` | `input_exceeded` | Input size exceeds limit. |
+| `protocol.limit` | `output_exceeded` | Output size exceeds limit. |
+| `protocol.limit` | `collection_exceeded` | Collection size exceeds limit. |
+| `protocol.limit` | `string_exceeded` | String length exceeds limit. |
+| `protocol.encode` | `non_canonical` | Output not in canonical form. |
+| `protocol.timeout` | `turn_exceeded` | Turn deadline exceeded. |
+| `protocol.cancel` | `requested` | Cancellation requested. |
+
+## Canonical JSON encoding
 
 ## Canonical JSON encoding
 
@@ -563,6 +646,7 @@ The semantic validator MUST:
 - Check causal relationships (causation_id references a prior invocation).
 - Check deadlines are in the future.
 - Check state revisions are monotonically increasing.
+- Check timestamps are in UTC (Z suffix).
 
 ### Output-size enforcement
 
