@@ -38,7 +38,7 @@ themselves.
 
 ### Documents
 
-- None yet.
+- [Profile Vocabulary And Architectural Boundaries](01-profile-vocabulary-and-architectural-boundaries.md) — Phase 1 of Milestone 1; establishes the language-neutral vocabulary, ownership assignments, host--guest interface, and bootstrap profile for the agent system.
 
 ## Maintaining this index
 
