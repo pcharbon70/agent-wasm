@@ -739,3 +739,62 @@ TestFixture {
 > **Normative definition.**
 The oversized value negative fixture validates that the host rejects
 inputs that exceed resource limits.
+### Fixture manifest
+
+> **Normative definition.**
+A fixture manifest binds each fixture to its expected canonical input,
+output, error category, profile, and artifact metadata.
+The manifest is the single source of truth for fixture conformance.
+
+> **Normative definition.**
+
+```
+FixtureManifest {
+  fixtures: TestFixture[],
+  schema_version: "1.0.0",
+  created: "2026-08-08T00:00:00Z"
+}
+```
+
+### SDK conformance
+
+> **Normative definition.**
+SDK conformance is determined by compiled-artifact behavior, not source-level
+unit-test success.
+A conformance run executes each fixture against the compiled guest artifact
+and verifies the observed output matches the expected output.
+
+Conformance criteria:
+
+- All positive fixtures MUST produce the expected output.
+- All negative fixtures MUST produce the expected error category and code.
+- All fixtures MUST complete within the deadline_ms specified in the fixture.
+- All fixtures MUST leave no unauthorized or partial state.
+
+### Milestone 1 exit report
+
+> **Normative definition.**
+The Milestone 1 exit report documents the profile, schema, fixture, and
+unresolved-variability inventories.
+It is produced at the end of Phase 5 and serves as evidence for milestone
+acceptance.
+
+The exit report MUST include:
+
+- Profile inventory: list of all profiles defined and their capabilities.
+- Schema inventory: list of all state schemas defined and their versions.
+- Fixture inventory: list of all fixtures and their conformance status.
+- Unresolved variability: list of any implementation-defined choices or
+  deferred work that could not be resolved during Milestone 1.
+
+> **Normative definition.**
+
+```
+Milestone1ExitReport {
+  profile_inventory: ProfileInventory,
+  schema_inventory: SchemaInventory,
+  fixture_inventory: FixtureInventory,
+  unresolved_variability: UnresolvedVariability[],
+  produced_at: "2026-08-08T00:00:00Z"
+}
+```
