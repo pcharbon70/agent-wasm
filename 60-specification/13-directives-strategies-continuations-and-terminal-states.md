@@ -351,3 +351,64 @@ The host MUST reject the following terminal state transitions:
 
 > **Normative definition.**
 Rejected transitions MUST emit a diagnostic identifying the failed boundary.
+
+## 4.3 Failure Evidence And Operational Notes
+
+### Diagnostics
+
+> **Normative definition.**
+All diagnostics emitted by the host MUST conform to the `Diagnostic` type
+defined in
+[Turn Lifecycle Protocols And Canonical Encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md#diagnostics).
+
+Diagnostics MUST identify the phase contract, profile, and failed boundary
+without exposing secrets or implementation internal state.
+
+### Diagnostic families
+
+| Family | Purpose | Example codes |
+|--------|---------|---------------|
+| `directive.missing` | Missing directive handling | `unknown_kind`, `missing_capability` |
+| `directive.execution` | Directive execution failures | `unauthorized`, `timeout`, `retry_exhausted` |
+| `strategy.snapshot` | Strategy snapshot issues | `incompatible_version`, `corruption` |
+| `strategy.transition` | Strategy transition failures | `invalid_state`, `no_matching_rule`, `iteration_exceeded` |
+| `strategy.termination` | Terminal state issues | `already_terminal`, `timeout_exceeded` |
+| `continuation.invalid` | Invalid continuation | `missing_snapshot`, `invalid_state_data` |
+
+### Failure modes
+
+| Mode | Description | Conditions |
+|------|-------------|------------|
+| Malformed | Invalid directive or strategy structure | Failed JSON parsing or schema validation |
+| Incompatible | Strategy version incompatible with snapshot | Strategy version mismatch |
+| Conflicting | Concurrent strategy modifications | Same strategy modified by multiple actors |
+| Unauthorized | Missing capability for directive | Required capability not granted |
+| Exhausted | Resource limits exceeded | Iteration limit, timeout, or memory limit |
+| Unavailable | Strategy or snapshot unavailable | Strategy not found or snapshot corrupted |
+
+### Implementation-defined choices
+
+> **Normative implementation-defined choice.**
+The following choices are implementation-defined and do not create
+conformance obligations.
+The Variability register below catalogs all such choices.
+
+1. **Directive execution model**: The host MAY choose to execute directives synchronously or asynchronously. The execution model is implementation-defined.
+
+2. **Strategy persistence**: The host MAY choose how to persist strategy snapshots (e.g., in-memory, database, file system). The persistence mechanism is implementation-defined.
+
+3. **Retry backoff**: The host MAY implement custom retry backoff strategies (e.g., linear, exponential, jittered). The backoff algorithm is implementation-defined.
+
+4. **Strategy loading**: The host MAY choose how to load and validate strategy descriptors (e.g., from file, database, or remote source). The loading mechanism is implementation-defined.
+
+### Deferred work
+
+> **Non-normative note.**
+The following work is deferred to future milestones and creates no
+conformance obligation for current implementations:
+
+1. **Strategy composition API**: A formal strategy composition API will be implemented in future milestones. The protocol is language-neutral and does not require strategy composition for base conformance.
+
+2. **Strategy debugging API**: A formal strategy debugging API will be implemented in future milestones. The protocol is language-neutral and does not require strategy debugging for base conformance.
+
+3. **Strategy monitoring API**: A formal strategy monitoring API will be implemented in future milestones. The protocol is language-neutral and does not require strategy monitoring for base conformance.
