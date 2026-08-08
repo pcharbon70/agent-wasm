@@ -65,7 +65,7 @@ MUST be explicit.
 - **merge**: Merge a partial object into an existing object at a path.
 - **append**: Append a value to an array at a path.
 - **increment**: Add a numeric delta to a numeric value at a path.
-- **test**: Verify a precondition without modifying state. Fails if precondition not met.
+- **test**: Verify a precondition without modifying state. Fails if precondition not met. Unlike other operations, `test` does not carry a `value` field and is used purely for precondition checking without side effects.
 
 > **Normative definition.**
 
@@ -128,7 +128,7 @@ Patch {
 | `state_schema_version` | string? | No | Expected state schema version |
 | `operations` | StateOperation[] | Yes | Ordered sequence of operations |
 | `created_at` | timestamp | Yes | Patch creation timestamp |
-| `created_by` | string | Yes | Patch originator identifier |
+| `created_by` | string | Yes | Originator identifier (turn ID or caller principal) |
 
 ### Path constraints
 
@@ -147,6 +147,24 @@ Canonical paths MUST conform to the following constraints:
 | Segment regex | `^[a-zA-Z_][a-zA-Z0-9_]*$` | Enforce canonical naming |
 | Minimum segments | 1 (namespace) | Ensure namespace ownership |
 | Maximum segments | 50 | Prevent deep nesting |
+
+### Namespace ownership
+
+> **Normative definition.**
+Each namespace prefix (e.g., `agent.`, `user.`, `config.`) identifies the principal authorized to write to paths under that namespace.
+The `created_by` field on a Patch identifies the caller principal, and the host MUST enforce namespace write permissions against this identifier.
+
+The following namespace ownership rules apply by default:
+
+| Namespace | Authorized principal | Description |
+|-----------|---------------------|-------------|
+| `agent.` | Host | Agent-owned internal state |
+| `user.` | User | User-owned data |
+| `config.` | Host | Agent configuration |
+
+> **Normative definition.**
+Implementations MAY define additional namespaces.
+The `Unauthorized` diagnostic family applies when a patch targets a namespace not owned by the caller.
 
 ### Patch-size limits
 
@@ -181,7 +199,7 @@ Revision {
   sequence_number: int,
   state_hash: string,
   timestamp: timestamp,
-  previous_revision: string?
+  previous_revision: string
 }
 ```
 
@@ -191,7 +209,7 @@ Revision {
 | `sequence_number` | int | Yes | Monotonic sequence number |
 | `state_hash` | string | Yes | Cryptographic hash of state |
 | `timestamp` | timestamp | Yes | Revision creation timestamp |
-| `previous_revision` | string? | Yes | Parent revision ID |
+| `previous_revision` | string | Yes | Parent revision ID |
 
 ## 3.2 Behavior And Integration
 
@@ -200,12 +218,12 @@ Revision {
 > **Normative definition.**
 The host MUST validate patches in the following order before application:
 
-1. **Structure validation**: Verify patch structure conforms to the Patch schema.
-2. **Revision check**: Verify the patch's `base_revision` matches the current state revision.
-3. **Operation validation**: Verify each operation's type, path, and value.
-4. **Precondition check**: Verify each operation's precondition against current state.
-5. **Size check**: Verify patch size does not exceed limits.
-6. **Schema check**: Verify `state_schema_version` matches if provided.
+1. **Size check**: Verify patch size does not exceed limits.
+2. **Structure validation**: Verify patch structure conforms to the Patch schema.
+3. **Schema check**: Verify `state_schema_version` matches if provided.
+4. **Revision check**: Verify the patch's `base_revision` matches the current state revision.
+5. **Operation validation**: Verify each operation's type, path, and value.
+6. **Precondition check**: Verify each operation's precondition against current state.
 
 > **Normative definition.**
 If validation fails at any step, the host MUST reject the patch with a diagnostic
@@ -236,7 +254,7 @@ The host MUST calculate the next revision as follows:
 - `state_hash` = hash(current_state)
 - `timestamp` = current_timestamp
 - `previous_revision` = current_revision_id
-- `id` = hash(sequence_number || state_hash || timestamp)
+- `id` = hash(sequence_number || state_hash || previous_revision)
 
 ### State initialization
 
@@ -255,15 +273,12 @@ followed by patch-based ordinary turns.
 ### Conflict detection
 
 > **Normative definition.**
-The host MUST detect conflicts when:
-
-- Two patches target the same `base_revision` concurrently.
-- A patch's `base_revision` does not match current state revision.
-- A patch's precondition fails against current state.
+The host MUST detect conflicts when two patches target the same `base_revision` concurrently.
+This is the only true conflict condition; other failure modes (stale revision, precondition failure) are caught during validation steps 4 and 6.
 
 > **Normative definition.**
-Upon conflict detection, the host MUST reject the conflicting patch and emit
-a diagnostic with the conflict type and details.
+Upon conflict detection, the host MUST reject one of the conflicting patches and emit a `state.patch.conflict` diagnostic.
+The selection of which patch to reject is implementation-defined (e.g., last-writer-wins, first-come-first-served).
 
 ### Deterministic behavior
 
@@ -460,12 +475,10 @@ Expected behavior:
 
 - All Phase 1 fixtures: PASS.
 - All Phase 2 fixtures: PASS.
-- All Phase 3 fixtures: PASS.
-- All Phase 4 fixtures: PASS.
-- All Phase 5 fixtures: PASS.
 - All Milestone 1 fixtures: PASS.
 - All Milestone 2 Phase 1 fixtures: PASS.
 - All Milestone 2 Phase 2 fixtures: PASS.
+- All existing Phase 3 fixtures: PASS.
 
 Any approved variability MUST be documented in the Milestone 2 exit report.
 
@@ -476,6 +489,7 @@ Any approved variability MUST be documented in the Milestone 2 exit report.
 | State operations | Required | Six kinds fixed by this chapter |
 | Patch structure | Required | Fields fixed by this chapter |
 | Path constraints | Required | Canonical path format fixed by this chapter |
+| Namespace ownership | Required | Default namespaces fixed by this chapter |
 | Patch-size limits | Required | Limits fixed by this chapter |
 | Revision structure | Required | Fields fixed by this chapter |
 | Validation order | Required | 6-step order fixed by this chapter |
@@ -507,6 +521,7 @@ The revision model provides:
 - Monotonically increasing sequence numbers for ordering.
 - Cryptographic state hashes for integrity verification.
 - Linked-list structure for state history traversal.
+- Deterministic revision IDs independent of wall-clock time.
 
 The size limits provide:
 
