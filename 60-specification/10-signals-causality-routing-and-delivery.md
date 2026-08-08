@@ -112,7 +112,9 @@ the `invocation_id` of the parent turn.
 It establishes the causal chain for distributed debugging and replay.
 The `causation_id` MAY be null for root signals.
 
-## Signal type naming
+## 1.1 Section - Contract And Data Model
+
+### Signal type naming
 
 > **Normative definition.**
 Signal types follow the naming convention `<domain>.<subject>.<event>`.
@@ -156,7 +158,9 @@ Signal `data` MUST be canonical JSON as defined in
 [Turn Lifecycle Protocols And Canonical Encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md#canonical-json-encoding).
 The host MUST reject signals with non-canonical `data`.
 
-## Routing declarations
+## 1.2 Section - Behavior And Integration
+
+### Routing declarations
 
 > **Normative definition.**
 The artifact manifest declares routing rules that map signal types to
@@ -316,7 +320,9 @@ A signal is dead-lettered if:
 - The retry limit is exceeded.
 - The signal is permanently invalid.
 
-## Diagnostics
+## 1.3 Section - Failure Evidence And Operational Notes
+
+### Diagnostics
 
 > **Normative definition.**
 All diagnostics emitted by the host MUST conform to the `Diagnostic` type
@@ -385,7 +391,9 @@ conformance obligation for current implementations:
    implemented in future milestones. The protocol is language-neutral and
    does not require dynamic priority adjustment for base conformance.
 
-## Phase 1 integration tests
+## 1.4 Section - Phase 1 Integration Tests
+
+### Successful routing
 
 ### Successful routing
 
