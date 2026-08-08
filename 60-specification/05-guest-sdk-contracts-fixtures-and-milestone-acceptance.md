@@ -201,7 +201,9 @@ TestFixture {
     supported_protocol_versions: ["0.1.0"]
   },
   expected_error_category: null,
-  expected_error_code: null
+  expected_error_code: null,
+  profile: null,
+  artifact_metadata: null
 }
 ```
 
@@ -235,7 +237,9 @@ TestFixture {
     diagnostics: []
   },
   expected_error_category: null,
-  expected_error_code: null
+  expected_error_code: null,
+  profile: null,
+  artifact_metadata: null
 }
 ```
 
@@ -313,7 +317,9 @@ TestFixture {
     diagnostics: []
   },
   expected_error_category: null,
-  expected_error_code: null
+  expected_error_code: null,
+  profile: null,
+  artifact_metadata: null
 }
 ```
 
@@ -400,7 +406,9 @@ TestFixture {
     diagnostics: []
   },
   expected_error_category: null,
-  expected_error_code: null
+  expected_error_code: null,
+  profile: null,
+  artifact_metadata: null
 }
 ```
 
@@ -475,7 +483,9 @@ TestFixture {
     diagnostics: []
   },
   expected_error_category: null,
-  expected_error_code: null
+  expected_error_code: null,
+  profile: null,
+  artifact_metadata: null
 }
 ```
 
@@ -516,7 +526,9 @@ TestFixture {
     diagnostics: []
   },
   expected_error_category: null,
-  expected_error_code: null
+  expected_error_code: null,
+  profile: null,
+  artifact_metadata: null
 }
 ```
 
@@ -739,6 +751,7 @@ TestFixture {
 > **Normative definition.**
 The oversized value negative fixture validates that the host rejects
 inputs that exceed resource limits.
+
 ### Fixture manifest
 
 > **Normative definition.**
@@ -791,49 +804,25 @@ The exit report MUST include:
 
 ```
 Milestone1ExitReport {
-  profile_inventory: ProfileInventory,
-  schema_inventory: SchemaInventory,
-  fixture_inventory: FixtureInventory,
-  unresolved_variability: UnresolvedVariability[],
-  produced_at: "2026-08-08T00:00:00Z"
+  profileInventory: ProfileInventory,
+  schemaInventory: SchemaInventory,
+  fixtureInventory: FixtureInventory,
+  unresolvedVariability: UnresolvedVariability[],
+  producedAt: "2026-08-08T00:00:00Z"
 }
 ```
 
-## Failure modes
+## Additional failure modes
 
-### Malformed input
-
-> **Normative definition.**
-When the host receives malformed input that cannot be decoded using the
-canonical codec, it MUST emit a `protocol.decode` diagnostic with an
-appropriate error code (e.g., `syntax_error`, `duplicate_key`).
-
-### Incompatible schema
-
-> **Normative definition.**
-When the host receives input that violates the declared state schema, it
-MUST emit a `protocol.schema` diagnostic with the `type_mismatch` error
-code.
-
-### Conflicting revisions
-
-> **Normative definition.**
-When the host receives a state revision that conflicts with the expected
-revision, it MUST emit a `protocol.semantic` diagnostic with the
-`revision_stale` error code.
+The negative fixtures cover malformed input, schema mismatch, duplicate keys,
+stale revisions, and oversized values. The following failure modes are
+not yet covered by fixtures but are documented here for completeness.
 
 ### Unauthorized access
 
 > **Normative definition.**
 When the host detects an unauthorized principal attempting to invoke an
 export, it MUST reject the request with an appropriate diagnostic.
-
-### Resource exhaustion
-
-> **Normative definition.**
-When the host detects resource limits being exceeded (e.g., oversized
-values, memory limits), it MUST reject the request with a `runtime.resource`
-diagnostic.
 
 ### Dependency unavailable
 
@@ -854,6 +843,12 @@ without exposing secrets or implementation internal state.
 
 ### Diagnostic families
 
+> **Normative definition.**
+The `GuestDiagnostic` type defined in
+[Guest SDK responsibilities](#guest-sdk-responsibilities) provides the
+structure for all diagnostics emitted by the guest.
+This section enumerates the families and codes the host uses.
+
 | Family | Purpose | Example codes |
 |--------|---------|---------------|
 | `protocol.decode` | Input decoding failures | `syntax_error`, `duplicate_key`, `invalid_number` |
@@ -865,9 +860,10 @@ without exposing secrets or implementation internal state.
 
 ## Implementation-defined choices
 
-> **Normative definition.**
+> **Normative implementation-defined choice.**
 The following choices are implementation-defined and do not create
-conformance obligations:
+conformance obligations.
+The Variability register below catalogs all such choices.
 
 1. **Retry policy**: The host MAY implement a retry policy for transient
    dependency failures. The policy parameters (max_retries, backoff_strategy)
@@ -885,8 +881,9 @@ conformance obligations:
 
 ## Deferred work
 
-> **Normative definition.**
-The following work is deferred to future milestones:
+> **Non-normative note.**
+The following work is deferred to future milestones and creates no
+conformance obligation for current implementations:
 
 1. **Guest SDK languages**: Initial SDK languages have not been chosen.
    The protocol is language-neutral, and SDKs will be implemented in future
@@ -904,81 +901,9 @@ The following work is deferred to future milestones:
 
 ## Phase 5 integration tests
 
-### Successful flow
-
-> **Normative definition.**
-The successful flow integration test validates the complete lifecycle:
-describe -> initialize -> reduce (direct) -> reduce (continuation) ->
-reduce (terminal) -> migrate.
-
-Expected behavior:
-
-1. `describe` returns all declared capabilities.
-2. `initialize` calculates initial state with revision 1.
-3. `reduce` processes direct instruction, returns state_patch with revision 2.
-4. `reduce` processes FSM continuation, returns state_patch with revision 3.
-5. `reduce` processes terminal instruction, returns terminal domain_status.
-6. `migrate` transforms state from schema version 1.0.0 to 2.0.0.
-
-### Malformed input
-
-> **Normative definition.**
-The malformed input integration test validates that the host rejects
-invalid JSON syntax with a `protocol.decode.syntax_error` diagnostic.
-
-Expected behavior:
-
-- Input: malformed JSON string.
-- Expected output: null.
-- Expected error: `protocol.decode.syntax_error`.
-
-### Schema mismatch
-
-> **Normative definition.**
-The schema mismatch integration test validates that the host rejects
-inputs that violate the declared state schema.
-
-Expected behavior:
-
-- Input: state with counter as string instead of number.
-- Expected output: null.
-- Expected error: `protocol.schema.type_mismatch`.
-
-### Duplicate keys
-
-> **Normative definition.**
-The duplicate keys integration test validates that the host rejects
-inputs with duplicate object keys.
-
-Expected behavior:
-
-- Input: JSON with duplicate "protocol_version" key.
-- Expected output: null.
-- Expected error: `protocol.decode.duplicate_key`.
-
-### Stale revision
-
-> **Normative definition.**
-The stale revision integration test validates that the host rejects
-inputs with out-of-order state revisions.
-
-Expected behavior:
-
-- Input: expected_state_revision of 5 when current revision is 1.
-- Expected output: null.
-- Expected error: `protocol.semantic.revision_stale`.
-
-### Oversized value
-
-> **Normative definition.**
-The oversized value integration test validates that the host rejects
-inputs that exceed resource limits.
-
-Expected behavior:
-
-- Input: state with value exceeding maximum allowed size.
-- Expected output: null.
-- Expected error: `runtime.resource.oversized_value`.
+The positive and negative fixtures defined above serve as the integration
+test expectations. This section documents additional test scenarios not
+covered by fixtures.
 
 ### Timeout and cancellation
 
@@ -1024,3 +949,40 @@ Expected behavior:
 - All Phase 5 fixtures: PASS.
 
 Any approved variability MUST be documented in the Milestone 1 exit report.
+
+## Variability register
+
+| Clause | Type | Selection |
+| --- | --- | --- |
+| Export implementations | Required | Four exports fixed by this chapter |
+| Canonical JSON codec | Required | Rules fixed by this chapter |
+| Diagnostic emission | Implementation-defined | Documented in conformance profile |
+| Diagnostic filtering | Implementation-defined | Documented in conformance profile |
+| Test-fixture loading utilities | Implementation-defined | Documented in conformance profile |
+| Retry policy | Implementation-defined | Documented in conformance profile |
+| Resource limits | Implementation-defined | Documented in conformance profile |
+| State migration strategy | Implementation-defined | Documented in conformance profile |
+
+## Rationale and evidence (non-normative)
+
+This chapter derives from the turn protocol defined in
+[Turn Lifecycle Protocols And Canonical Encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md)
+and the operational needs of a language-neutral guest SDK.
+
+The export lowering model provides:
+
+- A uniform calling convention across all SDK languages.
+- Clear separation between protocol types and SDK idiomatic types.
+- Extism memory management without SDK-level allocation.
+
+Fixture-based conformance testing provides:
+
+- Deterministic verification of protocol compliance.
+- Language-neutral acceptance criteria independent of source-level tests.
+- Evidence for milestone acceptance without requiring a host implementation.
+
+The failure modes and diagnostics model provides:
+
+- Stable error classification for host and SDK interoperability.
+- Bounded diagnostics that protect secrets and implementation details.
+- Clear mapping from fixture expectations to diagnostic codes.
