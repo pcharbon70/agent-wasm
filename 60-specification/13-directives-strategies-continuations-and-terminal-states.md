@@ -208,3 +208,146 @@ StrategySnapshot {
 | `iteration` | int | Yes | Current iteration count |
 | `started_at` | timestamp | Yes | Strategy start timestamp |
 | `last_transitioned_at` | timestamp | Yes | Last transition timestamp |
+
+## 4.2 Behavior And Integration
+
+### Strategy transitions
+
+> **Normative definition.**
+Strategies transition between states based on explicit signal, state, and
+prior result inputs.
+Three strategy transition models are specified:
+
+1. **Direct**: Single-step strategy with one transition from entry to exit.
+2. **FSM (Finite State Machine)**: Multi-state strategy with conditional transitions.
+3. **Bounded Loop**: Repeating strategy with iteration limit.
+
+> **Normative definition.**
+Each transition evaluates:
+
+1. **Signal filter**: Match against incoming signal type, source, and payload.
+2. **State filter**: Match against current state data.
+3. **Prior result filter**: Match against previous action result.
+4. **Condition**: Evaluate custom condition expression (if provided).
+
+The first matching transition is executed.
+If no transition matches, the strategy enters a terminal state.
+
+### Direct strategy
+
+> **Normative definition.**
+A direct strategy executes a single action and transitions to a terminal state.
+
+> **Non-normative diagram.**
+
+```
+Direct Strategy Flow:
+Entry State → [Signal] → Execute Action → Exit State (terminal)
+```
+
+| Property | Value |
+|----------|-------|
+| Max iterations | 1 |
+| Terminal states | Exit state |
+| Use case | Simple action execution |
+
+### FSM strategy
+
+> **Normative definition.**
+A finite state machine strategy transitions through multiple states based on
+signals and state conditions.
+
+> **Non-normative diagram.**
+
+```
+FSM Strategy Flow:
+State A → [Signal/Condition] → State B → [Signal/Condition] → State C (terminal)
+```
+
+| Property | Value |
+|----------|-------|
+| Max iterations | `max_iterations` or unlimited |
+| Terminal states | States with no outgoing transitions |
+| Use case | Multi-step workflows, approval chains |
+
+### Bounded loop strategy
+
+> **Normative definition.**
+A bounded loop strategy repeats a state transition up to a maximum iteration count.
+
+> **Non-normative diagram.**
+
+```
+Bounded Loop Strategy Flow:
+Loop State → [Signal] → Execute Action → Loop State (if iterations < max) → Exit State (terminal)
+```
+
+| Property | Value |
+|----------|-------|
+| Max iterations | `max_iterations` (required) |
+| Terminal states | Exit state (after max iterations or condition met) |
+| Use case | Polling, retry loops, iterative refinement |
+
+### Domain states
+
+> **Normative definition.**
+Agents and strategies exist in the following domain states independently of
+actor activation:
+
+| State | Description | Transitions to |
+|-------|-------------|----------------|
+| `waiting` | Awaiting signal or input | `running`, `cancelled` |
+| `running` | Actively executing | `completed`, `failed`, `suspended`, `cancelled` |
+| `completed` | Successfully finished | (terminal) |
+| `failed` | Execution failed | `running` (retry), `cancelled` |
+| `cancelled` | Explicitly cancelled | (terminal) |
+| `suspended` | Paused by host or user | `waiting`, `running` |
+
+> **Normative definition.**
+State transitions MUST be validated against the strategy's transition rules.
+Invalid transitions MUST be rejected with a diagnostic.
+
+### Directive processing
+
+> **Normative definition.**
+After a turn completes, the host MUST process all emitted directives in
+the following order:
+
+1. **Validation**: Verify each directive's structure and required capability.
+2. **Scheduling**: Queue directives for execution based on kind and priority.
+3. **Execution**: Execute directives outside the deterministic reducer scope.
+4. **Completion signal**: Emit completion signal if specified.
+5. **Retry**: Re-queue directives that failed based on retry class.
+
+> **Normative definition.**
+Directive execution MUST NOT affect the turn's state or results.
+If a directive fails, the turn is still considered successful.
+
+### Strategy lifecycle
+
+> **Normative definition.**
+A strategy follows the lifecycle:
+
+1. **Activation**: Host loads strategy descriptor and creates initial snapshot.
+2. **Execution**: Host processes signals through strategy transitions.
+3. **Suspension**: Host saves snapshot and pauses strategy (optional).
+4. **Resumption**: Host restores snapshot and continues processing.
+5. **Termination**: Strategy reaches terminal state or is cancelled.
+
+> **Normative definition.**
+Strategy snapshots MUST be persisted before suspension and restored before
+resumption.
+Snapshots MUST include all fields defined in `StrategySnapshot`.
+
+### Terminal state transitions
+
+> **Normative definition.**
+The host MUST reject the following terminal state transitions:
+
+- Transition from a terminal state to a non-terminal state.
+- Transition to an unknown state.
+- Transition that exceeds `max_iterations` in bounded loop strategies.
+- Transition that exceeds `timeout_ms` in time-bounded strategies.
+
+> **Normative definition.**
+Rejected transitions MUST emit a diagnostic identifying the failed boundary.
