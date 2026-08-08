@@ -279,6 +279,244 @@ bounded, cancelled, and safely retried.
 
 See [Failure modes](#failure-modes).
 
+## Behavior And Integration
+
+### Pinned Core WebAssembly feature set
+
+> **Normative implementation-defined choice.**
+This profile pins Core Wasm 3.0 as the minimum feature set.
+The host MUST reject any module that requires features not included in this
+pin unless an explicit, versioned extension is declared in the artifact
+manifest and accepted by the host policy.
+
+The bootstrap feature set includes:
+
+| Feature | Status | Agent impact |
+| --- | --- | --- |
+| Core Wasm 3.0 (released 2026-07-28) | Required | Portable typed machine, validation, execution, traps |
+| Reference types | Included in 3.0 | Function references for callbacks and delegation |
+| Saturating float-to-int conversions | Included in 3.0 | Safe float handling in decision logic |
+| Sign extension operations | Included in 3.0 | Correct integer semantics across languages |
+| Multi-memory | Included in 3.0 | Multiple linear memories per module |
+| Memory64 | Included in 3.0 | Large-state agents beyond 4 GiB |
+| Tail calls | Included in 3.0 | Deep recursion without stack overflow |
+| Exception handling | Included in 3.0 | Structured error propagation |
+| Threads | Excluded from bootstrap | Requires host synchronization primitives |
+| Stack switching | Excluded from bootstrap | Not yet stable in any production runtime |
+| Wide arithmetic | Excluded from bootstrap | Niche; not required for agent decision logic |
+| Garbage collection | Excluded from bootstrap | Not part of Core 3.0; Component Model direction |
+
+Extensions beyond this pin MAY be adopted through the manifest version
+declaration process described in
+[Milestone 1 Phase 3](../.spec/planning/agentic-system/milestone-01-contracts-profiles-and-artifacts/phase-03-agent-manifests-artifacts-schemas-and-registries.md).
+
+### WASI profile declaration
+
+> **Normative definition.**
+The bootstrap agent profile imports **no WASI**.
+All host interaction occurs through the Extism kernel and explicitly granted
+custom host functions under `extism:host/user`.
+
+Guest plug-ins for this profile MUST NOT import from
+`wasi_snapshot_preview1`, `wasi_cli_preview`, `wasi_fs_preview`,
+`wasi_http_preview`, or any other WASI namespace.
+Hosts MUST NOT configure WASI imports for bootstrap-profile plug-ins.
+
+This declaration is deliberate.
+Ambient filesystem, network, environment, clock, and secret access through
+WASI bypasses typed framework policy and audit.
+WASI interfaces MAY be adopted for later profiles through the manifest
+version declaration process once:
+
+1. The specific WASI 0.3 interfaces needed are identified;
+2. Each interface is evaluated for capability equivalence with a host-function
+   alternative;
+3. The host implements per-invocation attenuation for any adopted interface;
+4. Cross-runtime parity for the adopted interface is verified.
+
+### Extism ABI and runtime families
+
+> **Normative definition.**
+This profile adopts the Extism plug-in calling convention as the bootstrap
+application protocol.
+The portable center is:
+
+- Plug-in exports use no core-Wasm parameters and return no result or one
+  `i32` status.
+- Application input and output travel as byte buffers through an
+  offset-and-length convention.
+- Built-in imports live under `extism:host/env`; application host functions
+  default to `extism:host/user`.
+- An internal Wasm kernel, `extism-runtime.wasm`, implements the resettable
+  allocator and input, output, and error bookkeeping.
+
+The host MUST use the Extism kernel for all memory allocation, input/output
+setting, and error reporting between the application and the guest module.
+
+### Supported runtime families
+
+> **Normative definition.**
+The following runtime families are supported for this profile.
+Conformance requires passing the Phase 1 integration test suite on at least
+one member of each listed family.
+
+| Family | Engine | Language | Status | Notes |
+| --- | --- | --- | --- | --- |
+| Reference | Wasmtime 41+ | Rust | Primary | Fullest Extism feature set; fuel, epochs, instance pools |
+| Independent | Wazero | Go | Primary | Pure Go; no CGO; context-based cancellation |
+| JavaScript | Host JS engine | TypeScript | Deferred | Environment-dependent WASI, workers, and limits |
+| Java | Chicory | Java | Exploratory | Experimental parity; not a production target yet |
+
+The JavaScript and Chicory families are deferred for the bootstrap profile.
+They MUST NOT be claimed as conformance targets until differential tests
+prove equivalent behavior for the pinned feature set.
+
+The primary families are:
+
+- **Extism/Wasmtime (Rust reference runtime):** Uses Wasmtime's linker, store,
+  Cranelift compilation, caching, pooling support, resource limiter, fuel,
+  epoch interruption, and WASI Preview 1 support.
+  Provides Extism HTTP, variables, hashing, path preopens, compiled plug-ins,
+  instance pools, coredumps, and memory dumps.
+
+- **Extism/Wazero (Go SDK):** Pure Go implementation over Wazero.
+  Supports WASI Preview 1, maps manifest page limits into Wazero configuration,
+  and uses contexts for timeout and cancellation.
+  Compilation caches let multiple instances share compiled modules.
+
+### Supported target architectures
+
+> **Normative definition.**
+The following architectures are supported for bootstrap deployment.
+Host implementations MUST build for these targets; plug-in artifacts MUST
+target the same architectures.
+
+| Architecture | Bits | Supported runtimes |
+| --- | --- | --- |
+| `x86_64` | 64 | Reference, Independent |
+| `aarch64` | 64 | Reference, Independent |
+
+Additional architectures MAY be added when both primary runtime families
+provide equivalent support and conformance evidence.
+
+## Failure modes
+
+### Malformed
+
+The input, manifest, or artifact fails to decode or violates required
+structural rules.
+The host MUST reject the input without executing any decision logic and MUST
+return a `profile.vocabulary.malformed` diagnostic identifying the specific
+field or schema that failed validation.
+
+### Incompatible
+
+The artifact declares a protocol version, feature set, or capability
+requirement outside the host's accepted profile.
+The host MUST reject the artifact at admission time and MUST return a
+`profile.vocabulary.incompatible` diagnostic identifying the version or
+feature mismatch.
+
+### Conflicting
+
+Manifest composition detects route conflicts, state-key conflicts, migration
+ownership conflicts, or capability conflicts.
+The host MUST reject the composition and MUST return a
+`profile.vocabulary.conflicting` diagnostic identifying the conflicting
+declarations.
+
+### Unauthorized
+
+A guest plug-in requests a capability not granted by the current invocation,
+or a directive targets an action not authorized by host policy.
+The host MUST reject the request without executing it and MUST return a
+`profile.vocabulary.unauthorized` diagnostic identifying the requested and
+granted capability scope.
+
+### Exhausted
+
+A resource limit is reached: memory pages, heap allocations, call depth,
+output size, string length, collection size, or configuration bytes.
+The host MUST reject the operation and MUST return a
+`profile.vocabulary.exhausted` diagnostic identifying the limit and the
+invocation context.
+
+### Unavailable
+
+A required dependency is unavailable: artifact not found in registry,
+dependency plug-in missing, host function not installed, or external
+service unreachable at the time of the turn.
+The host MUST reject the turn and MUST return a
+`profile.vocabulary.unavailable` diagnostic identifying the missing
+dependency.
+
+### Diagnostics contract
+
+> **Normative definition.**
+Every diagnostic emitted under this profile MUST contain:
+
+1. A stable family code of the form `profile.vocabulary.<category>`.
+2. The phase, contract, and profile to which the diagnostic applies.
+3. The specific boundary or field that failed.
+4. A human-readable description that does not expose secrets, credentials,
+   or implementation-internal state.
+
+Diagnostics MUST NOT contain: secrets, raw guest memory contents, host
+process identifiers, internal stack traces, or unredacted configuration
+values.
+
+## Implementation-defined choices and deferred work
+
+### Implementation-defined choices
+
+The following choices are permitted but MUST be documented in the
+implementation's conformance profile:
+
+| Choice | Domain | Required documentation |
+| --- | --- | --- |
+| Compilation cache strategy | Engine | Cache key, invalidation, and hit-rate policy |
+| Instance pool size and eviction | Engine | Maximum instances, eviction trigger, reset semantics |
+| Fuel unit definition | Engine | Mapping from fuel to wall-clock time and determinism guarantees |
+| Timeout enforcement mechanism | Engine | Epoch, wall-clock, or hybrid; latency characteristics |
+| Output buffer copy strategy | Host | Zero-copy where possible; bounds enforcement point |
+| Directive outbox storage backend | Host | Database, log format, and retention policy |
+| Artifact admission policy | Host | Hash verification, signature verification, revocation |
+| Diagnostic redaction rules | Host | Exact redaction list and override mechanism |
+
+### Deferred work
+
+The following items are explicitly deferred to later phases or milestones:
+
+| Item | Target | Reason |
+| --- | --- | --- |
+| Component Model / WIT interface adoption | Milestone 8 | Requires stable phase-2 specification |
+| WASI 0.3 interface selection | Milestone 5 | Requires capability model to be defined first |
+| JavaScript runtime conformance | Milestone 8 | Environment variability requires later testing |
+| Chicory runtime conformance | Milestone 8 | Experimental parity; incomplete |
+| Multi-memory profiling and optimization | Milestone 4 | Requires durable state model first |
+| Memory64 large-state agent support | Milestone 4 | Requires state model and pagination policy |
+| Thread-based parallel turns | Milestone 6 | Requires multi-agent coordination model |
+| Synchronous host function catalog | Milestone 5 | Requires capability and security model |
+| Artifact signing and provenance chain | Milestone 5 | Requires trust model and plugin system |
+| Instance pooling state-erasure proof | Milestone 5 | Requires tenancy and security model |
+
+### Potential invalidation of earlier assumptions
+
+The following results from later phases would invalidate an assumption in
+this chapter and would require normative revision:
+
+1. Two primary runtimes cannot implement equivalent timeout, cancellation,
+   or memory-limit behavior for the pinned feature set.
+2. Reducer serialization dominates realistic turn latency for the target
+   state sizes, requiring a non-Extism bootstrap ABI.
+3. Common agent strategies require so many synchronous host calls that the
+   directive continuation model becomes unusable.
+4. Snapshot-plus-patch transfer cannot support the required state scale
+   without unsafe shared mutable memory.
+5. A stable Component Model interface provides materially stronger
+   portability with less application protocol than Extism for the target
+   deployment.
+
 ## Variability register
 
 | Clause | Type | Selection |
