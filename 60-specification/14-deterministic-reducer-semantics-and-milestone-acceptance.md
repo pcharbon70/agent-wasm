@@ -66,7 +66,10 @@ Reducer {
   execute: (TurnRequest) -> TurnResult
 }
 
-ReducerKind = "direct" | "fsm" | "bounded_loop"
+TurnRequest, TurnResult: Defined in
+[Turn Lifecycle Protocols And Canonical Encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md).
+
+ReducerKind = "direct" | "fsm" | "terminal_workflow" | "bounded_loop"
 
 ProfileRef {
   name: string,
@@ -87,14 +90,14 @@ ProfileRef {
 > **Normative definition.**
 The reducer MUST process turns in the following order:
 
-1. **Signal validation**: Validate each signal's structure and required fields.
+1. **Signal validation**: Validate each signal's structure and required fields. See [Signal Envelopes Causality Routing And Delivery](10-signals-causality-routing-and-delivery.md).
 2. **Signal routing**: Route signals to appropriate actions or strategy transitions.
-3. **Action/strategy execution**: Execute actions or apply strategy transitions.
+3. **Action/strategy execution**: Execute actions or apply strategy transitions. See [Actions Instructions Validation Plans And Results](11-actions-instructions-validation-plans-and-results.md) and [Directives Strategies Continuations And Terminal States](13-directives-strategies-continuations-and-terminal-states.md).
 4. **Patch production**: Collect state operations from action results or strategy transitions.
-5. **Patch validation**: Validate the combined patch against current state revision.
+5. **Patch validation**: Validate the combined patch against current state revision. See [State Operations Patches Revisions And Conflicts](12-state-operations-patches-revisions-and-conflicts.md#patch-validation).
 6. **Patch application**: Apply the validated patch to produce new state revision.
-7. **Directive production**: Collect directives from action results.
-8. **Result construction**: Assemble turn result with state, directives, and diagnostics.
+7. **Directive production**: Collect directives from action results. See [Directives Strategies Continuations And Terminal States](13-directives-strategies-continuations-and-terminal-states.md#directive-processing).
+8. **Result construction**: Assemble turn result with state, directives, and diagnostics. See [Turn Lifecycle Protocols And Canonical Encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md#turnresult-fields).
 
 > **Normative definition.**
 Each step MUST complete before the next step begins.
@@ -110,6 +113,12 @@ Given identical canonical inputs (signals, state, instructions) and profile,
 the reducer MUST produce canonically equivalent results.
 
 > **Normative definition.**
+The Reducer's `state_schema_version` constrains which Patch `state_schema_version`
+values are accepted.
+If a Patch specifies a `state_schema_version` that does not match the Reducer's
+`state_schema_version`, the patch MUST be rejected with `state.schema.version_mismatch`.
+
+> **Normative definition.**
 "Canonically equivalent" means:
 
 - State patches are byte-identical after canonical JSON encoding.
@@ -117,7 +126,22 @@ the reducer MUST produce canonically equivalent results.
 - Diagnostics are byte-identical after canonical JSON encoding.
 - State revision sequence numbers are identical.
 
-> **Non-normative note.**
+> **Normative definition.**
+The following `TurnResult` fields are excluded from equivalence checks:
+
+- `invocation_id`: Per-invocation identifier, not deterministic across replays.
+- `protocol_version`: May vary between protocol versions.
+- `timestamp`: Wall-clock time, not deterministic.
+
+The following `TurnResult` fields MUST be byte-identical for equivalence:
+
+- `domain_status`
+- `state` (after canonical encoding)
+- `directives` (after canonical encoding)
+- `diagnostics` (after canonical encoding)
+- `strategy_snapshot` (if present, after canonical encoding)
+
+> **Normative implementation-defined choice.**
 Implementation-defined choices (e.g., hash algorithm, conflict resolution)
 MUST be documented in the conformance profile.
 Different implementations with the same profile MUST produce equivalent results.
@@ -245,7 +269,7 @@ conformance obligation for current implementations:
 
 ### Canonical successful flow
 
-> **Normative test scenario.**
+> **Normative definition.**
 The canonical successful flow integration test validates that a valid turn
 is processed successfully through the full resolution order.
 
@@ -257,7 +281,7 @@ Expected behavior:
 
 ### Metamorphic: field ordering
 
-> **Normative test scenario.**
+> **Normative definition.**
 The metamorphic field ordering test validates that signal field ordering
 does not affect the result.
 
@@ -269,7 +293,7 @@ Expected behavior:
 
 ### Metamorphic: canonical re-encoding
 
-> **Normative test scenario.**
+> **Normative definition.**
 The metamorphic canonical re-encoding test validates that re-encoding
 the turn request produces identical results.
 
@@ -281,7 +305,7 @@ Expected behavior:
 
 ### Metamorphic: replay from same revision
 
-> **Normative test scenario.**
+> **Normative definition.**
 The metamorphic replay test validates that replaying a turn from the same
 revision produces identical results.
 
@@ -293,7 +317,7 @@ Expected behavior:
 
 ### Negative: stale state
 
-> **Normative test scenario.**
+> **Normative definition.**
 The negative stale state test validates that a turn with stale state is rejected.
 
 Expected behavior:
@@ -304,7 +328,7 @@ Expected behavior:
 
 ### Negative: ambiguous route
 
-> **Normative test scenario.**
+> **Normative definition.**
 The negative ambiguous route test validates that a signal with no matching
 action or strategy is rejected.
 
@@ -316,18 +340,18 @@ Expected behavior:
 
 ### Negative: invalid patch
 
-> **Normative test scenario.**
+> **Normative definition.**
 The negative invalid patch test validates that an invalid patch is rejected.
 
 Expected behavior:
 
 - Input: turn producing patch that fails validation.
 - Expected output: null.
-- Expected error: `state.patch.malformed` or similar.
+- Expected error: `state.patch.malformed`, `state.patch.incompatible`, or other `state.patch.*` diagnostic per [State Operations Patches Revisions And Conflicts](12-state-operations-patches-revisions-and-conflicts.md).
 
 ### Negative: unauthorized directive
 
-> **Normative test scenario.**
+> **Normative definition.**
 The negative unauthorized directive test validates that a directive requiring
 an ungranted capability is rejected.
 
@@ -339,7 +363,7 @@ Expected behavior:
 
 ### Negative: corrupt strategy snapshot
 
-> **Normative test scenario.**
+> **Normative definition.**
 The negative corrupt strategy snapshot test validates that a corrupt snapshot
 is rejected.
 
@@ -351,7 +375,7 @@ Expected behavior:
 
 ### Cross-milestone fixture regression
 
-> **Normative test scenario.**
+> **Normative definition.**
 All earlier milestone fixtures MUST be re-run after Phase 5 to verify
 no regressions.
 
