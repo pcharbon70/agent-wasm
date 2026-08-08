@@ -412,3 +412,177 @@ conformance obligation for current implementations:
 2. **Strategy debugging API**: A formal strategy debugging API will be implemented in future milestones. The protocol is language-neutral and does not require strategy debugging for base conformance.
 
 3. **Strategy monitoring API**: A formal strategy monitoring API will be implemented in future milestones. The protocol is language-neutral and does not require strategy monitoring for base conformance.
+
+## 4.4 Phase 4 Integration Tests
+
+### Successful directive emission
+
+> **Normative definition.**
+The successful directive emission integration test validates that a valid
+directive is emitted and processed.
+
+Expected behavior:
+
+- Input: action emitting a valid `emit` directive.
+- Expected output: directive processed, completion signal emitted.
+- Expected error: null.
+
+### Directive with retry
+
+> **Normative definition.**
+The directive with retry integration test validates that a failing directive
+is retried according to its retry class.
+
+Expected behavior:
+
+- Input: action emitting directive that fails on first attempt.
+- Expected output: directive retried up to `max_attempts`, eventually succeeds.
+- Expected error: null.
+
+### FSM strategy transition
+
+> **Normative definition.**
+The FSM strategy transition integration test validates that a finite state
+machine strategy transitions correctly.
+
+Expected behavior:
+
+- Input: strategy with multiple states and signal-triggered transitions.
+- Expected output: strategy transitions through states in order, reaches terminal state.
+- Expected error: null.
+
+### Bounded loop strategy
+
+> **Normative definition.**
+The bounded loop strategy integration test validates that a bounded loop
+strategy respects iteration limits.
+
+Expected behavior:
+
+- Input: bounded loop strategy with `max_iterations = 5`.
+- Expected output: strategy executes 5 iterations, reaches terminal state.
+- Expected error: null.
+
+### Strategy suspension and resumption
+
+> **Normative definition.**
+The strategy suspension and resumption integration test validates that a
+strategy can be suspended and resumed with preserved state.
+
+Expected behavior:
+
+- Input: running strategy, suspended, then resumed.
+- Expected output: strategy continues from last transition state.
+- Expected error: null.
+
+### Terminal state rejection
+
+> **Normative definition.**
+The terminal state rejection integration test validates that transitions
+from terminal states are rejected.
+
+Expected behavior:
+
+- Input: strategy in terminal state with incoming signal.
+- Expected output: null.
+- Expected error: `strategy.termination.already_terminal`.
+
+### Invalid continuation rejection
+
+> **Normative definition.**
+The invalid continuation rejection integration test validates that a
+continuation with invalid state data is rejected.
+
+Expected behavior:
+
+- Input: continuation with state data not matching `state_schema`.
+- Expected output: null.
+- Expected error: `continuation.invalid`.
+
+### Incompatible strategy version
+
+> **Normative definition.**
+The incompatible strategy version integration test validates that a strategy
+snapshot from an incompatible version is rejected.
+
+Expected behavior:
+
+- Input: snapshot from strategy version 1.0.0, loaded strategy version 2.0.0.
+- Expected output: null.
+- Expected error: `strategy.snapshot.incompatible_version`.
+
+### Directive without capability
+
+> **Normative definition.**
+The directive without capability integration test validates that a directive
+requiring an ungranted capability is rejected.
+
+Expected behavior:
+
+- Input: action emitting directive requiring ungranted capability.
+- Expected output: null.
+- Expected error: `directive.missing.missing_capability`.
+
+### Cross-milestone fixture regression
+
+> **Normative definition.**
+All earlier milestone fixtures MUST be re-run after Phase 4 to verify
+no regressions.
+
+Expected behavior:
+
+- All Phase 1 fixtures: PASS.
+- All Phase 2 fixtures: PASS.
+- All Phase 3 fixtures: PASS.
+- All Milestone 1 fixtures: PASS.
+- All Milestone 2 Phase 1 fixtures: PASS.
+- All Milestone 2 Phase 2 fixtures: PASS.
+- All Milestone 2 Phase 3 fixtures: PASS.
+
+Any approved variability MUST be documented in the Milestone 2 exit report.
+
+## Variability register
+
+| Clause | Type | Selection |
+|--------|------|-----------|
+| Directive kinds | Required | Six kinds fixed by this chapter |
+| Strategy descriptors | Required | Fields fixed by this chapter |
+| Strategy snapshots | Required | Fields fixed by this chapter |
+| Strategy transitions | Required | Direct, FSM, bounded loop fixed by this chapter |
+| Domain states | Required | Six states fixed by this chapter |
+| Directive processing order | Required | Validation, scheduling, execution, completion, retry |
+| Directive execution model | Implementation-defined | Documented in conformance profile |
+| Strategy persistence | Implementation-defined | Documented in conformance profile |
+| Retry backoff | Implementation-defined | Documented in conformance profile |
+| Strategy loading | Implementation-defined | Documented in conformance profile |
+
+## Rationale and evidence (non-normative)
+
+This chapter derives from the decision policy and external interaction
+requirements identified in
+[Profile Vocabulary And Architectural Boundaries](01-profile-vocabulary-and-architectural-boundaries.md)
+and the operational needs of a multi-tenant, multi-agent system.
+
+The directive model provides:
+
+- External requests that do not affect deterministic reducer scope.
+- Capability-based access control for external actions.
+- Retry policies for unfulfilled directives.
+
+The strategy model provides:
+
+- Replaceable decision policies with versioned descriptors.
+- Serializable snapshots for suspension and resumption.
+- Three transition models: direct, FSM, and bounded loop.
+
+The domain state model provides:
+
+- Explicit state tracking independent of actor activation.
+- Clear lifecycle transitions for agents and strategies.
+- Foundation for persistence and recovery.
+
+The terminal state enforcement provides:
+
+- Protection against invalid state transitions.
+- Clear diagnostics for debugging and monitoring.
+- Guarantee of strategy termination.
