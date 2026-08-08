@@ -240,3 +240,174 @@ conformance obligation for current implementations:
 3. **Reducer monitoring API**: A formal reducer monitoring API will be implemented in future milestones. The protocol is language-neutral and does not require reducer monitoring for base conformance.
 
 4. **Milestone 3 planning**: Future milestones will build on Milestone 2 contracts and may introduce additional phases and chapters.
+
+## 5.4 Phase 5 Integration Tests
+
+### Canonical successful flow
+
+> **Normative test scenario.**
+The canonical successful flow integration test validates that a valid turn
+is processed successfully through the full resolution order.
+
+Expected behavior:
+
+- Input: valid turn with signal, action, and state.
+- Expected output: TurnResult with state_patch, directives, diagnostics.
+- Expected error: null.
+
+### Metamorphic: field ordering
+
+> **Normative test scenario.**
+The metamorphic field ordering test validates that signal field ordering
+does not affect the result.
+
+Expected behavior:
+
+- Input: two turns with signals in different field orders.
+- Expected output: canonically equivalent TurnResults.
+- Expected error: null.
+
+### Metamorphic: canonical re-encoding
+
+> **Normative test scenario.**
+The metamorphic canonical re-encoding test validates that re-encoding
+the turn request produces identical results.
+
+Expected behavior:
+
+- Input: turn request encoded via canonical JSON, then re-encoded.
+- Expected output: byte-identical TurnResults.
+- Expected error: null.
+
+### Metamorphic: replay from same revision
+
+> **Normative test scenario.**
+The metamorphic replay test validates that replaying a turn from the same
+revision produces identical results.
+
+Expected behavior:
+
+- Input: same turn request replayed from same state revision.
+- Expected output: byte-identical TurnResults.
+- Expected error: null.
+
+### Negative: stale state
+
+> **Normative test scenario.**
+The negative stale state test validates that a turn with stale state is rejected.
+
+Expected behavior:
+
+- Input: turn with state revision older than current.
+- Expected output: null.
+- Expected error: `state.revision.stale`.
+
+### Negative: ambiguous route
+
+> **Normative test scenario.**
+The negative ambiguous route test validates that a signal with no matching
+action or strategy is rejected.
+
+Expected behavior:
+
+- Input: signal with no matching reducer or transition.
+- Expected output: null.
+- Expected error: `signal.routing.ambiguous`.
+
+### Negative: invalid patch
+
+> **Normative test scenario.**
+The negative invalid patch test validates that an invalid patch is rejected.
+
+Expected behavior:
+
+- Input: turn producing patch that fails validation.
+- Expected output: null.
+- Expected error: `state.patch.malformed` or similar.
+
+### Negative: unauthorized directive
+
+> **Normative test scenario.**
+The negative unauthorized directive test validates that a directive requiring
+an ungranted capability is rejected.
+
+Expected behavior:
+
+- Input: turn producing directive requiring ungranted capability.
+- Expected output: null.
+- Expected error: `directive.missing.missing_capability`.
+
+### Negative: corrupt strategy snapshot
+
+> **Normative test scenario.**
+The negative corrupt strategy snapshot test validates that a corrupt snapshot
+is rejected.
+
+Expected behavior:
+
+- Input: turn with strategy snapshot that fails validation.
+- Expected output: null.
+- Expected error: `strategy.snapshot.corruption`.
+
+### Cross-milestone fixture regression
+
+> **Normative test scenario.**
+All earlier milestone fixtures MUST be re-run after Phase 5 to verify
+no regressions.
+
+Expected behavior:
+
+- All Phase 1 fixtures: PASS.
+- All Phase 2 fixtures: PASS.
+- All Phase 3 fixtures: PASS.
+- All Phase 4 fixtures: PASS.
+- All Milestone 1 fixtures: PASS.
+- All Milestone 2 Phase 1 fixtures: PASS.
+- All Milestone 2 Phase 2 fixtures: PASS.
+- All Milestone 2 Phase 3 fixtures: PASS.
+- All Milestone 2 Phase 4 fixtures: PASS.
+
+Any approved variability MUST be documented in the Milestone 2 exit report.
+
+## Variability register
+
+| Clause | Type | Selection |
+|--------|------|-----------|
+| Reducer structure | Required | Fields fixed by this chapter |
+| Turn resolution order | Required | 8-step order fixed by this chapter |
+| Determinism requirement | Required | Canonically equivalent results fixed by this chapter |
+| Canonical encoding | Implementation-defined | Documented in conformance profile |
+| Hash algorithm | Implementation-defined | Documented in conformance profile |
+| Conflict resolution | Implementation-defined | Documented in conformance profile |
+| Reducer loading | Implementation-defined | Documented in conformance profile |
+
+## Rationale and evidence (non-normative)
+
+This chapter derives from the deterministic reducer requirements identified
+in
+[Profile Vocabulary And Architectural Boundaries](01-profile-vocabulary-and-architectural-boundaries.md)
+and the operational needs of a multi-tenant, multi-agent system.
+
+The reducer model provides:
+
+- A deterministic decision kernel that processes turns.
+- A clear resolution order from signal validation through result construction.
+- A determinism requirement that enables replay and verification.
+
+The metamorphic cases provide:
+
+- Verification that implementation-defined choices do not affect results.
+- Evidence that canonical encoding is stable.
+- Foundation for cross-implementation conformance testing.
+
+The negative cases provide:
+
+- Verification that failures are handled correctly.
+- Clear diagnostics for debugging and monitoring.
+- Protection against invalid or malicious inputs.
+
+The exit report provides:
+
+- A structured summary of Milestone 2 completion.
+- Evidence that all fixtures pass and determinism is verified.
+- Documentation of any unresolved variability.
