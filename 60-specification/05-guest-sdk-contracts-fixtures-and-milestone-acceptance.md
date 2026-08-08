@@ -798,3 +798,106 @@ Milestone1ExitReport {
   produced_at: "2026-08-08T00:00:00Z"
 }
 ```
+
+## Failure modes
+
+### Malformed input
+
+> **Normative definition.**
+When the host receives malformed input that cannot be decoded using the
+canonical codec, it MUST emit a `protocol.decode` diagnostic with an
+appropriate error code (e.g., `syntax_error`, `duplicate_key`).
+
+### Incompatible schema
+
+> **Normative definition.**
+When the host receives input that violates the declared state schema, it
+MUST emit a `protocol.schema` diagnostic with the `type_mismatch` error
+code.
+
+### Conflicting revisions
+
+> **Normative definition.**
+When the host receives a state revision that conflicts with the expected
+revision, it MUST emit a `protocol.semantic` diagnostic with the
+`revision_stale` error code.
+
+### Unauthorized access
+
+> **Normative definition.**
+When the host detects an unauthorized principal attempting to invoke an
+export, it MUST reject the request with an appropriate diagnostic.
+
+### Resource exhaustion
+
+> **Normative definition.**
+When the host detects resource limits being exceeded (e.g., oversized
+values, memory limits), it MUST reject the request with a `runtime.resource`
+diagnostic.
+
+### Dependency unavailable
+
+> **Normative definition.**
+When a required external dependency is unavailable, the host MAY emit a
+`runtime.dependency` diagnostic and MAY retry based on the configured
+retry policy.
+
+## Diagnostics
+
+> **Normative definition.**
+All diagnostics emitted by the host MUST conform to the `Diagnostic` type
+defined in
+[Turn Lifecycle Protocols And Canonical Encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md#diagnostics).
+
+Diagnostics MUST identify the phase contract, profile, and failed boundary
+without exposing secrets or implementation internal state.
+
+### Diagnostic families
+
+| Family | Purpose | Example codes |
+|--------|---------|---------------|
+| `protocol.decode` | Input decoding failures | `syntax_error`, `duplicate_key`, `invalid_number` |
+| `protocol.schema` | Schema validation failures | `type_mismatch`, `required_field_missing`, `enum_value_invalid` |
+| `protocol.semantic` | Semantic validation failures | `revision_stale`, `timestamp_invalid`, `idempotency_conflict` |
+| `runtime.resource` | Resource limit violations | `oversized_value`, `memory_limit_exceeded` |
+| `runtime.dependency` | External dependency failures | `unavailable`, `timeout` |
+| `runtime.unauthorized` | Authorization failures | `principal_not_allowed` |
+
+## Implementation-defined choices
+
+> **Normative definition.**
+The following choices are implementation-defined and do not create
+conformance obligations:
+
+1. **Retry policy**: The host MAY implement a retry policy for transient
+   dependency failures. The policy parameters (max_retries, backoff_strategy)
+   are implementation-defined.
+
+2. **Resource limits**: The host MAY enforce resource limits (e.g., memory,
+   CPU, wall-clock time). The specific limits are implementation-defined.
+
+3. **Diagnostic filtering**: The host MAY filter or redact diagnostics
+   before recording them. The filtering rules are implementation-defined.
+
+4. **State migration strategy**: The host MAY implement different strategies
+   for state migration (e.g., in-place, copy-on-write). The strategy is
+   implementation-defined.
+
+## Deferred work
+
+> **Normative definition.**
+The following work is deferred to future milestones:
+
+1. **Guest SDK languages**: Initial SDK languages have not been chosen.
+   The protocol is language-neutral, and SDKs will be implemented in future
+   milestones.
+
+2. **Host implementation**: A concrete host implementation has not been
+   built. The protocol is implemented in future milestones.
+
+3. **Conformance test suite**: A full conformance test suite will be
+   developed in future milestones based on the fixtures defined in this
+   phase.
+
+4. **Performance benchmarks**: Performance benchmarks will be developed
+   in future milestones to validate resource limits and retry policies.
