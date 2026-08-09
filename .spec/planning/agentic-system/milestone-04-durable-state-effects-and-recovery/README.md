@@ -2,7 +2,7 @@
 
 Make agent state transitions, history, directives, external effects, and activation recoverable across host crashes without claiming impossible exactly-once external behavior.
 
-Current status: planned; all phases and tasks are unchecked.
+Current status: phase 1-5 complete; milestone 4 complete.
 
 ## Purpose
 
