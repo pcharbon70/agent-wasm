@@ -403,3 +403,117 @@ The host MUST define recovery behavior for the following failure scenarios:
 > **Normative definition.**
 Each recovery action MUST be accompanied by an audit record.
 Recovery actions MUST NOT leave partial or unauthorized state.
+
+## 4.3 Failure Evidence And Operational Notes
+
+### Failure outcomes
+
+> **Normative definition.**
+The host MUST define the following failure outcomes for retry, timer, recovery,
+replay, hibernate, and migration:
+
+1. **Malformed**: Input data does not conform to the expected schema.
+2. **Incompatible**: Data is incompatible with the current schema version or
+   handler version.
+3. **Conflicting**: Multiple writers attempt to write to the same record
+   (optimistic concurrency conflict).
+4. **Unauthorized**: The caller does not have permission to perform the operation.
+5. **Exhausted**: The system is out of resources (e.g., storage capacity, retry
+   budget).
+6. **Unavailable**: The storage backend is unavailable.
+
+> **Normative definition.**
+Each failure outcome MUST be mapped to a specific error code and diagnostic
+message.
+
+### Error codes
+
+> **Normative definition.**
+The host MUST use the following error codes for retry, timer, recovery, replay,
+hibernate, and migration:
+
+| Error Code | Description |
+|------------|-------------|
+| `retry.max_retries_exceeded` | Maximum retry attempts exceeded |
+| `retry.deadline_exceeded` | Retry deadline exceeded |
+| `retry.expired` | Retry expired |
+| `timer.expired` | Timer expired |
+| `timer.duplicate` | Duplicate timer detected |
+| `timer.missed_fire` | Timer missed scheduled fire time |
+| `replay.conflicting_result` | Replayed result conflicts with original |
+| `replay.snapshot_mismatch` | Reconstructed state does not match snapshot |
+| `hibernate.checkpoint_failed` | Hibernate checkpoint creation failed |
+| `hibernate.thaw_failed` | Thaw activation failed |
+| `migration.authorization_required` | Migration requires operator approval |
+| `migration.incompatible_path` | Migration path is incompatible |
+| `migration.checkpoint_failed` | Migration checkpoint creation failed |
+| `migration.rollback_failed` | Migration rollback failed |
+| `artifact.missing` | Required artifact is missing |
+| `storage.snapshot.duplicate` | Snapshot ID already exists (see
+  [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md)) |
+| `storage.unavailable` | Storage backend unavailable (see
+  [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md)) |
+| `commit.conflict` | Optimistic concurrency conflict (see
+  [Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md)) |
+
+> **Normative definition.**
+Each error code MUST be accompanied by a human-readable diagnostic message.
+The diagnostic message MUST identify the phase contract, profile, and failed
+boundary without exposing secrets.
+
+### Bounded diagnostics
+
+> **Normative definition.**
+The host MUST emit bounded diagnostics for each failure outcome.
+The diagnostics MUST include:
+
+1. **Error code**: The specific error code from the table above.
+2. **Context**: The operation that failed (e.g., retry dispatch, timer fire,
+   replay, hibernate, migration).
+3. **Entity identifiers**: The tenant ID, agent ID, or record ID involved
+   (without exposing sensitive data).
+4. **Timestamp**: The time the error occurred.
+5. **Retryable**: Whether the operation can be retried.
+
+> **Normative definition.**
+The host MUST NOT expose internal implementation details, secrets, or
+sensitive data in diagnostics.
+
+### Implementation-defined choices
+
+> **Normative implementation-defined choice.**
+The following choices are implementation-defined and MUST be documented in the
+conformance profile:
+
+1. **Retry default policy**: The default retry policy for retries.
+2. **Missed-fire default policy**: The default missed-fire policy for timers.
+3. **Hibernate timeout**: The maximum time allowed for hibernate operations.
+4. **Thaw timeout**: The maximum time allowed for thaw operations.
+5. **Migration timeout**: The maximum time allowed for migration operations.
+
+### Deferred work
+
+> **Non-normative note.**
+The following work is deferred to later phases or host implementations:
+
+1. **Migration strategy**: The migration strategy (canary, blue-green, etc.).
+2. **Hibernate persistence**: The hibernate persistence strategy.
+3. **Replay optimization**: The replay optimization strategy.
+4. **Retry metrics**: The retry metrics and monitoring.
+
+### Results invalidating earlier milestones
+
+> **Non-normative note.**
+The following results from Phase 4 MAY invalidate earlier milestone assumptions:
+
+1. **Storage capacity**: If the storage capacity for retries, timers, and
+   migrations exceeds the capacity planned in earlier milestones, the capacity
+   plan MUST be revised.
+2. **Retry budget**: If the retry budget exceeds the turn timeout, the timeout
+   or retry policy MUST be revised.
+3. **Migration complexity**: If migration complexity exceeds the complexity
+   planned in earlier milestones, the complexity plan MUST be revised.
+
+> **Non-normative note.**
+If any result from Phase 4 invalidates an earlier milestone assumption, the
+affected milestone MUST be revised and re-validated.
