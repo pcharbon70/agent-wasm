@@ -77,6 +77,23 @@ open workbenches in inquiries, and session evidence in the journal.
   — documents Section 2.4 implementation: successful flow tests, failure
   handling tests, timeout and cancellation tests, and cross-milestone
   compatibility tests.
+- [Phase 3 Contract And Data Model Implementation](m7-phase-03-contract-and-data-model-implementation.md)
+  — documents Section 3.1 implementation from Phase 3 plan: direct strategy
+  behavior, FSM strategy states and transitions, bounded tool-loop state,
+  iteration budgets, and snapshot migration.
+- [Phase 3 Behavior And Integration Implementation](m7-phase-03-behavior-and-integration-implementation.md)
+  — documents Section 3.2 implementation: planning strategy outputs, budget
+  enforcement, and failure behavior for invalid snapshots, non-progress loops,
+  repeated tool requests, contradictory plans, missing results, model drift,
+  and forced termination.
+- [Phase 3 Failure Evidence And Operational Notes Implementation](m7-phase-03-failure-evidence-and-operational-notes-implementation.md)
+  — documents Section 3.3 implementation: failure outcomes, bounded diagnostics,
+  evidence emission, implementation-defined choices, deferred work, and
+  results that would invalidate earlier milestone assumptions.
+- [Phase 3 Integration Tests Implementation](m7-phase-03-integration-tests-implementation.md)
+  — documents Section 3.4 implementation: successful flow tests, failure
+  handling tests, timeout and cancellation tests, and cross-milestone
+  compatibility tests.
 
 ## Maintaining this index
 
