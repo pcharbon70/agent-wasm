@@ -631,7 +631,15 @@ controls.
 Operators SHOULD minimize the number of plugins that declare
 `privileged-host` artifacts.
 
-## Lifecycle operations
+## 3.2 Behavior And Integration
+
+This section defines the runtime behavior of framework plugin manifests
+composition and lifecycle hooks, including the ordered lifecycle
+operations, the composition and authorization gates that must complete
+before loading executable artifacts, and the specific failure scenarios
+that the host MUST detect and report.
+
+### Lifecycle operations
 
 > **Normative definition.**
 The following lifecycle operations are defined for framework plugins.
@@ -662,12 +670,57 @@ before loading executable artifacts.
    and archives its state according to
    [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md).
 
+> **Normative definition.**
+The lifecycle operations form a directed acyclic graph of valid
+transitions.
+The host MUST reject any transition that does not correspond to an
+edge in the valid transition graph.
+The host MUST record each completed transition as evidence in the
+plugin's lifecycle audit log.
+
 > **Non-normative note.**
 The separation between install (metadata-only) and enable (artifact
 loading) is critical: it ensures that no code runs before the manifest
 is fully validated and authorized.
+This separation is the primary mechanism for enforcing the trust-tier
+model defined in [Trust-tier separation](#trust-tier-separation).
 
-## Failure semantics
+### Composition and authorization before artifact loading
+
+> **Normative definition.**
+The host MUST NOT load any executable artifact for a framework plugin
+until the following conditions are all satisfied:
+
+1. The manifest has been validated against the data model defined in
+   [Contract And Data Model](#31-contract-and-data-model).
+2. All artifacts have been resolved against their declared digests.
+3. Composition has completed successfully with no unresolved conflicts
+   as defined in
+   [Composition order and conflict checks](#composition-order-and-conflict-checks).
+4. All `requested_grants` have been resolved against the trust model
+   defined in
+   [Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md).
+5. Authorization for the requested lifecycle operation has been obtained
+   according to the `lifecycle_ownership` field defined in
+   [Lifecycle ownership](#lifecycle-ownership).
+6. For any `privileged-host` artifacts, the review evidence defined in
+   [Reviewed preparation logic](#reviewed-preparation-logic) has been
+   recorded.
+
+> **Normative definition.**
+If any condition above is not satisfied, the host MUST fail the lifecycle
+operation with the appropriate diagnostic from
+[Failure semantics](#failure-semantics).
+The host MUST NOT leave the plugin in a partially-loaded state.
+
+> **Non-normative note.**
+This gate ensures that even if an operator or external system triggers
+an enable operation prematurely, the host will refuse to load
+unauthorized or unvalidated code.
+The gate is enforced at the host runtime boundary and cannot be bypassed
+by any plugin.
+
+### Failure semantics
 
 > **Normative definition.**
 The host MUST define the following failure outcomes for framework plugin
@@ -718,23 +771,132 @@ boundary without exposing secrets.
 | `plugin.orphaned_state` | A plugin has active state references after removal |
 | `plugin.revoked_publisher` | The publisher's trust class has been revoked |
 
-### Missing dependency, version conflict, circular dependency, ambiguous route, orphaned state, revoked publisher behavior
+### Missing dependency
+
+> **Normative definition.**
+When the host detects a missing dependency during any lifecycle operation,
+the host MUST abort the operation and emit the diagnostic
+`plugin.missing_dependency`.
+The diagnostic MUST identify the specific dependency that was missing,
+the operation that was attempted, and the phase in which the dependency
+was expected to be resolved.
+
+> **Normative definition.**
+The host MUST NOT leave any partial state for the operation that was
+attempted.
+If the operation was an install, the plugin MUST NOT be recorded in the
+registry.
+If the operation was an upgrade, the previous version of the plugin
+MUST remain installed and enabled.
 
 > **Non-normative note.**
-Each of the failure modes above has specific recovery semantics:
+Missing dependency is the most common failure mode during plugin
+installation.
+Operators SHOULD monitor for this diagnostic and ensure that dependency
+artifacts are available before attempting plugin installation.
 
-- **Missing dependency**: The host MUST abort the install and record
-  which dependency was missing.
-- **Version conflict**: The host MUST abort the install and record
-  the conflicting version.
-- **Circular dependency**: The host MUST abort the install and report
-  all plugins in the cycle.
-- **Ambiguous route**: The host MUST abort the composition and report
-  both conflicting routes.
-- **Orphaned state**: The host MUST refuse removal until all references
-  are resolved.
-- **Revoked publisher**: The host MUST immediately disable all plugins
-  authored by the revoked publisher.
+### Version conflict
+
+> **Normative definition.**
+When the host detects a version conflict during any lifecycle operation,
+the host MUST abort the operation and emit the diagnostic
+`plugin.version_conflict`.
+The diagnostic MUST identify the requested version, the installed
+version, and the operation that was attempted.
+
+> **Normative definition.**
+The host MUST NOT allow two versions of the same plugin to be installed
+simultaneously unless the host's conformance profile explicitly permits
+it.
+The host's conformance profile MUST document the versioning policy.
+
+> **Non-normative note.**
+Version conflicts typically indicate an operator error (e.g., attempting
+to install an older version over a newer one) or a supply-chain issue
+(e.g., a registry returning a stale artifact).
+The diagnostic SHOULD be informative enough to help the operator
+diagnose the root cause.
+
+### Circular dependency
+
+> **Normative definition.**
+When the host detects a circular dependency during composition, the host
+MUST abort the composition and emit the diagnostic
+`plugin.circular_dependency`.
+The diagnostic MUST identify all plugins involved in the cycle, in the
+order they form the cycle.
+
+> **Normative definition.**
+The host MUST use a deterministic cycle detection algorithm (e.g.,
+depth-first search with coloring) to detect circular dependencies.
+The host MUST record the cycle detection evidence in the lifecycle audit
+log.
+
+> **Non-normative note.**
+Circular dependencies typically arise when two plugins declare
+lifecycle hooks that depend on each other's state.
+The host's composition order defined in
+[Composition order and conflict checks](#composition-order-and-conflict-checks)
+prevents most circular dependencies, but lifecycle hooks can create
+cycles that are not detectable during composition alone.
+
+### Ambiguous route
+
+> **Normative definition.**
+When the host detects an ambiguous route during composition, the host
+MUST abort the composition and emit the diagnostic
+`plugin.ambiguous_route`.
+The diagnostic MUST identify both routes, the pattern they match, and
+the priority at which the ambiguity occurs.
+
+> **Normative definition.**
+The host MUST NOT load any plugin that contributes to an ambiguous route.
+The host MUST require the operator to resolve the ambiguity before
+enabling either plugin.
+
+> **Non-normative note.**
+Ambiguous routes are a composition-time error, not a runtime error.
+The host's route resolution logic defined in
+[Routes](#routes) ensures that routes are unambiguous before any
+plugin is enabled.
+
+### Orphaned state
+
+> **Normative definition.**
+When the host detects orphaned state during a remove operation, the
+host MUST abort the remove operation and emit the diagnostic
+`plugin.orphaned_state`.
+The diagnostic MUST identify the state namespaces that still have
+active references and the operations that reference them.
+
+> **Normative definition.**
+The host MUST refuse to remove a plugin until all active references to
+its state namespaces have been resolved.
+The host MUST provide the operator with a mechanism to inspect the
+active references and resolve them.
+
+> **Non-normative note.**
+Orphaned state typically arises when an agent or another plugin holds a
+reference to a state namespace that belongs to the plugin being removed.
+The operator MUST resolve these references before the plugin can be
+removed.
+If the references cannot be resolved, the operator MAY force-remove the
+plugin, but the host MUST log the force-removal as evidence.
+
+### Revoked publisher
+
+> **Normative definition.**
+When the host detects a revoked publisher, the host MUST immediately
+disable all plugins authored by the revoked publisher and emit the
+diagnostic `plugin.revoked_publisher`.
+The diagnostic MUST identify the revoked publisher, the plugins affected,
+and the revocation evidence.
+
+> **Normative definition.**
+The host MUST NOT allow any lifecycle operation on a plugin authored by
+a revoked publisher until the publisher's trust class has been restored.
+The host MUST log every attempt to perform a lifecycle operation on a
+plugin authored by a revoked publisher as evidence.
 
 > **Non-normative note.**
 The revoked publisher behavior is the most disruptive: it requires the
@@ -742,6 +904,8 @@ host to take immediate action against all of an author's plugins, which
 is why the trust model in
 [Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md)
 emphasises revocation procedures.
+Operators SHOULD define clear revocation procedures and communicate them
+to publishers before publishing plugins.
 
 ## Implementation-defined choices
 
