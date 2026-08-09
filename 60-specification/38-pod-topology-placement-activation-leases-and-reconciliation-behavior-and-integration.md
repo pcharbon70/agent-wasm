@@ -93,7 +93,7 @@ Every activation lease MUST include the following fields:
 | `issued_at` | The ISO 8601 timestamp of lease issuance. | Host clock. |
 | `expires_at` | The ISO 8601 timestamp of lease expiration. | Host clock. |
 | `lease_type` | The lease type: `create`, `update`, `terminate`, or `reconcile`. | Host runtime. |
-| `fence_token` | A deterministic fence token that increases monotonically for each lease issued for the same `node_id`; older leases are rejected with diagnostic `topology.lease.expired-fence`. | Host runtime. |
+| `fence_token` | A deterministic fence token that increases monotonically for each lease issued for the same `node_id`; older leases are rejected with this token. | Host runtime. |
 
 > **Normative definition.**
 Activation leases are time-bounded: a lease MUST expire after a maximum
@@ -128,27 +128,19 @@ a new lease on the target host.
 Transfer is used for host failover: if the host holding a lease crashes,
 the target host MUST issue a new lease with an incremented `fence_token`
 to take over placement authority.
-Lease transfer is deferred to Milestone 7 for multi-node placement; under
-single-node placement (Phase 4 scope), lease transfer is not exercised
-because there is only one host.
 
 > **Non-normative note.**
-Lease transfer is essential for fault tolerance in multi-node deployments:
-if a host crashes while holding an active lease, the lease is automatically
-revoked on the crashed host; the target host MUST issue a new lease to
-take over placement authority.
+Lease transfer is essential for fault tolerance: if a host crashes while
+holding an active lease, the lease is automatically revoked on the crashed
+host; the target host MUST issue a new lease to take over placement
+authority.
 This ensures that placement is never lost due to host crashes.
-Under single-node placement, lease transfer is not exercised because there
-is only one host; fault tolerance is provided by the durable journal, which
-allows live placement to be reconstructed from desired topology on restart.
 
 ### Reconciliation of missing, extra, failed, stale, moved, incompatible, and dependency-blocked agents
 
 > **Normative definition.**
 Reconciliation is the deterministic process that turns desired topology
-into live placement by applying the following rules in order.
-Under single-node placement (the scope of Phase 4), only rules 1-4 apply.
-Rules 5-7 are deferred to Milestone 7 for multi-node placement.
+into live placement by applying the following rules in order:
 
 1. **Missing nodes**: For each node in desired topology that is NOT
    present in live placement, create a live agent instance according to
@@ -178,9 +170,6 @@ Rules 5-7 are deferred to Milestone 7 for multi-node placement.
    mark the node as `stale` and apply the node's `lifecycle_policy` to
    determine whether to restart, wait, or allow partial results.
 
-> **Non-normative note.**
-Rules 5-7 below are deferred to Milestone 7 for multi-node placement:
-
 5. **Moved nodes**: For each node in live placement that has been moved
    to a different host, update the observed status to reflect the new
    host and refresh the activation lease.
@@ -203,29 +192,19 @@ This ensures that reconciliation is replayable from the durable state
 journal without depending on transient host memory.
 
 > **Normative definition.**
-Reconciliation is atomic with respect to the durable journal: the journal
-entries recording the desired topology version, observed status updates,
-and evidence records produced by a single reconciliation pass MUST be
-committed atomically through the atomic commit protocol defined in
+Reconciliation is atomic: all live placement updates produced by a single
+reconciliation pass MUST be applied atomically through the atomic commit
+protocol defined in
 [Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md).
-If the journal commit fails, the entire reconciliation pass is rolled back
-and observed status is updated with the failure diagnostic.
-Live agent creation and termination are NOT transactional; if a live agent
-creation fails after journal commit, the host MUST record the failure in
-observed status and retry on the next reconciliation pass.
+If any update fails, the entire reconciliation pass is rolled back and
+observed status is updated with the failure diagnostic.
 
 > **Non-normative note.**
-Atomic journal reconciliation ensures that the durable record of topology
-state is always consistent.
-Live agent creation involves host OS operations (process spawning, resource
-allocation) that are not naturally transactional and cannot be rolled back.
-The journal provides a recovery point: if live agent creation fails after
-journal commit, the next reconciliation pass will detect the inconsistency
-and retry or mark the node as failed.
-Without atomic journal reconciliation, a partial reconciliation could leave
-the durable record in an inconsistent state where some nodes are recorded
-as created but others are not, making it impossible to recover from
-failures.
+Atomic reconciliation ensures that live placement is always consistent
+with desired topology.
+Without atomic reconciliation, a partial reconciliation could leave the
+system in an inconsistent state where some nodes are created but others
+are not, leading to unpredictable behavior.
 
 ### Topology versioning, validation, rollout, rollback, and audit evidence
 
@@ -314,11 +293,9 @@ The host MUST emit evidence for the following events:
 | `topology.reconciliation.started` | A reconciliation pass starts. |
 | `topology.reconciliation.completed` | A reconciliation pass completes successfully. |
 | `topology.reconciliation.failed` | A reconciliation pass fails. |
-| `topology.reconciliation.cancelled` | A reconciliation pass is cancelled. |
 | `topology.node.created` | A live agent instance is created for a topology node. |
 | `topology.node.terminated` | A live agent instance is terminated. |
 | `topology.node.restarted` | A live agent instance is restarted after failure. |
-| `topology.node.cancelled` | A topology node is cancelled. |
 
 > **Non-normative note.**
 Topology audit evidence ensures that topology changes are fully auditable.
