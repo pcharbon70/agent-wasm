@@ -222,13 +222,13 @@ would invalidate an earlier milestone assumption.
 
 ### Earlier chapters
 
-- [10-signals-causality-routing-and-delivery.md](../10-signals-causality-routing-and-delivery.md)
-- [14-deterministic-reducer-semantics-and-milestone-acceptance.md](../14-deterministic-reducer-semantics-and-milestone-acceptance.md)
-- [29-crash-injection-durable-effects-and-milestone-acceptance.md](../29-crash-injection-durable-effects-and-milestone-acceptance.md)
-- [34-provenance-signing-audit-security-and-milestone-acceptance.md](../34-provenance-signing-audit-security-and-milestone-acceptance.md)
+- [10-signals-causality-routing-and-delivery.md](../60-specification/10-signals-causality-routing-and-delivery.md)
+- [14-deterministic-reducer-semantics-and-milestone-acceptance.md](../60-specification/14-deterministic-reducer-semantics-and-milestone-acceptance.md)
+- [29-crash-injection-durable-effects-and-milestone-acceptance.md](../60-specification/29-crash-injection-durable-effects-and-milestone-acceptance.md)
+- [34-provenance-signing-audit-security-and-milestone-acceptance.md](../60-specification/34-provenance-signing-audit-security-and-milestone-acceptance.md)
 
 ### Related chapters (Phase 3)
 
-- [43-direct-fsm-tool-loop-and-planning-strategies-contract-and-data-model.md](../43-direct-fsm-tool-loop-and-planning-strategies-contract-and-data-model.md)
-- [43-direct-fsm-tool-loop-and-planning-strategies-behavior-and-integration.md](../43-direct-fsm-tool-loop-and-planning-strategies-behavior-and-integration.md)
-- [43-direct-fsm-tool-loop-and-planning-strategies-phase-3-integration-tests.md](../43-direct-fsm-tool-loop-and-planning-strategies-phase-3-integration-tests.md)
+- [43-direct-fsm-tool-loop-and-planning-strategies-contract-and-data-model.md](../60-specification/43-direct-fsm-tool-loop-and-planning-strategies-contract-and-data-model.md)
+- [43-direct-fsm-tool-loop-and-planning-strategies-behavior-and-integration.md](../60-specification/43-direct-fsm-tool-loop-and-planning-strategies-behavior-and-integration.md)
+- [43-direct-fsm-tool-loop-and-planning-strategies-phase-3-integration-tests.md](../60-specification/43-direct-fsm-tool-loop-and-planning-strategies-phase-3-integration-tests.md)

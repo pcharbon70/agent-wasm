@@ -234,19 +234,19 @@ Defined bounded tool-loop state for model request, tool selection, tool result, 
 
 ### Earlier chapters
 
-- [11-actions-instructions-validation-plans-and-results.md](../11-actions-instructions-validation-plans-and-results.md)
-- [12-state-operations-patches-revisions-and-conflicts.md](../12-state-operations-patches-revisions-and-conflicts.md)
-- [13-directives-strategies-continuations-and-terminal-states.md](../13-directives-strategies-continuations-and-terminal-states.md)
-- [14-deterministic-reducer-semantics-and-milestone-acceptance.md](../14-deterministic-reducer-semantics-and-milestone-acceptance.md)
-- [25-revisioned-snapshots-journals-history-and-storage-contracts.md](../25-revisioned-snapshots-journals-history-and-storage-contracts.md)
-- [26-atomic-state-journal-and-directive-outbox-commits.md](../26-atomic-state-journal-and-directive-outbox-commits.md)
-- [27-effect-handlers-attempts-idempotency-and-result-signals.md](../27-effect-handlers-attempts-idempotency-and-result-signals.md)
-- [31-capability-policy-attenuation-limits-and-enforcement.md](../31-capability-policy-attenuation-limits-and-enforcement.md)
-- [34-provenance-signing-audit-security-and-milestone-acceptance.md](../34-provenance-signing-audit-security-and-milestone-acceptance.md)
+- [11-actions-instructions-validation-plans-and-results.md](../60-specification/11-actions-instructions-validation-plans-and-results.md)
+- [12-state-operations-patches-revisions-and-conflicts.md](../60-specification/12-state-operations-patches-revisions-and-conflicts.md)
+- [13-directives-strategies-continuations-and-terminal-states.md](../60-specification/13-directives-strategies-continuations-and-terminal-states.md)
+- [14-deterministic-reducer-semantics-and-milestone-acceptance.md](../60-specification/14-deterministic-reducer-semantics-and-milestone-acceptance.md)
+- [25-revisioned-snapshots-journals-history-and-storage-contracts.md](../60-specification/25-revisioned-snapshots-journals-history-and-storage-contracts.md)
+- [26-atomic-state-journal-and-directive-outbox-commits.md](../60-specification/26-atomic-state-journal-and-directive-outbox-commits.md)
+- [27-effect-handlers-attempts-idempotency-and-result-signals.md](../60-specification/27-effect-handlers-attempts-idempotency-and-result-signals.md)
+- [31-capability-policy-attenuation-limits-and-enforcement.md](../60-specification/31-capability-policy-attenuation-limits-and-enforcement.md)
+- [34-provenance-signing-audit-security-and-milestone-acceptance.md](../60-specification/34-provenance-signing-audit-security-and-milestone-acceptance.md)
 
 ### Related chapters (Phase 3)
 
-- [43-direct-fsm-tool-loop-and-planning-strategies-contract-and-data-model.md](../43-direct-fsm-tool-loop-and-planning-strategies-contract-and-data-model.md)
-- [43-direct-fsm-tool-loop-and-planning-strategies-behavior-and-integration.md](../43-direct-fsm-tool-loop-and-planning-strategies-behavior-and-integration.md)
-- [43-direct-fsm-tool-loop-and-planning-strategies-failure-evidence-and-operational-notes.md](../43-direct-fsm-tool-loop-and-planning-strategies-failure-evidence-and-operational-notes.md)
-- [43-direct-fsm-tool-loop-and-planning-strategies-phase-3-integration-tests.md](../43-direct-fsm-tool-loop-and-planning-strategies-phase-3-integration-tests.md)
+- [43-direct-fsm-tool-loop-and-planning-strategies-contract-and-data-model.md](../60-specification/43-direct-fsm-tool-loop-and-planning-strategies-contract-and-data-model.md)
+- [43-direct-fsm-tool-loop-and-planning-strategies-behavior-and-integration.md](../60-specification/43-direct-fsm-tool-loop-and-planning-strategies-behavior-and-integration.md)
+- [43-direct-fsm-tool-loop-and-planning-strategies-failure-evidence-and-operational-notes.md](../60-specification/43-direct-fsm-tool-loop-and-planning-strategies-failure-evidence-and-operational-notes.md)
+- [43-direct-fsm-tool-loop-and-planning-strategies-phase-3-integration-tests.md](../60-specification/43-direct-fsm-tool-loop-and-planning-strategies-phase-3-integration-tests.md)

@@ -384,11 +384,11 @@ Defined tests to run all earlier milestone fixtures affected by this phase and r
 
 ### Earlier chapters
 
-- [14-deterministic-reducer-semantics-and-milestone-acceptance.md](../14-deterministic-reducer-semantics-and-milestone-acceptance.md)
-- [29-crash-injection-durable-effects-and-milestone-acceptance.md](../29-crash-injection-durable-effects-and-milestone-acceptance.md)
+- [14-deterministic-reducer-semantics-and-milestone-acceptance.md](../60-specification/14-deterministic-reducer-semantics-and-milestone-acceptance.md)
+- [29-crash-injection-durable-effects-and-milestone-acceptance.md](../60-specification/29-crash-injection-durable-effects-and-milestone-acceptance.md)
 
 ### Related chapters (Phase 3)
 
-- [43-direct-fsm-tool-loop-and-planning-strategies-contract-and-data-model.md](../43-direct-fsm-tool-loop-and-planning-strategies-contract-and-data-model.md)
-- [43-direct-fsm-tool-loop-and-planning-strategies-behavior-and-integration.md](../43-direct-fsm-tool-loop-and-planning-strategies-behavior-and-integration.md)
-- [43-direct-fsm-tool-loop-and-planning-strategies-failure-evidence-and-operational-notes.md](../43-direct-fsm-tool-loop-and-planning-strategies-failure-evidence-and-operational-notes.md)
+- [43-direct-fsm-tool-loop-and-planning-strategies-contract-and-data-model.md](../60-specification/43-direct-fsm-tool-loop-and-planning-strategies-contract-and-data-model.md)
+- [43-direct-fsm-tool-loop-and-planning-strategies-behavior-and-integration.md](../60-specification/43-direct-fsm-tool-loop-and-planning-strategies-behavior-and-integration.md)
+- [43-direct-fsm-tool-loop-and-planning-strategies-failure-evidence-and-operational-notes.md](../60-specification/43-direct-fsm-tool-loop-and-planning-strategies-failure-evidence-and-operational-notes.md)
