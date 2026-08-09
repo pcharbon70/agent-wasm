@@ -2,7 +2,7 @@
 
 Make agent state transitions, history, directives, external effects, and activation recoverable across host crashes without claiming impossible exactly-once external behavior.
 
-Current status: phase 1-4 complete; phase 5 pending.
+Current status: phase 1-5 complete; milestone 4 complete.
 
 ## Purpose
 
