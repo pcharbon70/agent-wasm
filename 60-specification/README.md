@@ -53,6 +53,7 @@ themselves.
 - [Agent Registry Activation Cancellation And Completion](22-agent-registry-activation-cancellation-and-completion.md) — Phase 3 of Milestone 3; manages logical agent identity and disposable live actors without persisting engine or process handles.
 - [Sensors Schedules Timers And External Signal Ingress](23-sensors-schedules-timers-and-external-signal-ingress.md) — Phase 4 of Milestone 3; converts external events and time into validated signals without granting event sources direct access to agent state.
 - [Single-Agent Host Flow And Milestone Acceptance](24-single-agent-host-flow-and-milestone-acceptance.md) — Phase 5 of Milestone 3; connects admission, mailbox, activation, Extism invocation, validation, lifecycle, and observable results in one single-node runtime.
+- [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md) — Phase 1 of Milestone 4; defines durable records and transactional storage boundaries for authoritative state, history, and replay.
 
 ## Maintaining this index
 
