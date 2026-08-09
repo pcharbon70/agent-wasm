@@ -446,6 +446,111 @@ storage backend in the conformance profile.
 The host MUST support pluggable storage backends.
 The host MUST NOT hard-code storage backend logic in the core specification.
 
+## 4.3 Failure Evidence And Operational Notes
+
+### Failure outcomes
+
+> **Normative definition.**
+The host MUST define the following failure outcomes for revisioned snapshots
+journals history and storage contracts:
+
+1. **Malformed**: Input data does not conform to the expected schema.
+2. **Incompatible**: Data is incompatible with the current schema version or
+   artifact version.
+3. **Conflicting**: Multiple writers attempt to write to the same revision
+   (optimistic concurrency conflict).
+4. **Unauthorized**: The caller does not have permission to perform the operation.
+5. **Exhausted**: The system is out of resources (e.g., storage capacity, retry
+   budget).
+6. **Unavailable**: The storage backend is unavailable.
+
+> **Normative definition.**
+Each failure outcome MUST be mapped to a specific error code and diagnostic
+message.
+
+### Error codes
+
+> **Normative definition.**
+The host MUST use the following error codes for revisioned snapshots journals
+history and storage contracts:
+
+| Error Code | Description |
+|------------|-------------|
+| `storage.snapshot.duplicate` | Snapshot ID already exists |
+| `storage.snapshot.not_found` | Snapshot ID does not exist |
+| `storage.snapshot.corruption` | Snapshot checksum verification failed |
+| `storage.snapshot.lifecycle_inconsistent` | Snapshot lifecycle state inconsistent with registry |
+| `storage.snapshot.incompatible_schema` | State schema version incompatible |
+| `storage.snapshot.incompatible_artifact` | Artifact version incompatible |
+| `storage.snapshot.conflict` | Optimistic concurrency conflict |
+| `storage.journal.modified` | Attempt to modify append-only journal |
+| `storage.journal.corruption` | Journal entry checksum verification failed |
+| `storage.journal.garbage_collected` | Journal entry has been garbage collected |
+| `storage.unavailable` | Storage backend unavailable |
+
+> **Normative definition.**
+Each error code MUST be accompanied by a human-readable diagnostic message.
+The diagnostic message MUST identify the phase contract, profile, and failed
+boundary without exposing secrets.
+
+### Bounded diagnostics
+
+> **Normative definition.**
+The host MUST emit bounded diagnostics for each failure outcome.
+The diagnostics MUST include:
+
+1. **Error code**: The specific error code from the table above.
+2. **Context**: The operation that failed (e.g., snapshot read, journal write).
+3. **Entity identifiers**: The tenant ID, agent ID, snapshot ID, or entry ID
+   involved (without exposing sensitive data).
+4. **Timestamp**: The time the error occurred.
+5. **Retryable**: Whether the operation can be retried.
+
+> **Normative definition.**
+The host MUST NOT expose internal implementation details, secrets, or
+sensitive data in diagnostics.
+
+### Implementation-defined choices
+
+> **Normative definition.**
+The following choices are implementation-defined and MUST be documented in the
+conformance profile:
+
+1. **Storage backend**: The chosen storage backend and its durability guarantees.
+2. **Hash algorithm**: The hash algorithm used for checksums.
+3. **Retention period**: The journal and snapshot retention period.
+4. **Retry strategy**: The retry strategy for transient failures.
+5. **Garbage collection**: The garbage collection strategy for old snapshots
+   and journal entries.
+
+### Deferred work
+
+> **Normative definition.**
+The following work is deferred to later phases or host implementations:
+
+1. **State-schema migration**: The migration strategy between compatible schema
+   versions.
+2. **Storage backend migration**: The migration strategy between storage
+   backends.
+3. **Journal compaction**: The compaction strategy for the audit journal.
+4. **Snapshot compression**: The compression strategy for old snapshots.
+
+### Results invalidating earlier milestones
+
+> **Normative definition.**
+The following results from Phase 1 MAY invalidate earlier milestone assumptions:
+
+1. **Storage requirements**: If the storage requirements exceed the capacity
+   planned in earlier milestones, the capacity plan MUST be revised.
+2. **Journal growth**: If the journal grows faster than expected, the retention
+   policy and storage capacity MUST be revised.
+3. **Checksum algorithm**: If the chosen checksum algorithm has known weaknesses,
+   the algorithm MUST be changed.
+
+> **Normative definition.**
+If any result from Phase 1 invalidates an earlier milestone assumption, the
+affected milestone MUST be revised and re-validated.
+
 ## Variability register
 
 | Item | Permission | Recommendation | Constraint |
