@@ -896,6 +896,446 @@ The signal envelope is concerned with how signals move; the address/
 relationship layer is concerned with who is moving them and why.
 Both layers are necessary for a complete multi-agent coordination model.
 
+## 6.2 Behavior And Integration
+
+### Address resolution and placement projections
+
+> **Normative definition.**
+Address resolution is the observable behavior that maps a
+`TenantQualifiedAgentAddress` to a `ResolutionState` produced by combining
+two sources of information: (1) the durable agent registry entry that
+records the agent's identity, creation time, and lifecycle status, and
+(2) the current activation and placement projection that records the
+engine instance, worker, socket binding, and physical node where the
+agent's live actors are executing at the moment of the query.
+
+> **Normative definition.**
+The durable registry entry is the single source of truth for an agent's
+identity and lifecycle status.
+It is written through the durable state layer defined in
+[Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md)
+and is subject to the atomic commit protocol defined in
+[Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md).
+The registry entry MUST persist across engine instance restarts, agent
+migration, and host failure.
+
+> **Normative definition.**
+The activation and placement projection is a transient, in-memory or
+cache-local view that reflects which engine instance, worker, socket, and
+node are currently hosting the agent's live actors.
+The projection is derived from the host's runtime scheduling and
+placement logic and is updated asynchronously as agents start, stop,
+migrate, or fail.
+The projection is NOT durable and MUST NOT be treated as authoritative
+for identity or lifecycle questions; it is purely a routing hint.
+
+> **Non-normative note.**
+The separation between durable registry state and transient placement
+projection is what allows address resolution to remain correct even when
+the host has no currently active placement for an agent (e.g., the agent
+is inactive, suspended, or in the process of migration).
+The registry tells the resolver that the agent still exists; the
+projection tells the router where to send signals if the agent is live.
+Both views must be combined to produce a complete `ResolutionState`.
+
+> **Normative definition.**
+Address resolution returns a `ResolutionState` that includes:
+
+1. The agent's `status` from the durable registry entry.
+2. The agent's current `placement` from the activation/placement
+   projection, if any.
+3. A point-in-time snapshot of the agent's active relationships,
+   consistent with the relationship visibility policy defined in
+   section 6.1.
+4. A timestamp indicating when the resolution was computed.
+
+The resolution operation MUST NOT create, modify, or terminate the agent.
+It is a purely read-only observation of current state.
+
+> **Non-normative note.**
+Because the placement projection is asynchronous, two consecutive
+resolution queries for the same agent MAY return different placement
+values even though the agent's durable identity has not changed.
+This is expected behavior and is consistent with the eventual
+consistency model described in the conformance profile.
+
+> **Normative implementation-defined choice.**
+The mechanism by which the host combines the durable registry entry with
+the activation/placement projection to produce a `ResolutionState` is
+implementation-defined.
+The implementation MUST document how it handles the case where the
+registry entry is present but no placement is available, and how it
+handles the case where the registry entry is absent but a stale
+placement reference persists.
+
+> **Normative definition.**
+Address resolution for a `TenantQualifiedAgentAddress` that does not
+exist in the durable registry MUST return a `ResolutionState` with
+`status: "unknown"` and an absent `placement`.
+The resolution MUST NOT fabricate a placement for an unknown agent,
+even if the host has historical evidence of a previous agent with a
+similar address.
+
+> **Normative definition.**
+Address resolution for a `TenantQualifiedAgentAddress` whose registry
+entry exists but whose status is `"deleted"` MUST return a
+`ResolutionState` with `status: "deleted"`.
+Signal delivery to a deleted agent MUST be rejected with the diagnostic
+`agent.resolution.deleted` by any component that receives the
+resolution result and attempts delivery.
+
+> **Normative definition.**
+Address resolution for a `TenantQualifiedAgentAddress` whose registry
+entry exists but whose status is `"pending"` MUST return a
+`ResolutionState` with `status: "pending"` and an absent `placement`.
+Signals delivered to a pending agent MUST be queued in the agent's
+mailbox as defined in
+[Mailboxes Ordering Bounds Fairness And Turn Leases](21-mailboxes-ordering-bounds-fairness-and-turn-leases.md)
+and delivered when the agent transitions to `"active"`.
+
+### Signal provenance propagation
+
+> **Normative definition.**
+Signal provenance propagation is the set of rules that govern how the
+provenance fields defined in section 6.1 are carried, preserved, and
+validated as a signal traverses the multi-agent system from its
+originating agent to its final recipient.
+Propagation is governed by three invariants: origin preservation, chain
+integrity, and return-address binding.
+
+> **Normative definition.**
+Origin preservation requires that the `originating_agent` and
+`originating_principal` fields on a signal are immutable once set.
+An intermediate agent that relays, delegates, or transforms a signal
+MUST NOT modify these fields.
+The originating agent is the agent that created the signal, not the
+agent that last modified its content or the agent that is currently
+forwarding it.
+If a signal is received with an `originating_agent` that does not match
+the agent that the signal claims to originate from, the signal MUST
+be rejected with the diagnostic `signal.provenance.origin-mismatch`.
+
+> **Non-normative note.**
+Origin preservation is the primary defense against identity spoofing
+and delegation abuse.
+Without this invariant, any agent could claim to originate a signal
+from a more authoritative agent, thereby bypassing the trust and
+authority model defined by relationships.
+
+> **Normative definition.**
+Chain integrity requires that the `delegation_chain` field on a signal
+is a valid, contiguous chain of active `delegate` relationship records.
+Each element in the chain MUST correspond to an active delegate
+relationship whose source matches the target of the preceding element
+(in order from originating agent to current sender).
+If the chain is empty, the current sender MUST be the originating agent.
+If the chain is non-empty, each transition from one delegation to the
+next MUST be through a valid relationship: the target of delegation
+element N MUST be the source of delegation element N+1.
+
+> **Normative definition.**
+A broken delegation chain is a signal-level error.
+If, at any point during signal processing, the recipient detects that
+the `delegation_chain` does not form a valid contiguous chain of active
+`delegate` relationships, the signal MUST be rejected with the
+diagnostic `signal.provenance.delegation-chain-broken`.
+The recipient MUST NOT process, forward, or act on a signal with a
+broken delegation chain.
+
+> **Normative definition.**
+A cyclic delegation chain is a signal-level error.
+If processing the `delegation_chain` reveals that the same
+`RelationshipId` appears more than once, the signal MUST be rejected
+with the diagnostic `signal.provenance.delegation-chain-cyclic`.
+Cycles in the delegation chain indicate a misconfiguration or an
+adversarial attempt to create an infinite signal relay loop.
+
+> **Non-normative note.**
+A cyclic delegation chain can arise in two scenarios: (1) an agent
+A delegates to agent B, and agent B delegates back to agent A, creating
+a cycle that allows an attacker to amplify signal visibility or bypass
+authority checks by looping through the chain; (2) a legitimate
+multi-hop delegation where the chain is incorrectly constructed with a
+redundant back-edge.
+Both scenarios are rejected because they are either security violations
+or bugs, and neither can be distinguished from the signal alone.
+
+> **Normative definition.**
+Return-address binding requires that the `return_address` field on a
+signal, if present, is honored by the recipient as the destination for
+any result signals produced in response to this signal.
+The recipient MUST NOT deliver results to any address other than the
+`return_address`, even if the signal's current sender is at a different
+address or placement.
+If `return_address` is `null`, the recipient MUST NOT deliver results
+back to the signal's sender or any other address.
+
+> **Non-normative note.**
+Return-address binding enables fire-and-forget signaling patterns where
+the sender does not wish to receive results, and it also enables
+multi-hop delegation where the original sender (at a different address
+than the current sender) expects results to be returned.
+Without this binding, a delegating agent that forwards a signal to a
+delegate cannot control where results are delivered, which breaks the
+delegation contract.
+
+> **Normative definition.**
+Correlation ID inheritance requires that all signals generated within
+a single logical interaction share the same `correlation_id`.
+The `correlation_id` is established at the start of the interaction
+(by the initiating agent or principal) and is inherited by every
+subsequent signal generated as part of that interaction.
+An agent that generates multiple signals from a single incoming signal
+MUST set the `correlation_id` of all derived signals to the same value
+as the incoming signal.
+
+> **Normative definition.**
+Causation ID propagation requires that the `causation_id` field on a
+signal records the relationship through which the signal was transmitted.
+If a signal is forwarded through a `delegate` relationship, the
+intermediate agent MUST update the `causation_id` to reflect the
+relationship through which it is forwarding the signal.
+If a signal is forwarded without any relationship (e.g., direct
+delivery to an agent that is not in the sender's relationship graph),
+the `causation_id` MUST be set to `null`.
+
+> **Non-normative note.**
+The distinction between `originating_agent` (immutable, set once at
+creation) and `causation_id` (may change at each hop to reflect the
+current transmission path) is intentional.
+`originating_agent` answers "who created this?"; `causation_id` answers
+"through what relationship was this last transmitted?".
+Both are needed for complete provenance: one identifies the source of
+intent, the other identifies the authority used to transmit.
+
+> **Normative implementation-defined choice.**
+The maximum length of the `delegation_chain` field is implementation-defined.
+Implementations MUST document their maximum chain length and MUST
+reject signals whose delegation chain exceeds the documented maximum
+with the diagnostic `signal.provenance.delegation-chain-too-long`.
+The maximum MUST be at least 128 elements and SHOULD be documented as a
+bounded value in the conformance profile.
+
+> **Non-normative note.**
+A bounded delegation chain prevents unbounded signal propagation that
+could lead to resource exhaustion or infinite relay loops in the event
+of a misconfiguration.
+The minimum of 128 elements is chosen to accommodate deep multi-agent
+organizational hierarchies while remaining small enough to process
+efficiently in memory.
+
+### Relation outcome classifications
+
+> **Normative definition.**
+A relation outcome is the result returned by a relationship query or
+operation when the requested relationship cannot be satisfied under the
+specified conditions.
+Relation outcomes are classified into the following categories:
+unknown, ambiguous, moved, terminated, cross-tenant, cyclic, and
+unauthorized.
+Each category has a distinct diagnostic, semantic meaning, and
+required handling behavior for the requesting principal.
+
+> **Normative definition.**
+The **unknown** relation outcome occurs when a relationship query
+references an agent address that does not exist in the durable
+registry.
+The host MUST return the diagnostic `relationship.query.unknown-agent`
+and the query MUST NOT return any partial or speculative data about the
+unknown agent.
+The requesting principal SHOULD re-resolve the agent address before
+retrying the query.
+
+> **Normative definition.**
+The **ambiguous** relation outcome occurs when a relationship query
+matches more than one relationship record and the query does not include
+sufficient filtering criteria to disambiguate.
+For example, an agent that has multiple active `dependency` relationships
+with the same target agent but different relationship IDs would produce
+an ambiguous result if the query does not specify which relationship
+ID to retrieve.
+The host MUST return the diagnostic `relationship.query.ambiguous` and
+MUST include in the diagnostic the count of matching records and the
+available filtering dimensions.
+The requesting principal MUST refine the query with additional criteria
+before retrying.
+
+> **Non-normative note.**
+Ambiguity is a query-shape error, not a data integrity error.
+It indicates that the query is under-specified, not that the data is
+corrupt.
+The host helps the principal resolve the ambiguity by reporting the
+count and available dimensions, rather than silently choosing one
+result or returning all matches without explanation.
+
+> **Normative definition.**
+The **moved** relation outcome occurs when a relationship query references
+a relationship record whose source or target agent has been migrated
+to a different engine instance, worker, or node since the relationship
+was created.
+Because agent addresses are independent of placement (as defined in
+section 6.1), the relationship record itself does NOT change when an
+agent migrates.
+The moved outcome is NOT an error: the relationship remains valid and
+operative.
+The moved outcome is a informational signal to the querying principal
+that the agents involved in the relationship may currently be executing
+on different runtime instances, which may affect latency, fault
+tolerance, and delivery guarantees.
+The host MUST NOT return a moved diagnostic for a relationship query
+that succeeds normally.
+The moved outcome is returned only when the query explicitly requests
+placement information and the placement of one or both agents has
+changed since the last resolution.
+
+> **Non-normative note.**
+The moved outcome is intentionally distinct from a broken or terminated
+relationship.
+A moved relationship is still active and valid; only the runtime
+placement of one or both agents has changed.
+This distinction matters because agents that depend on relationship
+topology can continue to operate normally even when their targets have
+migrated, as long as they handle the placement change gracefully (e.g.,
+by adjusting expected latency or retry backoff).
+
+> **Normative definition.**
+The **terminated** relation outcome occurs when a relationship query
+references a relationship record whose status is `terminated`.
+The host MUST return the diagnostic `relationship.query.terminated`
+and MUST NOT include the terminated relationship in the query result.
+The requesting principal SHOULD treat a terminated relationship as if
+it never existed for the purposes of authority, visibility, and routing
+decisions.
+A terminated relationship MAY still be present in historical archives
+for audit and forensic purposes, but it MUST NOT be returned by
+operational queries.
+
+> **Normative definition.**
+The **cross-tenant** relation outcome occurs when a relationship query
+references a cross-tenant relationship and the requesting principal is
+not a member of either tenant.
+The host MUST return the diagnostic `relationship.query.cross-tenant-invisible`
+and MUST NOT return any data about the cross-tenant relationship,
+including its existence, type, source, target, or status.
+If the requesting principal is a member of one but not the other
+tenant, the host MAY return a restricted view (type, source, target,
+status only, as defined in the visibility policy in section 6.1).
+
+> **Non-normative note.**
+The cross-tenant outcome enforces the tenant isolation boundary defined
+in
+[Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md).
+Cross-tenant relationships are the only relationships that can span
+tenant boundaries, and they are subject to stricter visibility rules
+than intra-tenant relationships.
+
+> **Normative definition.**
+The **cyclic** relation outcome occurs when a relationship operation
+would create a cycle in the relationship graph.
+For example, creating a `parent` relationship from agent A to agent B
+would create a cycle if agent B already has a `parent` relationship
+pointing to agent A (directly or through a chain of `parent`
+relationships).
+The host MUST reject the operation with the diagnostic
+`relationship.operation.cyclic` and MUST NOT create the relationship.
+The diagnostic MUST include the cycle path (the sequence of relationship
+IDs that form the cycle) to enable the requesting principal to
+understand and resolve the conflict.
+
+> **Non-normative note.**
+Cyclic relationships are rejected for governance and ownership types
+(`parent`, `child`, `owner`) because cycles in these types create
+accountability and escalation ambiguity.
+For non-governance types (`dependency`, `delegate`, `observer`), cycles
+are permitted but subject to the cycle-detection rules in the
+delegation-chain propagation section above.
+
+> **Normative definition.**
+The **unauthorized** relation outcome occurs when a relationship
+operation is attempted by a principal that lacks the required creation
+authority for the requested relationship type.
+The host MUST reject the operation with the diagnostic
+`relationship.operation.unauthorized` and MUST NOT create, modify, or
+terminate the relationship.
+The diagnostic MUST identify the relationship type, the requesting
+principal, and the required trust tier or consent condition.
+
+> **Non-normative note.**
+The unauthorized outcome is the primary enforcement mechanism for the
+relationship creation authority model defined in section 6.1.
+Without this outcome, principals could create or modify relationships
+without proper authority, undermining the trust and governance model.
+
+### Integration with existing contracts
+
+> **Normative definition.**
+Address resolution, signal provenance propagation, and relation outcome
+classifications are integrated with the following existing contracts
+in this specification:
+
+1. **Signal envelopes**: The provenance fields defined in this section
+   are the address-and-relationship-layer component of the signal
+   envelope defined in
+   [Signal Envelopes Causality Routing And Delivery](10-signals-causality-routing-and-delivery.md).
+   Signal envelope delivery semantics govern how signals are routed
+   after provenance validation succeeds.
+2. **Agent registry**: Address resolution is backed by the agent
+   registry defined in
+   [Agent Registry Activation Cancellation And Completion](22-agent-registry-activation-cancellation-and-completion.md).
+   Registry state transitions (activation, cancellation, completion)
+   update the durable entry that address resolution reads.
+3. **Mailboxes**: Signal delivery to agents without current placement
+   is governed by the mailbox and delivery policies defined in
+   [Mailboxes Ordering Bounds Fairness And Turn Leases](21-mailboxes-ordering-bounds-fairness-and-turn-leases.md).
+   Provenance validation occurs before signal admission to the mailbox.
+4. **Threat model**: Cross-tenant relationship enforcement, trust tier
+   requirements for relationship creation, and information leakage
+   prevention are governed by the threat model defined in
+   [Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md).
+5. **Capability policy**: Relationship creation authority and visibility
+   enforcement are governed by the capability policy defined in
+   [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md).
+6. **Provenance and audit**: Signal provenance fields are recorded in
+   the evidence logs defined in
+   [Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md).
+   Relationship lifecycle events are also recorded as evidence.
+
+> **Non-normative note.**
+This integration ensures that agent identity, addressing, ownership, and
+dependency relations are not an isolated subsystem but are deeply
+woven into the multi-agent coordination fabric.
+Every other chapter that deals with inter-agent communication,
+authority, or lifecycle interacts with this chapter's contracts in
+well-defined ways.
+The cross-references above are the primary integration points.
+
+> **Normative definition.**
+When this section and another section of this specification appear to
+conflict on a behavior question, the following precedence rules apply:
+
+1. For signal provenance and provenance validation: this section takes
+   precedence over the signal envelope specification for questions of
+   field immutability, validation rules, and origin preservation.
+2. For relationship authority and lifecycle: this section takes
+   precedence over the directive and effect handler specifications for
+   questions of creation authority, consent requirements, and lifecycle
+   transitions.
+3. For address resolution: this section takes precedence over the
+   mailbox and delivery specifications for questions of what state is
+   returned by resolution (status, placement, relationships).
+4. Where both sections are applicable and agree, they are mutually
+   reinforcing.
+
+> **Non-normative note.**
+The precedence rules above are narrowly scoped: they resolve conflicts
+only within the specific behavioral domains identified.
+They do NOT establish blanket precedence of this section over any other
+section.
+For example, the signal envelope specification still governs signal
+delivery semantics, fault tolerance, and retry behavior; this section
+only governs how the provenance fields within those signals are
+populated and validated.
+
 ## Variability register
 
 The following table enumerates every implementation-defined choice,
@@ -918,3 +1358,6 @@ and
 | V-6.1-08 | Relationship snapshot consistency model | Whether resolution returns a strong-consistency snapshot or a eventually-consistent snapshot of relationship state. | Conformance profile. | Strong consistency |
 | V-6.1-09 | Resolution cache invalidation mechanism | The mechanism used to invalidate resolution cache entries on relationship state changes (immediate, event-driven, TTL-based, or hybrid). | Conformance profile. | Event-driven |
 | V-6.1-10 | Signal provenance validation strictness | Whether provenance validation at reception is hard-fail (reject signal) or soft-fail (log warning, allow signal). | Conformance profile. | Hard-fail |
+| V-6.2-01 | Address resolution combination mechanism | How the host combines the durable registry entry with the activation/placement projection to produce a `ResolutionState`, including handling of missing placement and stale references. | Conformance profile. | Registry-first with placement overlay |
+| V-6.2-02 | Maximum delegation chain length | The maximum number of elements permitted in the `delegation_chain` field before the signal is rejected. | Conformance profile. | 128 |
+| V-6.2-03 | Moved outcome delivery mechanism | How the host signals that an agent's placement has changed since the last resolution (informational diagnostic, explicit placement field, or separate notification). | Conformance profile. | Informational diagnostic on placement-request |

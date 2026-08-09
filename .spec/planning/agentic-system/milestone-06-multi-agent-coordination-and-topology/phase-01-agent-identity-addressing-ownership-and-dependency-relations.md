@@ -25,18 +25,18 @@ Back to milestone: [README](./README.md)
 
 ## 1.2 Section - Behavior And Integration
 
-- [ ] 1.2 Section - Establish behavior and integration for agent identity addressing ownership and dependency relations.
+- [x] 1.2 Section - Establish behavior and integration for agent identity addressing ownership and dependency relations.
 
   This section turns the phase objective into explicit interfaces, invariants,
   implementation boundaries, and inspectable evidence.
 
-  - [ ] 1.2.1 Task - Complete the behavior and integration work.
+  - [x] 1.2.1 Task - Complete the behavior and integration work.
 
     This task is the section-sized implementation and commit boundary.
 
-    - [ ] 1.2.1.1 Subtask - Resolve addresses through durable registry state plus current activation/placement projections.
-    - [ ] 1.2.1.2 Subtask - Preserve correlation, causation, delegation chain, originating principal, and return address across agent signals.
-    - [ ] 1.2.1.3 Subtask - Define unknown, ambiguous, moved, terminated, cross-tenant, cyclic, and unauthorized relation outcomes.
+    - [x] 1.2.1.1 Subtask - Resolve addresses through durable registry state plus current activation/placement projections.
+    - [x] 1.2.1.2 Subtask - Preserve correlation, causation, delegation chain, originating principal, and return address across agent signals.
+    - [x] 1.2.1.3 Subtask - Define unknown, ambiguous, moved, terminated, cross-tenant, cyclic, and unauthorized relation outcomes.
 
 ## 1.3 Section - Failure Evidence And Operational Notes
 
