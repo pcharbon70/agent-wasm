@@ -289,6 +289,109 @@ commit failed. The host MUST retry the commit.
 > **Normative definition.**
 The host MUST log all ambiguous commit resolutions for audit purposes.
 
+## 2.3 Failure Evidence And Operational Notes
+
+### Failure outcomes
+
+> **Normative definition.**
+The host MUST define the following failure outcomes for atomic state journal
+and directive-outbox commits:
+
+1. **Malformed**: Input data does not conform to the expected schema.
+2. **Incompatible**: Data is incompatible with the current schema version or
+   artifact version.
+3. **Conflicting**: Multiple writers attempt to write to the same revision
+   (optimistic concurrency conflict).
+4. **Unauthorized**: The caller does not have permission to perform the operation.
+5. **Exhausted**: The system is out of resources (e.g., storage capacity, retry
+   budget).
+6. **Unavailable**: The storage backend is unavailable.
+
+> **Normative definition.**
+Each failure outcome MUST be mapped to a specific error code and diagnostic
+message.
+
+### Error codes
+
+> **Normative definition.**
+The host MUST use the following error codes for atomic state journal and
+directive-outbox commits:
+
+| Error Code | Description |
+|------------|-------------|
+| `commit.conflict` | Optimistic concurrency conflict (expected_revision mismatch) |
+| `commit.invalid_revision` | next_revision is not expected_revision + 1 |
+| `commit.missing_payload_hash` | Outbox entry missing payload hash |
+| `commit.unresolved_directive` | Directive identity not determined before commit |
+| `commit.orphaned_outbox` | Outbox entry without committed state transition |
+| `storage.snapshot.duplicate` | Snapshot ID already exists |
+| `storage.snapshot.not_found` | Snapshot ID does not exist |
+| `storage.snapshot.corruption` | Snapshot checksum verification failed |
+| `storage.journal.modified` | Attempt to modify append-only journal |
+| `storage.unavailable` | Storage backend unavailable |
+
+> **Normative definition.**
+Each error code MUST be accompanied by a human-readable diagnostic message.
+The diagnostic message MUST identify the phase contract, profile, and failed
+boundary without exposing secrets.
+
+### Bounded diagnostics
+
+> **Normative definition.**
+The host MUST emit bounded diagnostics for each failure outcome.
+The diagnostics MUST include:
+
+1. **Error code**: The specific error code from the table above.
+2. **Context**: The operation that failed (e.g., commit write, outbox dispatch).
+3. **Entity identifiers**: The tenant ID, agent ID, revision, or entry ID
+   involved (without exposing sensitive data).
+4. **Timestamp**: The time the error occurred.
+5. **Retryable**: Whether the operation can be retried.
+
+> **Normative definition.**
+The host MUST NOT expose internal implementation details, secrets, or
+sensitive data in diagnostics.
+
+### Implementation-defined choices
+
+> **Normative implementation-defined choice.**
+The following choices are implementation-defined and MUST be documented in the
+conformance profile:
+
+1. **Storage backend**: The chosen storage backend and its durability guarantees.
+2. **Hash algorithm**: The hash algorithm used for payload hashes.
+3. **Retry strategy**: The retry strategy for transient conflicts.
+4. **Outbox dispatch strategy**: The dispatch strategy (at-least-once, etc.).
+5. **Ambiguous commit resolution timeout**: The timeout for ambiguous commit
+   resolution.
+
+### Deferred work
+
+> **Non-normative note.**
+The following work is deferred to later phases or host implementations:
+
+1. **Outbox retry with backoff**: The retry strategy with exponential backoff.
+2. **Outbox deduplication**: The deduplication strategy for outbox entries.
+3. **Outbox compaction**: The compaction strategy for completed outbox entries.
+4. **Cross-process fencing**: The fencing token strategy for multi-process
+   deployments.
+
+### Results invalidating earlier milestones
+
+> **Non-normative note.**
+The following results from Phase 2 MAY invalidate earlier milestone assumptions:
+
+1. **Storage requirements**: If the storage requirements exceed the capacity
+   planned in earlier milestones, the capacity plan MUST be revised.
+2. **Outbox growth**: If the outbox grows faster than expected, the retention
+   policy and storage capacity MUST be revised.
+3. **Commit latency**: If commit latency exceeds the turn timeout, the timeout
+   or commit strategy MUST be revised.
+
+> **Non-normative note.**
+If any result from Phase 2 invalidates an earlier milestone assumption, the
+affected milestone MUST be revised and re-validated.
+
 ## Variability register
 
 | Item | Permission | Recommendation | Constraint |
@@ -297,3 +400,4 @@ The host MUST log all ambiguous commit resolutions for audit purposes.
 | Outbox dispatch strategy | Implementation-defined | At-least-once with idempotency | Must prevent dispatch without commit |
 | Ambiguous commit resolution timeout | Implementation-defined | Document in conformance profile | Must not block agent turns indefinitely |
 | Outbox entry retention | Implementation-defined | Document retention policy | Must preserve audit journal for cancelled/completed agents |
+| Commit retry strategy | Implementation-defined | Exponential backoff | Must limit retries and back off |
