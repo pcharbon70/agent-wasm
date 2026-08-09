@@ -209,9 +209,11 @@ and boundary-limit inputs fail with stable diagnostics where applicable.
 |---------|-------------|-------|-----------------|
 | `test-budget-exhaustion-1` | Terminate on turn budget exhaustion. | Turn budget exhausted. | Diagnostic `turn_budget_exhausted` is emitted, strategy is terminated. |
 | `test-budget-exhaustion-2` | Terminate on token budget exhaustion. | Token budget exhausted. | Diagnostic `token_budget_exhausted` is emitted, strategy is terminated. |
-| `test-budget-exhaustion-3` | Terminate on tool budget exhaustion. | Tool budget exhausted. | Diagnostic `tool_budget_exhausted` is emitted, strategy is terminated. |
-| `test-budget-exhaustion-4` | Terminate on cost budget exhaustion. | Cost budget exhausted. | Diagnostic `cost_budget_exhausted` is emitted, strategy is terminated. |
-| `test-budget-exhaustion-5` | Terminate on time budget exhaustion. | Time budget exhausted. | Diagnostic `time_budget_exhausted` is emitted, strategy is terminated. |
+| `test-budget-exhaustion-3` | Terminate on iteration budget exhaustion. | Iteration budget exhausted. | Diagnostic `iteration_budget_exhausted` is emitted, strategy is terminated. |
+| `test-budget-exhaustion-4` | Terminate on tool budget exhaustion. | Tool budget exhausted. | Diagnostic `tool_budget_exhausted` is emitted, strategy is terminated. |
+| `test-budget-exhaustion-5` | Terminate on cost budget exhaustion. | Cost budget exhausted. | Diagnostic `cost_budget_exhausted` is emitted, strategy is terminated. |
+| `test-budget-exhaustion-6` | Terminate on time budget exhaustion. | Time budget exhausted. | Diagnostic `time_budget_exhausted` is emitted, strategy is terminated. |
+| `test-budget-exhaustion-7` | Terminate on recursion budget exhaustion. | Recursion budget exhausted. | Diagnostic `recursion_budget_exhausted` is emitted, strategy is terminated. |
 
 #### Unavailable dependency tests
 

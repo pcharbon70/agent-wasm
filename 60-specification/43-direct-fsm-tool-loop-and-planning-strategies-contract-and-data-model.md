@@ -104,7 +104,7 @@ Every direct strategy instance MUST include the following fields:
 
 | Field | Content | Source |
 |-------|---------|--------|
-| `strategy_kind` | The strategy kind (`direct`, `fsm`, `tool_loop`). | Host runtime |
+| `strategy_kind` | The strategy kind (`direct`). Always `direct` on instances of this type. | Host runtime |
 | `strategy_id` | The `StrategyId` of the strategy instance. | Host runtime |
 | `agent_address` | The `TenantQualifiedAgentAddress` of the agent using this strategy. | Host runtime |
 | `action_id` | The `ActionId` of the validated action being executed. | Host runtime |
@@ -172,6 +172,13 @@ The FSM strategy MUST handle the following events:
 | `model_failed` | A model response fails. | `waiting_for_model` -> `planning` |
 | `model_cancelled` | A model response is cancelled. | `waiting_for_model` -> `planning` |
 | `model_unavailable` | A model response cannot be completed. | `waiting_for_model` -> `planning` |
+
+> **Normative definition.**
+The `tool_unavailable` and `model_unavailable` events are FSM events that
+drive the state transition to `planning`.
+The host MAY retry the tool/model request or terminate based on configuration,
+but the FSM transition is always to `planning`.
+The failure outcomes for these events are documented in Section 43.3.
 | `human_input` | Human provides input or approval. | `waiting_for_human` -> `planning` |
 | `human_rejected` | Human rejects the plan. | `waiting_for_human` -> `planning` |
 | `human_cancelled` | Human cancels the plan. | `waiting_for_human` -> `terminated` |
@@ -181,6 +188,7 @@ The FSM strategy MUST handle the following events:
 | `cost_budget_exhausted` | The cost budget is exhausted. | Any -> `terminated` |
 | `time_budget_exhausted` | The time budget is exhausted. | Any -> `terminated` |
 | `recursion_budget_exhausted` | The recursion budget is exhausted. | Any -> `terminated` |
+| `tool_budget_exhausted` | The tool budget is exhausted. | Any -> `terminated` |
 | `snapshot_restored` | A snapshot is restored from history. | Any -> `idle` |
 | `invalid_snapshot` | The snapshot is invalid or incompatible. | Any -> `terminated` |
 | `nonprogress_loop_detected` | The strategy enters a non-progress loop. | Any -> `terminated` |

@@ -118,7 +118,7 @@ Defined tests to verify malformed, incompatible, stale, duplicate, and boundary-
 | Incompatible version | Tests for incompatible version detection. | 3 |
 | Conflicting input | Tests for conflicting input detection. | 2 |
 | Unauthorized access | Tests for unauthorized access detection. | 3 |
-| Budget exhaustion | Tests for budget exhaustion detection. | 5 |
+| Budget exhaustion | Tests for budget exhaustion detection. | 7 |
 | Unavailable dependency | Tests for unavailable dependency detection. | 3 |
 | Invalid snapshot | Tests for invalid snapshot detection. | 2 |
 | Non-progress loop | Tests for non-progress loop detection. | 1 |
@@ -169,9 +169,11 @@ Defined tests to verify malformed, incompatible, stale, duplicate, and boundary-
 |---------|-------------|-------|-----------------|
 | `test-budget-exhaustion-1` | Terminate on turn budget exhaustion. | Turn budget exhausted. | Diagnostic `turn_budget_exhausted` is emitted, strategy is terminated. |
 | `test-budget-exhaustion-2` | Terminate on token budget exhaustion. | Token budget exhausted. | Diagnostic `token_budget_exhausted` is emitted, strategy is terminated. |
-| `test-budget-exhaustion-3` | Terminate on tool budget exhaustion. | Tool budget exhausted. | Diagnostic `tool_budget_exhausted` is emitted, strategy is terminated. |
-| `test-budget-exhaustion-4` | Terminate on cost budget exhaustion. | Cost budget exhausted. | Diagnostic `cost_budget_exhausted` is emitted, strategy is terminated. |
-| `test-budget-exhaustion-5` | Terminate on time budget exhaustion. | Time budget exhausted. | Diagnostic `time_budget_exhausted` is emitted, strategy is terminated. |
+| `test-budget-exhaustion-3` | Terminate on iteration budget exhaustion. | Iteration budget exhausted. | Diagnostic `iteration_budget_exhausted` is emitted, strategy is terminated. |
+| `test-budget-exhaustion-4` | Terminate on tool budget exhaustion. | Tool budget exhausted. | Diagnostic `tool_budget_exhausted` is emitted, strategy is terminated. |
+| `test-budget-exhaustion-5` | Terminate on cost budget exhaustion. | Cost budget exhausted. | Diagnostic `cost_budget_exhausted` is emitted, strategy is terminated. |
+| `test-budget-exhaustion-6` | Terminate on time budget exhaustion. | Time budget exhausted. | Diagnostic `time_budget_exhausted` is emitted, strategy is terminated. |
+| `test-budget-exhaustion-7` | Terminate on recursion budget exhaustion. | Recursion budget exhausted. | Diagnostic `recursion_budget_exhausted` is emitted, strategy is terminated. |
 
 #### Unavailable dependency tests
 
@@ -247,7 +249,7 @@ Defined tests to verify timeout, cancellation, unavailable dependency, and retry
 | Test ID | Description | Input | Expected output |
 |---------|-------------|-------|-----------------|
 | `test-cancellation-1` | Cancel strategy execution. | Strategy cancellation request. | Strategy is cancelled, no partial state remains. |
-| `test-timeout-2` | Cancel plan execution. | Plan cancellation request. | Plan is cancelled, no partial state remains. |
+| `test-cancellation-2` | Cancel plan execution. | Plan cancellation request. | Plan is cancelled, no partial state remains. |
 | `test-cancellation-3` | Cancel tool execution. | Tool cancellation request. | Tool execution is cancelled, no partial state remains. |
 | `test-cancellation-4` | Cancel model request. | Model cancellation request. | Model request is cancelled, no partial state remains. |
 

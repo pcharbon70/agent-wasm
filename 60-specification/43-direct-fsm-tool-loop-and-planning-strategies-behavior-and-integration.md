@@ -173,7 +173,7 @@ The host MUST enforce the following budget types:
 |-------------|------|------------|------------|
 | `turns` | Number of turns | Host runtime | Host policy |
 | `tokens` | Number of tokens | Host runtime | Host policy |
-| `tools` | Number of tool executions | Host runtime | Host policy |
+| `iterations` | Number of strategy iterations | Host runtime | Host policy |
 | `cost` | Monetary cost (e.g., USD) | Host runtime | Host policy |
 | `time` | Elapsed time (e.g., seconds) | Host runtime | Host policy |
 | `recursion_depth` | Recursion depth | Host runtime | Host policy |
@@ -201,7 +201,7 @@ and emit the corresponding diagnostic:
 |-------------|------------|
 | `turns` | `turn_budget_exhausted` |
 | `tokens` | `token_budget_exhausted` |
-| `tools` | `tool_budget_exhausted` |
+| `iterations` | `iteration_budget_exhausted` |
 | `cost` | `cost_budget_exhausted` |
 | `time` | `time_budget_exhausted` |
 | `recursion_depth` | `recursion_budget_exhausted` |
