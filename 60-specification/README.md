@@ -48,6 +48,11 @@ themselves.
 - [State Operations Patches Revisions And Conflicts](12-state-operations-patches-revisions-and-conflicts.md) — Phase 3 of Milestone 2; defines safe internal state transitions against host-owned snapshots and optimistic revisions.
 - [Directives Strategies Continuations And Terminal States](13-directives-strategies-continuations-and-terminal-states.md) — Phase 4 of Milestone 2; defines external requests and replaceable decision policies without hiding mutable runtime authority in the guest.
 - [Deterministic Reducer Semantics And Milestone Acceptance](14-deterministic-reducer-semantics-and-milestone-acceptance.md) — Phase 5 of Milestone 2; assembles signals, actions, state operations, directives, and strategies into one replayable decision kernel.
+- [Extism Invocation Boundary Instances And Output Validation](20-extism-invocation-boundary-instances-and-output-validation.md) — Phase 1 of Milestone 3; establishes the host boundary that resolves artifacts, creates constrained instances, invokes exports, and treats all guest output as untrusted until validated.
+- [Mailboxes Ordering Bounds Fairness And Turn Leases](21-mailboxes-ordering-bounds-fairness-and-turn-leases.md) — Phase 2 of Milestone 3; provides one-at-a-time committed turns per agent while bounding queued work and making overload behavior explicit.
+- [Agent Registry Activation Cancellation And Completion](22-agent-registry-activation-cancellation-and-completion.md) — Phase 3 of Milestone 3; manages logical agent identity and disposable live actors without persisting engine or process handles.
+- [Sensors Schedules Timers And External Signal Ingress](23-sensors-schedules-timers-and-external-signal-ingress.md) — Phase 4 of Milestone 3; converts external events and time into validated signals without granting event sources direct access to agent state.
+- [Single-Agent Host Flow And Milestone Acceptance](24-single-agent-host-flow-and-milestone-acceptance.md) — Phase 5 of Milestone 3; connects admission, mailbox, activation, Extism invocation, validation, lifecycle, and observable results in one single-node runtime.
 
 ## Maintaining this index
 
