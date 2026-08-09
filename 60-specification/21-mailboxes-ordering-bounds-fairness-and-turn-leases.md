@@ -120,11 +120,9 @@ The host MUST NOT starve lower-priority entries indefinitely.
 > **Normative definition.**
 The host MAY implement fairness using the following policies:
 
-1. **Strict priority**: Higher-priority entries are always delivered before lower-priority entries. Lower-priority entries may be starved.
+1. **Weighted fair queuing**: Each priority class receives a weighted share of delivery capacity. The weights MUST be documented in the conformance profile.
 
-2. **Weighted fair queuing**: Each priority class receives a weighted share of delivery capacity. The weights MUST be documented in the conformance profile.
-
-3. **Round-robin with priority**: Entries are delivered in round-robin fashion, but higher-priority classes are visited more frequently. The frequency MUST be documented in the conformance profile.
+2. **Round-robin with priority**: Entries are delivered in round-robin fashion, but higher-priority classes are visited more frequently. The frequency MUST be documented in the conformance profile.
 
 > **Normative definition.**
 The host MUST document the chosen fairness policy in the conformance profile.
@@ -139,6 +137,7 @@ The host MUST enforce the following mailbox bounds:
 3. **Age bound**: The maximum age of an entry before it is rejected.
 4. **Per-source bound**: The maximum number of entries from a single source.
 5. **Per-tenant bound**: The maximum number of entries for a single tenant.
+6. **Delivery deadline**: The maximum time an entry may remain undelivered. Entries past their deadline are rejected with `mailbox.delivery.expired`.
 
 > **Normative definition.**
 
@@ -148,7 +147,8 @@ MailboxBounds {
   max_bytes: u64,
   max_age_ms: u64,
   max_entries_per_source: u64,
-  max_entries_per_tenant: u64
+  max_entries_per_tenant: u64,
+  delivery_deadline_ms: u64?
 }
 ```
 
@@ -159,6 +159,7 @@ MailboxBounds {
 | `max_age_ms` | u64 | Yes | Maximum age of an entry in milliseconds |
 | `max_entries_per_source` | u64 | Yes | Maximum number of entries from a single source |
 | `max_entries_per_tenant` | u64 | Yes | Maximum number of entries for a single tenant |
+| `delivery_deadline_ms` | u64? | No | Maximum delivery time in milliseconds. Null means no delivery deadline. |
 
 > **Normative definition.**
 The host MUST reject new entries when any bound is reached, according to the
@@ -173,8 +174,8 @@ The bounds MUST be documented in the conformance profile.
 ### Overload behavior
 
 > **Normative definition.**
-When a mailbox bound is reached, the host MUST apply the following behavior
-by signal class:
+When a mailbox bound is reached, the host MUST select one of the following
+overload actions for each signal class:
 
 1. **Reject**: Reject the new entry immediately with `mailbox.overload.rejected`.
 2. **Defer**: Queue the new entry in a separate overflow queue with `mailbox.overload.deferred`.
@@ -201,7 +202,7 @@ The host MUST enforce one-at-a-time committed turns per agent using turn leases.
 TurnLease {
   agent_id: AgentId,
   owner: HostInstanceId,
-  revision: int,
+  revision: u64,
   expiry: UnixTimestamp,
   fencing_token: u64,
   status: LeaseStatus
@@ -220,7 +221,7 @@ LeaseStatus {
 |-------|------|----------|---------|
 | `agent_id` | AgentId | Yes | Agent this lease is for |
 | `owner` | HostInstanceId | Yes | Host instance that owns the lease |
-| `revision` | int | Yes | State revision this lease covers |
+| `revision` | u64 | Yes | State revision this lease covers |
 | `expiry` | UnixTimestamp | Yes | Absolute expiry time for the lease |
 | `fencing_token` | u64 | Yes | Fencing token for lease validation |
 | `status` | LeaseStatus | Yes | Current lease status |
@@ -264,7 +265,7 @@ fairness, and turn leases:
 > **Normative definition.**
 The host MUST handle each failure outcome as follows:
 
-1. **Duplicate workers**: The host MUST use fencing tokens to ensure only one worker processes the agent. The worker with the highest fencing token wins.
+1. **Duplicate workers**: The host MUST use fencing tokens to ensure only one worker processes the agent. The worker with the highest fencing token wins. If two workers attempt to acquire a lease for the same agent simultaneously, the host MUST emit `mailbox.turn_lease.conflict` for the losing worker.
 
 2. **Expired leases**: The host MUST terminate the turn and release the lease. The next turn request for the agent MUST acquire a new lease.
 
@@ -288,8 +289,9 @@ fairness, and turn leases:
 | Incompatible | Mailbox policy incompatible with signal | Priority class or signal class mismatch | `mailbox.entry.incompatible` |
 | Conflicting | Concurrent turns on same agent | Same agent targeted with multiple leases | `mailbox.turn_lease.conflict` |
 | Unauthorized | Missing capability for mailbox operation | Required capability not granted | `mailbox.entry.unauthorized` |
-| Exhausted | Mailbox bounds exceeded | Count, byte, age, per-source, or per-tenant bound reached | `mailbox.bounds.exhausted` |
+| Exhausted | Mailbox bounds exceeded | Count, byte, age, per-source, or per-tenant bound reached | `mailbox.bounds.count_exceeded`, `mailbox.bounds.byte_exceeded`, `mailbox.bounds.age_exceeded`, `mailbox.bounds.per_source_exceeded`, `mailbox.bounds.per_tenant_exceeded` |
 | Unavailable | Mailbox or lease unavailable | Mailbox not found or lease not acquired | `mailbox.entry.unavailable` |
+| DeliveryExpired | Entry delivery deadline passed | Entry not delivered before deadline | `mailbox.delivery.expired` |
 | Overload | Mailbox overload | Bound reached, overload policy triggered | `mailbox.overload.*` |
 | LeaseExpired | Turn lease expired | Lease expiry time passed without renewal | `mailbox.turn_lease.expired` |
 | StaleToken | Stale fencing token | Fencing token does not match current lease | `mailbox.turn_lease.stale_token` |
@@ -316,6 +318,7 @@ without exposing secrets or implementation internal state.
 |--------|---------|---------------|
 | `mailbox.entry` | Mailbox entry failures | `malformed`, `incompatible`, `unauthorized`, `unavailable` |
 | `mailbox.bounds` | Mailbox bound failures | `count_exceeded`, `byte_exceeded`, `age_exceeded`, `per_source_exceeded`, `per_tenant_exceeded` |
+| `mailbox.delivery` | Mailbox delivery failures | `expired` |
 | `mailbox.overload` | Mailbox overload failures | `rejected`, `deferred`, `coalesced`, `superseded`, `dead_lettered` |
 | `mailbox.turn_lease` | Turn lease failures | `missing`, `expired`, `stale_token`, `revoked`, `conflict` |
 
@@ -333,6 +336,8 @@ The Variability register below catalogs all such choices.
 3. **Lease renewal interval**: The host MAY choose how frequently to renew turn leases. The interval MUST be documented in the conformance profile.
 
 4. **Dead-letter retention**: The host MAY choose how long to retain dead-lettered entries. The retention period MUST be documented in the conformance profile.
+
+5. **Delivery deadline**: The host MAY choose whether to enforce delivery deadlines. The deadline policy MUST be documented in the conformance profile.
 
 ### Deferred work
 
@@ -352,7 +357,7 @@ conformance obligation for current implementations:
 
 ### Canonical successful flow
 
-> **Normative definition.**
+> **Normative conformance criterion.**
 The canonical successful flow integration test validates that a valid mailbox
 entry is processed successfully through the full mailbox and lease pipeline.
 
@@ -364,7 +369,7 @@ Expected behavior:
 
 ### Negative: malformed entry
 
-> **Normative definition.**
+> **Normative conformance criterion.**
 The negative malformed entry test validates that invalid mailbox entries are rejected.
 
 Expected behavior:
@@ -375,7 +380,7 @@ Expected behavior:
 
 ### Negative: incompatible signal class
 
-> **Normative definition.**
+> **Normative conformance criterion.**
 The negative incompatible signal class test validates that incompatible signal classes are rejected.
 
 Expected behavior:
@@ -386,7 +391,7 @@ Expected behavior:
 
 ### Negative: unauthorized
 
-> **Normative definition.**
+> **Normative conformance criterion.**
 The negative unauthorized test validates that missing capabilities are rejected.
 
 Expected behavior:
@@ -397,7 +402,7 @@ Expected behavior:
 
 ### Negative: count bound exceeded
 
-> **Normative definition.**
+> **Normative conformance criterion.**
 The negative count bound exceeded test validates that count bounds are enforced.
 
 Expected behavior:
@@ -408,7 +413,7 @@ Expected behavior:
 
 ### Negative: byte bound exceeded
 
-> **Normative definition.**
+> **Normative conformance criterion.**
 The negative byte bound exceeded test validates that byte bounds are enforced.
 
 Expected behavior:
@@ -419,7 +424,7 @@ Expected behavior:
 
 ### Negative: age bound exceeded
 
-> **Normative definition.**
+> **Normative conformance criterion.**
 The negative age bound exceeded test validates that age bounds are enforced.
 
 Expected behavior:
@@ -430,7 +435,7 @@ Expected behavior:
 
 ### Negative: per-source bound exceeded
 
-> **Normative definition.**
+> **Normative conformance criterion.**
 The negative per-source bound exceeded test validates that per-source bounds are enforced.
 
 Expected behavior:
@@ -441,7 +446,7 @@ Expected behavior:
 
 ### Negative: per-tenant bound exceeded
 
-> **Normative definition.**
+> **Normative conformance criterion.**
 The negative per-tenant bound exceeded test validates that per-tenant bounds are enforced.
 
 Expected behavior:
@@ -452,7 +457,7 @@ Expected behavior:
 
 ### Negative: missing turn lease
 
-> **Normative definition.**
+> **Normative conformance criterion.**
 The negative missing turn lease test validates that missing turn leases are rejected.
 
 Expected behavior:
@@ -463,7 +468,7 @@ Expected behavior:
 
 ### Negative: expired turn lease
 
-> **Normative definition.**
+> **Normative conformance criterion.**
 The negative expired turn lease test validates that expired turn leases are handled correctly.
 
 Expected behavior:
@@ -474,7 +479,7 @@ Expected behavior:
 
 ### Negative: stale fencing token
 
-> **Normative definition.**
+> **Normative conformance criterion.**
 The negative stale fencing token test validates that stale fencing tokens are rejected.
 
 Expected behavior:
@@ -485,7 +490,7 @@ Expected behavior:
 
 ### Negative: revoked turn lease
 
-> **Normative definition.**
+> **Normative conformance criterion.**
 The negative revoked turn lease test validates that revoked turn leases are rejected.
 
 Expected behavior:
@@ -494,9 +499,20 @@ Expected behavior:
 - Expected output: null.
 - Expected error: `mailbox.turn_lease.revoked`.
 
+### Negative: delivery expired
+
+> **Normative conformance criterion.**
+The negative delivery expired test validates that entries past their deadline are rejected.
+
+Expected behavior:
+
+- Input: mailbox entry with deadline that has passed.
+- Expected output: null.
+- Expected error: `mailbox.delivery.expired`.
+
 ### Cross-milestone fixture regression
 
-> **Normative definition.**
+> **Normative conformance criterion.**
 All earlier milestone fixtures MUST be re-run after Phase 2 to verify
 no regressions.
 
@@ -528,6 +544,7 @@ Any approved variability MUST be documented in the Milestone 3 exit report.
 | Overload policy | Implementation-defined | Documented in conformance profile |
 | Lease renewal interval | Implementation-defined | Documented in conformance profile |
 | Dead-letter retention | Implementation-defined | Documented in conformance profile |
+| Delivery deadline | Implementation-defined | Documented in conformance profile |
 
 ## Rationale and evidence (non-normative)
 
