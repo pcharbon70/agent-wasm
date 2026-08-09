@@ -1177,3 +1177,349 @@ the affected milestone MUST be revised and re-validated. The revision
 process is governed by
 [Specification Authority](../SPECIFICATION-AUTHORITY.md) and
 [Conformance Vocabulary](../CONFORMANCE-VOCABULARY.md).
+
+## 3.4 Phase 3 Integration Tests
+
+This section defines the integration test scenarios, objectives, evidence
+requirements, and cross-milestone compatibility checks for framework plugin
+manifests composition and lifecycle hooks.
+These tests prove the phase works as an integrated behavior and preserve
+reproducible evidence for later milestone and release gates.
+
+> **Non-normative note.**
+> Integration tests verify observable contracts rather than private
+> implementation structure.
+> Tests that exercise only private implementation structure MUST be
+> classified as implementation tests, not integration tests, and MUST
+> NOT appear in this section.
+
+### Test objectives
+
+> **Normative definition.**
+> The integration tests for this phase MUST verify the following objectives:
+
+1. **Canonical successful flow**: Every lifecycle operation completes
+   end-to-end without error when the manifest, artifacts, grants, and
+   dependencies are all valid and available.
+2. **Failure handling**: Every failure outcome defined in
+   [Failure semantics](#failure-semantics) is detected, classified, and
+   reported with a stable diagnostic when the triggering condition is
+   present.
+3. **Lifecycle enforcement**: The lifecycle transition graph defined in
+   [Lifecycle operations](#lifecycle-operations) is enforced, and no
+   unauthorized or partially-loaded state persists after any failure.
+4. **Trust-tier separation**: Every trust tier rule defined in
+   [Trust-tier separation](#trust-tier-separation) is enforced at
+   runtime, and no artifact is loaded outside its declared tier.
+5. **Cross-milestone compatibility**: All fixtures from earlier
+   milestones that interact with the plugin registry remain functional
+   after this phase is integrated.
+
+> **Normative definition.**
+> If any test objective cannot be verified with the available test
+> harness, the objective MUST be recorded as a gap, and the gap MUST
+> be documented in the Phase 3 integration test evidence report.
+> The phase MUST NOT be promoted to `status: normative` with unresolved
+> test objectives.
+
+### Successful flow tests
+
+> **Normative definition.**
+> The following successful flow tests MUST be executed and pass for Phase
+> 3 integration evidence.
+> Each test MUST capture the observable outcome (registry state, audit
+> log entries, diagnostics) as evidence.
+
+> **Normative definition.**
+>
+
+| Test ID | Description | Expected outcome |
+|---------|-------------|------------------|
+| `P3-SUCCESS-01` | Valid manifest passes schema validation | Manifest is accepted; no diagnostic emitted |
+| `P3-SUCCESS-02` | Composition with lexicographic order is deterministic | Plugins are composed in stable identifier order |
+| `P3-SUCCESS-03` | Semantic version tie-breaking selects newest | Higher semantic version takes precedence |
+| `P3-SUCCESS-04` | Manifest digest tie-breaking is stable | Equal identifiers and versions are ordered by digest |
+| `P3-SUCCESS-05` | Trust tier untrusted-guest is sandboxed through Extism | Guest module bytes are loaded only through the invocation boundary |
+| `P3-SUCCESS-06` | Trust tier reviewed-preparation requires review evidence | Artifact is loaded only after review evidence is recorded |
+| `P3-SUCCESS-07` | Trust tier privileged-host is restricted to approved operations | Artifact is invoked only via the approved operation set |
+| `P3-SUCCESS-08` | install operation completes without loading artifacts | Plugin is in the registry; no artifacts are loaded into the runtime |
+| `P3-SUCCESS-09` | enable operation loads artifacts after install, validate, and approve | All artifacts are loaded into the runtime and the plugin is active |
+| `P3-SUCCESS-10` | disable operation unloads artifacts and freezes state | All artifacts are unloaded; state is frozen but preserved |
+| `P3-SUCCESS-11` | upgrade operation composes new version and migrates state | New version is installed; migration artifacts are applied |
+| `P3-SUCCESS-12` | rollback operation restores previous version | Previous version is restored; migration artifacts are undone in reverse |
+| `P3-SUCCESS-13` | remove operation unregisters plugin and archives state | Plugin is removed from the registry; state is archived per the storage contract |
+| `P3-SUCCESS-14` | Route resolution is unambiguous for all configured routes | All routes resolve to exactly one target; no diagnostic emitted |
+| `P3-SUCCESS-15` | State namespaces are isolated between plugins | Cross-plugin state access is prevented |
+| `P3-SUCCESS-16` | Schedule declarations generate signals deterministically | Schedule signals are emitted at the configured intervals |
+| `P3-SUCCESS-17` | Lifecycle ownership "host" allows host-only transitions | Publisher cannot trigger lifecycle transitions |
+| `P3-SUCCESS-18` | Lifecycle ownership "publisher" requires publisher-signed approval | Host requires explicit publisher signature for each transition |
+| `P3-SUCCESS-19` | Lifecycle ownership "shared" follows shared authority rules | Transitions follow the shared authority rules defined in
+[Single-Agent Host Flow And Milestone Acceptance](24-single-agent-host-flow-and-milestone-acceptance.md) |
+| `P3-SUCCESS-20` | Grant resolution succeeds for all requested grants | All requested grants are resolved; no `grant-unresolvable` diagnostic |
+
+> **Non-normative note.**
+> Test IDs are stable across Phase 3 revisions.
+> New successful flow tests MUST use the next available ID in the
+> `P3-SUCCESS-XX` sequence.
+> Existing test IDs MUST NOT be reassigned or deleted.
+
+#### Manifest validation
+
+> **Normative definition.**
+> Tests `P3-SUCCESS-01` through `P3-SUCCESS-04` verify that manifest
+> validation succeeds for well-formed manifests.
+> The host MUST accept every field defined in
+> [Contract And Data Model](#31-contract-and-data-model) when the
+> values conform to their declared types and constraints.
+
+> **Non-normative note.**
+> Manifest validation is the first gate in the install operation.
+> A manifest that passes validation is guaranteed to be structurally
+> correct but is not yet authorized for artifact loading.
+
+#### Composition order
+
+> **Normative definition.**
+> Tests `P3-SUCCESS-02` through `P3-SUCCESS-04` verify that composition
+> order is deterministic and consistent with the rules defined in
+> [Composition order](#composition-order).
+
+> **Non-normative note.**
+> Deterministic composition order ensures that conflict diagnostics
+> always identify the same plugins, regardless of the order in which
+> they were submitted.
+
+#### Trust tier enforcement
+
+> **Normative definition.**
+> Tests `P3-SUCCESS-05` through `P3-SUCCESS-07` verify that trust tier
+> rules are enforced at runtime.
+> Each test MUST confirm that artifacts are loaded through the mechanism
+> defined for their tier.
+
+> **Non-normative note.**
+> Trust tier enforcement is the primary defense against supply-chain
+> attacks.
+> Tests in this category MUST be designed to detect any bypass of the
+> tier boundaries.
+
+#### Lifecycle operations
+
+> **Normative definition.**
+> Tests `P3-SUCCESS-08` through `P3-SUCCESS-13` and `P3-SUCCESS-17`
+> through `P3-SUCCESS-19` verify that every lifecycle operation
+> completes successfully under normal conditions.
+> Each test MUST verify the post-condition of the operation, including
+> registry state, audit log entries, and artifact loading status.
+
+> **Non-normative note.**
+> Lifecycle operations are the primary user-facing interface for plugin
+> management.
+> Operators rely on these operations to install, update, and remove
+> plugins.
+> Tests MUST verify both the happy path and the observability of each
+> operation's outcome.
+
+### Failure handling tests
+
+> **Normative definition.**
+> The following failure handling tests MUST be executed and pass for Phase
+> 3 integration evidence.
+> Each test MUST capture the specific diagnostic emitted, the registry
+> state after failure, and the absence of unauthorized or partially-loaded
+> artifacts.
+
+> **Normative definition.**
+>
+
+| Test ID | Description | Expected diagnostic |
+|---------|-------------|---------------------|
+| `P3-FAIL-01` | Malformed manifest with missing required field | `plugin.malformed_manifest` |
+| `P3-FAIL-02` | Malformed manifest with invalid semantic version | `plugin.malformed_manifest` |
+| `P3-FAIL-03` | Incompatible manifest with unsupported manifest_version | `plugin.incompatible_version` |
+| `P3-FAIL-04` | Stale manifest with expired artifact digest | `plugin.missing_dependency` |
+| `P3-FAIL-05` | Duplicate plugin id with existing installed plugin | `plugin.version_conflict` |
+| `P3-FAIL-06` | Boundary-limit: manifest with maximum number of actions | Diagnostic depends on host capacity policy |
+| `P3-FAIL-07` | Boundary-limit: manifest with maximum number of routes | Diagnostic depends on host capacity policy |
+| `P3-FAIL-08` | Conflicting name between two plugins | `plugin.conflict` |
+| `P3-FAIL-09` | Conflicting route pattern at same priority | `plugin.ambiguous_route` |
+| `P3-FAIL-10` | Conflicting state namespace between plugins | `plugin.conflict` |
+| `P3-FAIL-11` | Conflicting schema definitions with same schema_id | `plugin.schema-conflict` |
+| `P3-FAIL-12` | Unauthorized lifecycle transition by caller without required trust class | `plugin.unauthorized` |
+| `P3-FAIL-13` | Resource exhaustion: state namespace allocation fails | `plugin.exhausted` |
+| `P3-FAIL-14` | Unresolvable grant under current trust model | `plugin.missing_dependency` |
+| `P3-FAIL-15` | Circular dependency between two plugins | `plugin.circular_dependency` |
+| `P3-FAIL-16` | Orphaned state prevents remove operation | `plugin.orphaned_state` |
+| `P3-FAIL-17` | Revoked publisher prevents all lifecycle operations | `plugin.revoked_publisher` |
+
+> **Non-normative note.**
+> Tests `P3-FAIL-06` and `P3-FAIL-07` are boundary-limit tests.
+> The exact diagnostic emitted depends on the host's capacity policy,
+> which is implementation-defined.
+> Tests in this category MUST verify that the host does not exceed its
+> declared capacity in any way, including silently degrading behavior.
+
+#### Malformed inputs
+
+> **Normative definition.**
+> Tests `P3-FAIL-01` through `P3-FAIL-03` verify that malformed inputs
+> are detected during manifest validation and produce the
+> `plugin.malformed_manifest` or `plugin.incompatible_version` diagnostic.
+
+> **Non-normative note.**
+> Malformed inputs are the most common failure mode during initial
+> plugin development.
+> Diagnostics for malformed inputs MUST be informative enough to help
+> plugin authors identify and fix the issue.
+
+#### Incompatible inputs
+
+> **Normative definition.**
+> Tests `P3-FAIL-03` through `P3-FAIL-04` verify that incompatible inputs
+> are detected and produce the appropriate diagnostic.
+
+> **Non-normative note.**
+> Incompatible inputs include manifests that reference features the host
+> does not support, and artifacts whose digests do not match any
+> previously approved version.
+
+#### Stale inputs
+
+> **Normative definition.**
+> Tests `P3-FAIL-04` verify that stale inputs, including manifests that
+> reference artifact digests that have been rotated or revoked, are
+> detected and produce the `plugin.missing_dependency` diagnostic.
+
+> **Non-normative note.**
+> Stale inputs typically arise when an operator attempts to install a
+> plugin whose artifacts have been updated in the registry without
+> updating the manifest.
+
+#### Duplicate inputs
+
+> **Normative definition.**
+> Tests `P3-FAIL-05` verify that duplicate plugin identifiers are
+> detected and produce the `plugin.version_conflict` diagnostic.
+
+> **Non-normative note.**
+> Duplicate plugin identifiers indicate either an operator error or a
+> supply-chain issue.
+> The diagnostic MUST identify the conflicting version.
+
+#### Boundary-limit inputs
+
+> **Normative definition.**
+> Tests `P3-FAIL-06` and `P3-FAIL-07` verify that boundary-limit inputs
+> are handled without resource exhaustion or silent degradation.
+
+> **Non-normative note.**
+> Boundary-limit tests exercise the host's capacity policies.
+> These tests MUST be designed to detect any bypass of capacity limits,
+> including resource exhaustion, integer overflow, or memory corruption.
+
+### Lifecycle enforcement tests
+
+> **Normative definition.**
+> The following lifecycle enforcement tests MUST be executed and pass for
+> Phase 3 integration evidence.
+> Each test MUST verify that the lifecycle transition graph is enforced
+> and that no unauthorized or partially-loaded state persists after any
+> failure.
+
+> **Normative definition.**
+>
+
+| Test ID | Description | Expected outcome |
+|---------|-------------|------------------|
+| `P3-LIFE-01` | Invalid transition `remove` from `disabled` state | Transition rejected with diagnostic |
+| `P3-LIFE-02` | Invalid transition `approve` before `install` | Transition rejected with diagnostic |
+| `P3-LIFE-03` | Invalid transition `enable` before `approve` | Transition rejected with diagnostic |
+| `P3-LIFE-04` | `disable` followed by `enable` reloads artifacts correctly | Artifacts are reloaded without error |
+| `P3-LIFE-05` | `upgrade` followed by `rollback` restores previous state | Previous version is active with all state preserved |
+| `P3-LIFE-06` | `enable` without prior `validate` is refused | Operation fails with `plugin.missing_dependency` |
+| `P3-LIFE-07` | `enable` without prior `approve` is refused for publisher-owned plugin | Operation fails with `plugin.unauthorized` |
+| `P3-LIFE-08` | `remove` with active state references is refused | Operation fails with `plugin.orphaned_state` |
+| `P3-LIFE-09` | `upgrade` with missing artifact digest is refused | Operation fails with `plugin.missing_dependency` |
+| `P3-LIFE-10` | `rollback` on a plugin with no upgrade history is refused | Operation fails with diagnostic identifying no upgrade history |
+| `P3-LIFE-11` | Concurrent `upgrade` and `remove` on same plugin is serialized | Only one operation completes; the other is rejected or queued |
+| `P3-LIFE-12` | `disable` while an agent invocation is in progress completes gracefully | In-progress invocation completes or is cancelled cleanly |
+
+> **Non-normative note.**
+> Lifecycle enforcement tests verify that the host does not enter an
+> inconsistent state under any sequence of operations.
+> These tests MUST be designed to detect state corruption, race
+> conditions, and resource leaks.
+
+### Cross-milestone compatibility tests
+
+> **Normative definition.**
+> The following cross-milestone compatibility tests MUST be executed and
+> pass for Phase 3 integration evidence.
+> These tests run fixtures from earlier milestones and verify that the
+> integration of Phase 3 does not introduce regressions.
+
+> **Normative definition.**
+>
+
+| Test ID | Earlier milestone fixture | Interaction point | Expected outcome |
+|---------|---------------------------|-------------------|------------------|
+| `P3-CROSS-01` | [Signal Envelopes Causality Routing And Delivery](10-signals-causality-routing-and-delivery.md) | Routes emit signals through the signal envelope | Signals are delivered to the correct destination |
+| `P3-CROSS-02` | [Turn Lifecycle Protocols And Canonical Encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md) | Plugin actions are invoked during turn execution | Turn completes without protocol violations |
+| `P3-CROSS-03` | [Single-Agent Host Flow And Milestone Acceptance](24-single-agent-host-flow-and-milestone-acceptance.md) | Plugin lifecycle transitions during host flow | Host flow completes without milestone rejection |
+| `P3-CROSS-04` | [Agent Manifests Artifacts Schemas And Registries](03-agent-manifests-artifacts-schemas-and-registries.md) | Plugin artifacts are stored and retrieved | Artifacts are stored and retrieved without corruption |
+| `P3-CROSS-05` | [Extism Invocation Boundary Instances And Output Validation](20-extism-invocation-boundary-instances-and-output-validation.md) | Guest modules are invoked through the Extism boundary | Output is validated and admitted to the turn |
+| `P3-CROSS-06` | [Agent Registry Activation Cancellation And Completion](22-agent-registry-activation-cancellation-and-completion.md) | Plugin state is accessed during agent lifecycle | Agent lifecycle proceeds without registry errors |
+| `P3-CROSS-07` | [Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md) | Plugin grants are evaluated against the trust model | Grant evaluation produces correct decisions |
+| `P3-CROSS-08` | [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md) | Plugin capabilities are attenuated and enforced | Capabilities are attenuated per policy |
+| `P3-CROSS-09` | [Retry Timer Recovery Replay Hibernate And Migration](28-retry-timer-recovery-replay-hibernate-and-migration.md) | Plugin migration artifacts are applied | Migration completes without data loss |
+| `P3-CROSS-10` | [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md) | Plugin state is archived on remove | State is archived per the storage contract |
+| `P3-CROSS-11` | [Sensors Schedules Timers And External Signal Ingress](23-sensors-schedules-timers-and-external-signal-ingress.md) | Plugin schedules generate signals | Signals are generated at the configured intervals |
+| `P3-CROSS-12` | [Directives Strategies Continuations And Terminal States](13-directives-strategies-continuations-and-terminal-states.md) | Plugin directives and strategies are loaded | Directives and strategies are available to the agent |
+
+> **Non-normative note.**
+> Cross-milestone compatibility tests are the final gate before Phase 3
+> can be promoted to `status: normative`.
+> Any regression in a cross-milestone test MUST be documented in the
+> Phase 3 integration test evidence report and resolved before
+> promotion.
+> If a regression is approved as acceptable variability, the approval
+> MUST be recorded in the test evidence report with an explicit
+> rationale.
+
+### Integration test evidence requirements
+
+> **Normative definition.**
+> The Phase 3 integration test evidence report MUST include the following:
+
+1. **Test execution summary**: The date, environment, and version of
+   the host implementation used for testing.
+2. **Test results**: For each test, the result (pass, fail, or gap),
+   the observable outcome captured, and the diagnostic emitted, if any.
+3. **Registry state snapshots**: Registry state snapshots before and
+   after each lifecycle operation test, to verify that no unauthorized
+   or partially-loaded state persists.
+4. **Audit log entries**: Lifecycle audit log entries for each
+   completed lifecycle operation and failure, to verify that all
+   transitions are recorded.
+5. **Cross-milestone regression report**: For each cross-milestone
+   test, the result, the interaction point, and any observed regression.
+6. **Gap report**: For each test objective that could not be verified,
+   the reason for the gap, the impact on conformance, and the
+   proposed resolution.
+7. **Approved variability**: For each approved variability (e.g.,
+   cross-milestone regression approved as acceptable), the rationale,
+   the scope of impact, and the expected resolution timeline.
+
+> **Normative definition.**
+> The Phase 3 integration test evidence report MUST be stored in
+> [50-journal/](../50-journal/) or a location documented in the
+> repository's index, and MUST be linked from this specification chapter
+> for traceability.
+
+> **Non-normative note.**
+> The integration test evidence report is the primary artifact for
+> promoting Phase 3 to `status: normative`.
+> Operators and reviewers SHOULD use the report to verify that Phase 3
+> has been implemented correctly and does not introduce regressions.
+> The report MUST be updated whenever new tests are added or existing
+> tests are modified.
