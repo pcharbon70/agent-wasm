@@ -91,6 +91,10 @@ ChildLifecyclePermission = None | Suspend | Cancel | Terminate
 
 `DirectiveKindName` is defined in
 [Directives Strategies Continuations And Terminal States](13-directives-strategies-continuations-and-terminal-states.md).
+`RetryPolicy` is defined in
+[Sensors Schedules Timers And External Signal Ingress](23-sensors-schedules-timers-and-external-signal-ingress.md).
+`SignalKind`, `EffectKind`, and `TimerKind` are defined in
+[Signal Envelopes Causality Routing And Delivery](10-signals-causality-routing-and-delivery.md).
 
 | Field | Type | Required | Purpose |
 |-------|------|----------|---------|
@@ -176,7 +180,7 @@ DiagnosticsKind = Internal | External
 `EntryId` is defined in
 [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md).
 `DirectiveId` is defined in
-[Directives Strategies Continuations And Terminal States](13-directives-strategies-continuations-and-terminal-states.md).
+[Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md).
 `TenantId` and `AgentId` are defined in
 [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md).
 
@@ -255,17 +259,6 @@ idempotency key.
 The idempotency key is determined by the directive payload and MUST be
 deterministic for the same payload.
 
-## Variability register
-
-| Item | Permission | Recommendation | Constraint |
-|------|------------|----------------|------------|
-| Handler registry implementation | Implementation-defined | Document in conformance profile | Must support hot-reload |
-| Retry policy defaults | Implementation-defined | Document in conformance profile | Must not exceed turn timeout |
-| Idempotency key scope | Implementation-defined | Document in conformance profile | Must support tenant/agent/directive/global |
-| Response size limit | Implementation-defined | Document in conformance profile | Must be bounded |
-| Duration limit | Implementation-defined | Document in conformance profile | Must be bounded |
-| Handler trust classes | Implementation-defined | Document in conformance profile | Must enforce trust boundaries |
-
 ## 3.2 Behavior And Integration
 
 ### Pre-dispatch validation
@@ -317,31 +310,31 @@ signals for the agent turn.
 The host MUST translate the following outcomes:
 
 1. **Success**: The external provider returned successfully. The host MUST
-   create a result signal with `signal.kind = effect_result` and
-   `signal.payload` containing the provider's response.
+   create a result signal with `signal.type = effect_result` and
+   `signal.data` containing the provider's response.
 2. **Domain failure**: The external provider returned a domain error. The host
-   MUST create a result signal with `signal.kind = effect_result` and
-   `signal.payload` containing the error details.
+   MUST create a result signal with `signal.type = effect_result` and
+   `signal.data` containing the error details.
 3. **Infrastructure failure**: The external provider is unavailable or
    encountered an infrastructure error. The host MUST create a result signal
-   with `signal.kind = infrastructure_failure` and `signal.payload` containing
+   with `signal.type = infrastructure_failure` and `signal.data` containing
    the error details.
 4. **Timeout**: The external provider did not respond within the duration
-   limit. The host MUST create a result signal with `signal.kind = timeout`
-   and `signal.payload` containing the timeout details.
+   limit. The host MUST create a result signal with `signal.type = timeout`
+   and `signal.data` containing the timeout details.
 5. **Cancellation**: The turn was cancelled before the dispatch completed.
-   The host MUST create a result signal with `signal.kind = cancellation`
-   and `signal.payload` containing the cancellation details.
+   The host MUST create a result signal with `signal.type = cancellation`
+   and `signal.data` containing the cancellation details.
 6. **Approval**: The directive requires user approval. The host MUST create a
-   result signal with `signal.kind = approval_required` and `signal.payload`
+   result signal with `signal.type = approval_required` and `signal.data`
    containing the approval request details.
 
 > **Normative definition.**
-Each result signal MUST include the following causality metadata:
-- `signal.causality.turn_id`: The turn ID that produced the result signal.
-- `signal.causality.outbox_entry_id`: The outbox entry ID for the dispatched
-  directive.
-- `signal.causality.attempt_id`: The attempt ID for the dispatched attempt.
+Each result signal MUST set the following causality fields from
+[Signal Envelopes Causality Routing And Delivery](10-signals-causality-routing-and-delivery.md):
+- `signal.correlation_id`: Set to the attempt ID to group all attempts for the
+  same directive.
+- `signal.causation_id`: Set to the turn ID that produced the result signal.
 
 ### Failure behavior
 
@@ -369,25 +362,15 @@ The host MUST define the following failure behavior for effect handlers:
    attempt without idempotency protection.
 
 > **Normative definition.**
-The host MUST retry failed attempts according to the retry policy defined in
+The host MUST retry failed attempts according to the `RetryPolicy` defined in
 the effect handler registration.
-The retry policy includes:
-- **Max retries**: The maximum number of retry attempts.
-- **Backoff strategy**: The backoff strategy for retries (e.g., exponential).
-- **Backoff multiplier**: The multiplier for exponential backoff.
-- **Backoff cap**: The maximum backoff duration.
-
-## Variability register
-
-| Item | Permission | Recommendation | Constraint |
-|------|------------|----------------|------------|
-| Handler registry implementation | Implementation-defined | Document in conformance profile | Must support hot-reload |
-| Retry policy defaults | Implementation-defined | Document in conformance profile | Must not exceed turn timeout |
-| Idempotency key scope | Implementation-defined | Document in conformance profile | Must support tenant/agent/directive/global |
-| Response size limit | Implementation-defined | Document in conformance profile | Must be bounded |
-| Duration limit | Implementation-defined | Document in conformance profile | Must be bounded |
-| Handler trust classes | Implementation-defined | Document in conformance profile | Must enforce trust boundaries |
-| Backoff strategy | Implementation-defined | Exponential backoff | Must be bounded |
+The `RetryPolicy` type is defined in
+[Sensors Schedules Timers And External Signal Ingress](23-sensors-schedules-timers-and-external-signal-ingress.md)
+and includes:
+- `max_attempts`: The maximum number of dispatch attempts (including the
+  original).
+- `backoff_ms`: The base backoff duration in milliseconds.
+- `jitter_ms`: Optional additional random jitter in milliseconds.
 
 ## 3.3 Failure Evidence And Operational Notes
 
@@ -616,11 +599,14 @@ failure.
 The following tests MUST verify cross-milestone compatibility:
 
 1. **Milestone 1 fixtures**: Run all Milestone 1 fixtures and verify no
-   regressions.
+   regressions. Milestone 1 fixtures are defined in
+   [Guest SDK Contracts Fixtures And Milestone Acceptance](05-guest-sdk-contracts-fixtures-and-milestone-acceptance.md).
 2. **Milestone 2 fixtures**: Run all Milestone 2 fixtures and verify no
-   regressions.
+   regressions. Milestone 2 fixtures are defined in the Phase 1-5 plans under
+   [Milestone 2](../.spec/planning/agentic-system/milestone-02-signals-actions-state-and-strategies/).
 3. **Milestone 3 fixtures**: Run all Milestone 3 fixtures and verify no
-   regressions.
+   regressions. Milestone 3 fixtures are defined in the Phase 1-5 plans under
+   [Milestone 3](../.spec/planning/agentic-system/milestone-03-host-actor-runtime-and-lifecycle/).
 
 > **Normative definition.**
 If any regression is detected, the affected milestone MUST be revised and
