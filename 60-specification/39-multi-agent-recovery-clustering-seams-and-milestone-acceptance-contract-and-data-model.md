@@ -99,6 +99,21 @@ Every topology MUST include the following fields:
 | `purpose` | A human-readable description of the topology's purpose. | Topology directive. |
 | `status` | The current status: `active`, `revoked`, or `archived`. | Host runtime. |
 
+> **Normative definition.**
+Topology nodes are defined in
+[Pod Topology Placement Activation Leases And Reconciliation Contract And Data Model](38-pod-topology-placement-activation-leases-and-reconciliation-contract-and-data-model.md)
+section 38.1.
+Phase 5 reuses the Phase 4 node schema without deviation.
+The `node_id` is derived deterministically from `topology_version`,
+`role`, `agent_address`, and position index as defined in Phase 4.
+
+> **Non-normative note.**
+The `updated_at` field is set by the host at topology admission (not from
+the directive's timestamp) and is updated each time a new topology version
+is committed.
+This ensures that `updated_at` always reflects the most recent durable
+revision, regardless of the directive's original timestamp.
+
 > **Non-normative note.**
 The durable topology is stored in the durable journal as defined in
 [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md).
@@ -175,6 +190,16 @@ Renewal is not transactional: if renewal fails after journal commit, the
 host MUST record the failure in observed status and retry on the next
 reconciliation pass.
 
+> **Non-normative note.**
+Phase 5's renewal behavior supersedes Phase 4's behavior: Phase 4 defined
+renewal as incrementing the `fence_token`, but Phase 5 defines renewal as
+NOT incrementing the `fence_token`.
+This change is intentional: renewal is a safety mechanism to extend lease
+lifetime, not a transfer of authority.
+The `fence_token` is only incremented on lease transfer (Milestone 7),
+which represents a true handoff of placement authority to a different
+host.
+
 > **Normative definition.**
 A lease MAY be transferred to another host.
 Transfer increments the `fence_token` and is used for host failover.
@@ -214,15 +239,6 @@ Reconciliation applies the following rules in order:
    has expired, mark the node as `stale` and apply the node's
    `lifecycle_policy` to determine whether to restart, wait, or allow
    partial results.
-5. **Moved nodes**: For each node in live placement that has been moved
-   to a different host, update the observed status to reflect the new
-   host and refresh the activation lease. (Deferred to Milestone 7.)
-6. **Incompatible nodes**: For each node in live placement whose
-   `agent_address` no longer resolves to an active agent, mark the node
-   as `incompatible` and terminate the live agent instance.
-7. **Dependency-blocked nodes**: For each node in desired topology whose
-   `dependencies` are not yet satisfied, defer creation until dependencies
-   are resolved.
 
 > **Non-normative note.**
 Rules 5-7 below are deferred to Milestone 7 for multi-node placement:

@@ -114,12 +114,21 @@ directive against the following rules in order:
 10. **Resource limit check**: The topology MUST NOT exceed the
     implementation-defined maximum number of nodes per topology.
     Exceeding limits MUST be rejected with `topology.directive.exhausted-nodes`.
+11. **Processing timeout**: The directive MUST be processed within the
+    implementation-defined timeout. Exceeding the timeout MUST be rejected
+    with `topology.directive.timeout`.
 
 > **Non-normative note.**
 Topology directive validation is designed to fail fast: the host MUST
 reject invalid directives before creating any partial state.
 This is consistent with the atomic commit protocol defined in
 [Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md).
+The processing timeout (step 11) is enforced by the host's directive
+processing pipeline and is distinct from the lease timeout defined in
+section 39.1.
+The processing timeout prevents indefinite blocking during directive
+admission, while the lease timeout prevents stale live placement after
+a host crash.
 
 ### No durable live handles
 
@@ -333,7 +342,12 @@ an earlier milestone assumption:
    defined in
    [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md)
    that all state transitions are durable across host restarts.
-3. **Topology allows cross-tenant authority leaks**: If durable topology
+3. **Topology bypasses the atomic commit protocol**: If topology
+   directives bypass the atomic commit protocol, this would invalidate
+   the assumption defined in
+   [Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md)
+   that all state transitions are atomic.
+4. **Topology allows cross-tenant authority leaks**: If durable topology
    records grant cross-tenant routing, relationship, grant, or result
    access, this would invalidate the assumption defined in
    [Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md)

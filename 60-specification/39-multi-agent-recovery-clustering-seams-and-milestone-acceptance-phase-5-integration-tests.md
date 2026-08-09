@@ -266,15 +266,15 @@ cancellation under various `lifecycle_policy` settings.
 |---------|-------------|
 | `P5-TO-001` | Create a topology directive and verify that the directive is accepted before the implementation-defined timeout expires. |
 | `P5-TO-002` | Create a topology directive and verify that the directive is rejected with `topology.directive.timeout` if it exceeds the implementation-defined timeout. |
-| `P5-TO-003` | Create a topology directive with `lifecycle_policy: terminate-on-topology-revoke` and verify that the directive is terminated when the topology is revoked. |
-| `P5-TO-004` | Create a topology directive with `lifecycle_policy: wait-completion-on-topology-revoke` and verify that the directive is allowed to complete before being terminated. |
-| `P5-TO-005` | Create a topology directive with `lifecycle_policy: allow-partial-on-topology-revoke` and verify that the directive is allowed to continue but its results are excluded from aggregation. |
+| `P5-LP-001` | Create a topology directive with `lifecycle_policy: terminate-on-topology-revoke` and verify that the directive is terminated when the topology is revoked. |
+| `P5-LP-002` | Create a topology directive with `lifecycle_policy: wait-completion-on-topology-revoke` and verify that the directive is allowed to complete before being terminated. |
+| `P5-LP-003` | Create a topology directive with `lifecycle_policy: allow-partial-on-topology-revoke` and verify that the directive is allowed to continue but its results are excluded from aggregation. |
 
 > **Non-normative note.**
-Tests `P5-TO-001` through `P5-TO-005` validate the topology directive
+Tests `P5-TO-001` through `P5-TO-002` validate the topology directive
 timeout behavior defined in section 39.2.
-Each test validates one of the three `lifecycle_policy` settings and
-verifies that the host behaves correctly according to the policy.
+Tests `P5-LP-001` through `P5-LP-003` validate the three `lifecycle_policy`
+settings defined in section 39.2.
 
 #### Reconciliation cancellation tests
 

@@ -125,6 +125,17 @@ The host MUST reject incompatible input without creating partial state,
 which is consistent with the validation rules defined in
 [Multi-Agent Recovery Clustering Seams And Milestone Acceptance Contract And Data Model](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-contract-and-data-model.md).
 
+> **Non-normative note.**
+The distinction between `incompatible-agent` and `unavailable-agent` is
+based on when the diagnostic is emitted:
+- `incompatible-agent` is emitted at topology directive submission time
+  when the agent was never registered in the durable registry.
+- `unavailable-agent` is emitted at reconciliation time when the agent
+  was registered but has since been deactivated.
+This distinction ensures that operators can distinguish between
+configuration errors (agent never registered) and runtime failures
+(agent was active but is no longer).
+
 #### Conflicting outcomes
 
 | Diagnostic | Cause | Host behavior |
