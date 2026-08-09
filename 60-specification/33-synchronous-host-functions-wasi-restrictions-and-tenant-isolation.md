@@ -990,6 +990,488 @@ The revision process is governed by
 All invalidated assumptions MUST be recorded in the phase's journal
 evidence and in the affected milestone's revision history.
 
+## 4.4 Phase 4 Integration Tests
+
+### Test objectives
+
+> **Normative definition.**
+The Phase 4 integration tests verify that the synchronous host function
+surface, WASI restrictions, and tenant isolation guarantees operate as
+an integrated whole rather than as a collection of independently passing
+unit tests.
+The objectives below are exhaustive for Phase 4 integration evidence.
+
+1. **Canonical flow**: The host function evaluation, WASI profile
+   enforcement, and instance creation modes operate successfully when
+   all preconditions defined in
+    [Contract And Data Model](#41-contract-and-data-model) and
+    [Behavior And Integration](#42-behavior-and-integration) are satisfied.
+2. **Failure handling**: Malformed, incompatible, stale, duplicate,
+    and boundary-limit inputs produce stable, bounded diagnostics and
+    leave no unauthorized residue, as defined in
+    [Failure Evidence And Operational Notes](#43-failure-evidence-and-operational-notes).
+3. **Instance mode enforcement**: Every instance creation mode defined
+   in [Instance modes](#instance-modes) preserves the `fresh` oracle
+   on every isolation invariant, including under concurrent cross-tenant
+   load.
+4. **Tenant isolation**: Memory, state, capability, and resource
+   separation hold under the adversarial scenarios defined in
+   [Tenant isolation model](#tenant-isolation-model), including
+   deliberate violation attempts.
+
+> **Non-normative note.**
+These four objectives correspond directly to the four subtasks of the
+Phase 4 integration test section defined in the planning document.
+Each objective produces its own evidence bundle; the bundles are
+assembled together to satisfy the phase promotion criterion defined in
+this chapter's Status And Authority section.
+
+### Successful flow tests
+
+> **Normative definition.**
+Successful flow tests verify that the synchronous surface produces the
+expected observable outcome when every precondition defined in this
+chapter is satisfied.
+A successful flow test MUST exercise at least one host function, at least
+one WASI-enabled guest, and at least one instance creation mode per
+mode defined in [Instance modes](#instance-modes).
+
+#### Host function evaluation
+
+1. **Eligible function success**: Register a host function whose
+   capability record satisfies every eligibility criterion defined in
+   [Eligibility criteria](#eligibility-criteria-for-synchronous-host-functions),
+   invoke it with a fully populated invocation context, and verify
+   that the observable output matches the declared output schema.
+   Verify that the residue matrix defined in
+   [Test residue](#test-residue) reports zero deviation across all
+   nine residue categories for the success outcome.
+2. **Bounded resource adherence**: Invoke an eligible host function
+   under its declared bounds and verify that no bound is exceeded,
+   including `max_duration_ms`, `max_memory_bytes`,
+   `max_recursive_calls`, and `max_native_alloc_bytes`.
+   Record the measured values in the evidence bundle.
+3. **Cancellation point observability**: Invoke an eligible host
+   function, trigger cancellation mid-execution, and verify that the
+   function responds within twice its declared cancellation timeout.
+   Verify that the cancellation outcome produces no unauthorized
+   residue in any residue category.
+4. **Retry safety**: Invoke an idempotent host function twice with
+   the same inputs and verify that the second invocation produces
+   the same observable output as the first and that no duplicate
+   effects appear in the agent directive-outbox.
+
+#### WASI profile enforcement
+
+1. **No-WASI default**: Load a guest module with no WASI interfaces
+   requested in its guest profile and verify that the module cannot
+   invoke any WASI interface.
+   The host MUST reject any attempted WASI call with the diagnostic
+   `wasi.interface-disabled`.
+2. **Explicit grant enforcement**: Load a guest module that requests
+   `wasi:cli/stdout` in its guest profile, approve it through the
+   host policy, and verify that the module can invoke
+   `wasi:cli/stdout` but cannot invoke any other WASI interface
+   from the closed list.
+   Verify that an attempt to invoke a non-approved interface produces
+   the diagnostic `wasi.interface-denied`.
+3. **Policy denial**: Load a guest module that requests
+   `wasi:filesystem/preopened-dir` in its guest profile without
+   corresponding host policy approval and verify that the module is
+   rejected at composition and authorization time with the diagnostic
+   `wasi.policy-denied`.
+   Verify that the module is not loaded.
+4. **Unknown interface rejection**: Load a guest module that requests
+   a WASI interface not in the closed list defined in
+   [Default-to-no-WASI and guest profile](#default-to-no-wasi-and-guest-profile)
+   and verify that the module is rejected with the diagnostic
+   `wasi.interface-unknown`.
+
+#### Instance creation modes
+
+1. **Fresh mode baseline**: Create a `fresh` instance for a
+   WASI-enabled guest, invoke it, capture the full residue matrix,
+   destroy the instance, and verify that no state persists in any
+   residue category.
+   This test establishes the `fresh` oracle against which all other
+   modes are measured.
+2. **Reset mode recycling**: Create a `reset` instance, invoke it
+   twice, and verify that the second invocation sees a memory state
+   identical to the post-`_start` state of the first invocation.
+   Verify that the residue matrix for the second invocation matches
+   the `fresh` oracle.
+3. **Pooled mode tenant isolation**: Create a `pooled` pool with at
+   least two tenants, invoke both tenants concurrently, and verify
+   that neither tenant observes state from the other.
+   Capture the full residue matrix for both tenants and verify
+   zero cross-tenant residue.
+4. **Agent-pinned mode scoping**: Create an `agent-pinned` instance
+   for agent A, invoke it twice by agent A, and verify that the
+   second invocation can observe state from the first (if the
+   agent's capability policy permits stateful instances).
+   Then invoke the same instance with agent B and verify that
+   agent B observes a fresh state with no access to agent A's
+   state.
+   Destroy the agent A activation and verify that the pinned
+   instance is destroyed.
+
+> **Non-normative note.**
+These successful flow tests produce the canonical flow evidence bundle.
+They are the primary evidence that the synchronous surface works
+under non-adversarial conditions.
+They do not, by themselves, satisfy the phase promotion criterion;
+failure handling and tenant isolation evidence are also required.
+
+### Failure handling tests
+
+> **Normative definition.**
+Failure handling tests verify that invalid or adversarial inputs
+produce stable diagnostics and leave no unauthorized residue.
+A failure handling test MUST exercise at least one input per failure
+category defined below and verify both the diagnostic output and the
+residue matrix.
+
+#### Malformed inputs
+
+1. **Malformed host function record**: Register a host function
+   whose capability record omits the required `bounds` field and
+   verify that the host rejects the registration with the diagnostic
+   `host-function.ineligible`.
+   Verify that no trace of the function appears in the application
+   namespace.
+2. **Malformed guest module**: Attempt to load a guest module whose
+   binary is truncated or whose validation section is corrupt and
+   verify that the host rejects the module with a `phase4.malformed.*`
+   diagnostic.
+3. **Malformed invocation context**: Invoke a host function with a
+   context that omits the required `tenant_id` field and verify
+   that the host rejects the invocation with the diagnostic
+   `invocation.context-missing`.
+
+#### Incompatible inputs
+
+1. **Non-deterministic function**: Register a host function that
+   reads wall-clock time as part of its core logic and verify that
+   the host rejects the registration with the diagnostic
+   `host-function.ineligible`.
+   The diagnostic subtype MUST be `determinism-conflict`.
+2. **Unbounded function**: Register a host function whose declared
+   `max_duration_ms` exceeds the host's policy limit and verify
+   that the host rejects the registration with the diagnostic
+   `host-function.ineligible`.
+   The diagnostic subtype MUST be `bounds-exceeds-policy`.
+
+#### Stale inputs
+
+1. **Stale agent activation**: Invoke a host function with an
+   `agent_id` that corresponds to a deactivation event that has
+   already completed and verify that the host rejects the invocation
+   with a `phase4.unauthorized.*` diagnostic.
+2. **Revoked capability grant**: Invoke a host function with a
+   capability grant that has been revoked between the time the
+   application namespace was built and the time of invocation and
+   verify that the host rejects the invocation with the diagnostic
+   `invocation.grant-missing`.
+
+#### Duplicate inputs
+
+1. **Duplicate host function registration**: Register two host
+   functions with the same `function_id` and verify that the second
+   registration is rejected with the diagnostic
+   `host-function.duplicate`.
+2. **Namespace collision**: Construct a guest module whose import
+   section declares a function that exists in both the built-in and
+   application namespaces and verify that the host rejects the
+   module with the diagnostic `import.namespace-collision`.
+
+#### Boundary-limit inputs
+
+1. **Deadline boundary**: Invoke a host function with
+   `deadline_ms` equal to the function's declared `max_duration_ms`
+   and verify that the invocation completes within the deadline.
+2. **Deadline exceedance**: Invoke a host function with
+   `deadline_ms` less than the function's declared
+   `max_duration_ms` and verify that the host traps the invocation
+   with the diagnostic `invocation.deadline-exceeded` within the
+   documented deadline-checking overhead.
+3. **Output limit boundary**: Invoke a host function whose output
+   is exactly `output_limit_bytes` and verify that the full output
+   is produced.
+4. **Output limit exceedance**: Invoke a host function whose output
+   exceeds `output_limit_bytes` and verify that the host traps the
+   invocation with the diagnostic `invocation.output-limit` and
+   produces no output exceeding the limit.
+5. **Native allocation boundary**: Invoke a host function whose
+   native allocation equals `max_native_alloc_bytes` and verify
+   that the invocation completes.
+6. **Recursive call boundary**: Invoke a host function whose
+   recursive call depth equals `max_recursive_calls` and verify
+   that the invocation completes, then invoke with depth equal
+   to `max_recursive_calls` + 1 and verify that the host traps
+   with the diagnostic `phase4.exhausted.recursive-limit`.
+
+> **Non-normative note.**
+For every failure handling test above, the residue matrix defined
+in [Test residue](#test-residue) MUST be captured before and after
+the invocation and reported in the evidence bundle.
+Any residue category that deviates from expected behavior for the
+failure outcome constitutes a test failure, regardless of whether
+the diagnostic was correct.
+
+### Instance mode tests
+
+> **Normative definition.**
+Instance mode tests verify that every instance creation mode defined
+in [Instance modes](#instance-modes) preserves the `fresh` oracle
+on every isolation invariant under controlled and adversarial
+conditions.
+The `fresh` oracle is the behavioral baseline; every other mode MUST
+be at least as restrictive as `fresh` on memory, state, capability,
+and resource isolation.
+
+#### Fresh mode
+
+1. **Fresh isolation baseline**: Invoke a `fresh` instance with
+   two concurrent tenants and verify that neither tenant observes
+   any cross-tenant residue.
+   This test establishes the isolation baseline for all other
+   modes.
+
+#### Reset mode
+
+1. **Reset state leakage**: Invoke a `reset` instance by tenant A,
+   write deterministic state into the guest's linear memory,
+   then invoke the same instance by tenant B and verify that
+   tenant B observes zero bytes of tenant A's state.
+   If the host recycles the instance, this test MUST detect
+   the recycling and still verify isolation.
+2. **Reset export leakage**: Invoke a `reset` instance, modify
+   a guest export value, then invoke the same instance again and
+   verify that the export value has been reset to its initial
+   state.
+3. **Reset WASI re-evaluation**: Create a `reset` instance with
+   `wasi:cli/stdout` approved, invoke it, revoke `wasi:cli/stdout`
+   from the capability record, then trigger a reset and invoke
+   again and verify that the instance cannot invoke
+   `wasi:cli/stdout`.
+
+#### Pooled mode
+
+1. **Pool tenant scoping**: Populate a `pooled` pool with
+   instances from tenant A and tenant B, invoke both tenants
+   concurrently with interleaved calls, and verify that no
+   invocation observes state from the other tenant.
+2. **Pool eviction fairness**: Trigger pool eviction while
+   both tenant A and tenant B have active invocations and verify
+   that eviction does not starve one tenant of instances.
+3. **Pool WASI consistency**: Verify that WASI bindings are
+   re-evaluated from the capability record on every invocation,
+   even when the underlying instance is recycled within the pool.
+
+#### Agent-pinned mode
+
+1. **Agent scoping**: Pin an instance to agent A, invoke it
+   by agent A, then invoke it by agent B and verify that agent
+   B receives a `fresh` instance with no access to agent A's state.
+2. **Agent deactivation cleanup**: Activate agent A, pin an
+   instance, invoke it, deactivate agent A, and verify that
+   the pinned instance is destroyed and cannot be reused by
+   any subsequent activation of agent A.
+3. **Inter-invocation state**: Pin an instance to agent A with
+   a capability policy that permits stateful instances, invoke
+   it twice, and verify that the second invocation observes
+   state from the first.
+   Then invoke with a policy that does NOT permit stateful
+   instances and verify that the instance is treated as `fresh`.
+
+> **Non-normative note.**
+Instance mode tests produce the instance mode evidence bundle.
+A mode that fails any test in this subsection MUST be restricted
+or removed pending a root cause analysis documented in the
+phase's journal evidence.
+
+### Tenant isolation tests
+
+> **Normative definition.**
+Tenant isolation tests verify that the four isolation invariants
+defined in [Tenant isolation model](#tenant-isolation-model) hold
+under deliberate adversarial conditions.
+Each test below targets one isolation invariant; a single failure
+in any test invalidates the corresponding invariant for the
+implementing host.
+
+#### Memory isolation
+
+1. **Cross-tenant memory read**: Invoke two tenants concurrently
+   on the same physical host, have tenant A write a known byte
+   pattern to a specific offset in its guest linear memory, then
+   have tenant B read the same offset and verify that tenant B
+   observes a different pattern or a trap.
+2. **Cross-tenant memory write**: Attempt to have a guest invoked
+   by tenant A write to a memory region that is owned by tenant
+   B's isolation domain and verify that the host traps with the
+   diagnostic `phase4.unauthorized.memory-cross-tenant`.
+
+#### State isolation
+
+1. **Cross-tenant state read**: Invoke a host function on behalf
+   of tenant A that writes to tenant-scoped state, then invoke
+   the same host function on behalf of tenant B and verify that
+   tenant B observes no data written by tenant A.
+2. **Cross-tenant state write**: Invoke a host function on behalf
+   of tenant A with an invocation context that claims to be
+   tenant B and verify that the host rejects the invocation with
+   the diagnostic `phase4.unauthorized.tenant-mismatch`.
+
+#### Capability isolation
+
+1. **Cross-tenant capability visibility**: Grant `wasi:cli/stdout`
+   to tenant A only, then invoke a WASI-enabled guest on behalf
+   of tenant B and verify that tenant B cannot invoke
+   `wasi:cli/stdout`.
+2. **Host function capability isolation**: Grant host function
+   X to tenant A only, then invoke tenant B with an invocation
+   that attempts to call host function X and verify that the
+   host rejects with the diagnostic `invocation.grant-missing`.
+
+#### Resource isolation
+
+1. **Tenant resource exhaustion**: Exhaust tenant A's resource
+   budget (e.g., native allocation or wall-clock time) and verify
+   that tenant B's invocations continue to complete normally
+   within their own budgets.
+2. **Budget accounting accuracy**: Measure the resource consumption
+   of tenant A and tenant B independently over a fixed number of
+   invocations and verify that the accounting is accurate to
+   within the host's documented measurement tolerance.
+
+> **Non-normative note.**
+Tenant isolation tests produce the tenant isolation evidence bundle.
+These tests are the most critical for phase promotion because a
+failure in any one test indicates a fundamental breakdown in the
+logical tenancy guarantee.
+Any observed cross-tenant leak, regardless of severity, MUST
+trigger an immediate halt to phase promotion pending a root cause
+analysis.
+
+### Cross-milestone compatibility tests
+
+> **Normative definition.**
+Cross-milestone compatibility tests verify that Phase 4 does not
+regress behavior established by earlier milestones.
+The host MUST run the integration fixtures defined in each earlier
+milestone that exercises the synchronous host function surface,
+WASI, or tenant isolation, and record any regression or approved
+variability.
+
+#### Affected earlier milestones
+
+The following milestones define fixtures that MUST be re-run under
+Phase 4:
+
+1. **Milestone 1** - Deterministic reducer semantics and milestone
+   acceptance: Verify that deterministic invocation semantics are
+   preserved when host functions are exposed through the synchronous
+   surface.
+2. **Milestone 3** - Signal envelopes, causality, routing, and
+   delivery: Verify that synchronous host function invocations
+   produce signal envelope entries consistent with the causality
+   model.
+3. **Milestone 4** - Turn lifecycle protocols and canonical encoding:
+   Verify that synchronous host function invocations respect turn
+   lifecycle boundaries and produce canonically encoded outcomes.
+4. **Milestone 5 Phase 1** - Extism invocation boundary, instances,
+   and output validation: Verify that Phase 4 instance modes are
+   compatible with the invocation boundary defined in that phase.
+5. **Milestone 5 Phase 2** - Agent registry, activation,
+   cancellation, and completion: Verify that Phase 4 agent-pinned
+   instances respect agent deactivation events.
+6. **Milestone 5 Phase 3** - Capability policy attenuation, limits,
+   and enforcement: Verify that Phase 4 capability grants are
+   properly attenuated by the capability policy.
+
+#### Regression and variability recording
+
+1. **Regression detection**: For each affected milestone fixture,
+   record whether the fixture passes, fails, or produces
+   implementation-defined variability under Phase 4.
+2. **Approved variability**: If a fixture produces variability that
+   is documented in the Phase 4 conformance profile and does not
+   violate any isolation invariant, record the variability as
+   approved with the conformance profile reference.
+3. **Unapproved regression**: If a fixture fails and the failure
+   is not covered by approved variability, record the failure as
+   a regression and trigger a revision of the affected milestone
+   as defined in
+   [Results invalidating earlier milestones](#results-invalidating-earlier-milestones).
+
+> **Non-normative note.**
+Cross-milestone compatibility tests produce the cross-milestone
+evidence bundle.
+They are the final evidence bundle required for phase promotion;
+all four preceding bundles (canonical flow, failure handling,
+instance mode, tenant isolation) MUST pass before cross-milestone
+compatibility is evaluated.
+
+### Integration test evidence requirements
+
+> **Normative definition.**
+The Phase 4 integration test evidence is the aggregate of the five
+evidence bundles defined in the preceding subsections.
+The evidence bundles MUST be assembled into a single Phase 4
+integration test report that satisfies the requirements below.
+
+1. **Completeness**: The report MUST contain evidence for every
+   test defined in this section.
+   A test that was not executed MUST be documented with a reason
+   and an approval from the phase lead.
+2. **Reproducibility**: The report MUST include enough information
+   for an independent reviewer to reproduce every test, including
+   the exact host function records, guest modules, invocation
+   contexts, and instance modes used.
+3. **Traceability**: Every test result in the report MUST be
+   traceable to a specific subsection of this section, a specific
+   test case within that subsection, and a specific residue matrix
+   outcome.
+4. **Diagnostic stability**: For every failure handling test, the
+   report MUST include the exact diagnostic emitted, the
+   `evidence_hash` value, and the bounded diagnostic fields.
+5. **Isolation verdict**: For every tenant isolation test, the
+   report MUST include a clear pass/fail verdict and, for failures,
+   a root cause analysis.
+6. **Cross-milestone verdict**: For every cross-milestone
+   compatibility test, the report MUST include a clear pass/fail
+   or approved-variability verdict with the conformance profile
+   reference if variability is approved.
+7. **Phase promotion readiness**: The report MUST conclude with
+   an explicit statement of whether the evidence satisfies the
+   phase promotion criterion defined in this chapter's Status And
+   Authority section.
+
+> **Non-normative note.**
+The evidence requirements above ensure that the Phase 4 integration
+tests are not a self-certifying exercise.
+An independent reviewer with access to the report and the
+implementation's conformance profile MUST be able to determine
+whether the synchronous host function surface, WASI restrictions,
+and tenant isolation guarantees are conformant.
+
+> **Normative definition.**
+The Phase 4 integration test report MUST be committed to the
+phase's planning directory as a Markdown document named
+`phase-04-integration-test-report.md` within the directory
+`.spec/planning/agentic-system/milestone-05-capabilities-plugins-security-and-tenancy/`.
+The report MUST be referenced from the phase's planning document
+and from this specification chapter.
+
+> **Normative implementation-defined choice.**
+The exact format of the integration test report is an
+implementation-defined choice, subject to the requirements above.
+The format MUST be human-readable Markdown and MUST be parseable
+by the `validate_archive.py` verification tool for structural
+compliance with the archive conventions defined in
+[AGENTS.md](../AGENTS.md).
+
 ## Variability register
 
 | Item | Permission | Recommendation | Constraint |
