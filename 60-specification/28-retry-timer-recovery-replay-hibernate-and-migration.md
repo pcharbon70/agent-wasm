@@ -135,7 +135,7 @@ with `retry.deadline_exceeded` when the deadline passes.
 ### Timer persistence
 
 > **Normative definition.**
-A timer is a durable record of a delayed signal that the host must fire at a
+A timer is a durable record of a delayed signal that the host MUST fire at a
 specific time.
 The host MUST persist timers independently of live schedulers.
 If the host crashes, the host MUST recover timers from the durable store on

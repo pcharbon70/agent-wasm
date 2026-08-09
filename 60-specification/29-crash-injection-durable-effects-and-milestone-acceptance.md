@@ -90,8 +90,13 @@ dispatch boundary:
    but before the result signal is enqueued in the agent's mailbox.
 
 > **Normative definition.**
-Each failure point MUST have a corresponding recovery strategy documented in
-section 5.2.
+Recovery strategies are documented in section 5.2. Failure points before an
+operation starts (e.g., "before invocation", "before dispatch") have no recovery
+strategy because there is nothing to recover from. Failure points after an
+operation completes (e.g., "after commit", "after acknowledgement") are handled
+by crash recovery on host restart. Failure points during an operation (e.g.,
+"before commit", "during commit", "during dispatch") are also handled by crash
+recovery, which reconstructs state from the durable store.
 
 ### State invariants
 
@@ -270,6 +275,9 @@ and milestone acceptance:
 | `dispatch.after_external_success_failure` | Host crash after external success |
 | `dispatch.before_ack_failure` | Host crash before acknowledgement |
 | `dispatch.after_ack_failure` | Host crash after acknowledgement |
+| `attempt.timeout` | Attempt dispatch timed out |
+| `attempt.max_retries_exceeded` | Maximum retry attempts exceeded |
+| `attempt.conflicting_replay` | Replayed attempt produced different result |
 | `recovery.snapshot_invalid` | Snapshot is invalid or corrupt |
 | `recovery.journal_gap` | Journal has gaps that cannot be recovered |
 | `recovery.outbox_inconsistent` | Outbox entries are inconsistent with state |
@@ -344,6 +352,17 @@ The following results from Phase 5 MAY invalidate earlier milestone assumptions:
 If any result from Phase 5 invalidates an earlier milestone assumption, the
 affected milestone MUST be revised and re-validated.
 
+## Variability register
+
+| Item | Permission | Recommendation | Constraint |
+|------|------------|----------------|------------|
+| Crash injection framework | Implementation-defined | Document in conformance profile | Must support deterministic failure injection |
+| Recovery timeout | Implementation-defined | Document in conformance profile | Must not exceed turn timeout |
+| Outbox ack retry policy | Implementation-defined | Document in conformance profile | Must be bounded |
+| Snapshot frequency | Implementation-defined | Document in conformance profile | Must balance durability and performance |
+| Journal compaction | Implementation-defined | Document in conformance profile | Must preserve audit trail |
+| Backoff strategy | Implementation-defined | Exponential backoff | Must be bounded |
+
 ## 5.4 Phase 5 Integration Tests
 
 ### Integration test objectives
@@ -353,11 +372,12 @@ The Phase 5 integration tests MUST verify the following objectives:
 
 1. **Canonical successful flow**: The host handles commits, dispatches, external
    successes, acknowledgements, and result ingestion successfully.
-2. **Failure handling**: The host handles malformed, incompatible, stale,
-   duplicate, and boundary-limit inputs correctly.
-3. **Transient failure recovery**: The host recovers from timeout, cancellation,
-   unavailable dependency, and retry behavior without leaving unauthorized or
-   partial state.
+2. **Crash durability**: The host persists durable state correctly across crashes
+   at every enumerated failure point (before/during/after commit, dispatch,
+   acknowledgement).
+3. **Recovery completeness**: The host recovers all durable records (snapshots,
+   journals, outbox, timers, retries, hibernated agents, migrations) correctly
+   after a crash.
 4. **Cross-milestone compatibility**: The phase does not introduce regressions
    in earlier milestones.
 
@@ -415,19 +435,24 @@ The following tests MUST verify failure handling:
 Each test MUST verify that the error code and diagnostic message match the
 expected values.
 
-### Transient failure recovery tests
+### Recovery after transient failure tests
 
 > **Normative definition.**
-The following tests MUST verify transient failure recovery:
+The following tests MUST verify recovery after transient failures (simulating
+a crash during the transient failure):
 
-1. **Retry timeout**: Simulate a retry timeout and verify the attempt is marked
-   as `Failed` with `attempt.timeout`.
-2. **Retry cancellation**: Simulate a retry cancellation and verify the attempt
-   is marked as `Cancelled`.
-3. **Storage unavailable**: Simulate a storage unavailability and verify the
-   operation is marked as `Failed` with `storage.unavailable`.
-4. **Timer missed fire**: Simulate a timer missed fire and verify the missed-fire
-   policy is applied.
+1. **Retry timeout with crash**: Simulate a retry timeout followed by a host
+   crash, then verify on restart that the attempt is marked as `Failed` with
+   `attempt.timeout` and no partial state remains.
+2. **Retry cancellation with crash**: Simulate a retry cancellation followed by
+   a host crash, then verify on restart that the attempt is marked as `Cancelled`
+   and no partial state remains.
+3. **Storage unavailable with crash**: Simulate a storage unavailability followed
+   by a host crash, then verify on restart that the operation is marked as
+   `Failed` with `storage.unavailable` and no partial state remains.
+4. **Timer missed fire with crash**: Simulate a timer missed fire followed by a
+   host crash, then verify on restart that the missed-fire policy is applied
+   and no partial state remains.
 
 > **Normative definition.**
 Each test MUST verify that no unauthorized or partial state is left after the
@@ -478,14 +503,3 @@ The Phase 5 integration tests MUST produce the following evidence:
 > **Normative definition.**
 The integration test evidence MUST be retained for later milestone and release
 gates.
-
-## Variability register
-
-| Item | Permission | Recommendation | Constraint |
-|------|------------|----------------|------------|
-| Crash injection framework | Implementation-defined | Document in conformance profile | Must support deterministic failure injection |
-| Recovery timeout | Implementation-defined | Document in conformance profile | Must not exceed turn timeout |
-| Outbox ack retry policy | Implementation-defined | Document in conformance profile | Must be bounded |
-| Snapshot frequency | Implementation-defined | Document in conformance profile | Must balance durability and performance |
-| Journal compaction | Implementation-defined | Document in conformance profile | Must preserve audit trail |
-| Backoff strategy | Implementation-defined | Exponential backoff | Must be bounded |
