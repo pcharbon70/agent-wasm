@@ -2,7 +2,7 @@
 
 Back to milestone: [README](./README.md)
 
-- [ ] 4 Phase - Make delayed work, runtime deactivation, state reconstruction, and schema evolution explicit durable operations.
+- [x] 4 Phase - Make delayed work, runtime deactivation, state reconstruction, and schema evolution explicit durable operations.
 
   This phase is complete only when its contracts, behavior, failure semantics,
   and integration evidence are reviewable without relying on a host-language
@@ -15,7 +15,7 @@ Back to milestone: [README](./README.md)
   This section turns the phase objective into explicit interfaces, invariants,
   implementation boundaries, and inspectable evidence.
 
-  - [ ] 4.1.1 Task - Complete the contract and data model work.
+  - [x] 4.1.1 Task - Complete the contract and data model work.
 
     This task is the section-sized implementation and commit boundary.
 
@@ -25,12 +25,12 @@ Back to milestone: [README](./README.md)
 
 ## 4.2 Section - Behavior And Integration
 
-- [ ] 4.2 Section - Establish behavior and integration for retry timer recovery replay hibernate and migration.
+- [x] 4.2 Section - Establish behavior and integration for retry timer recovery replay hibernate and migration.
 
   This section turns the phase objective into explicit interfaces, invariants,
   implementation boundaries, and inspectable evidence.
 
-  - [ ] 4.2.1 Task - Complete the behavior and integration work.
+  - [x] 4.2.1 Task - Complete the behavior and integration work.
 
     This task is the section-sized implementation and commit boundary.
 
@@ -40,12 +40,12 @@ Back to milestone: [README](./README.md)
 
 ## 4.3 Section - Failure Evidence And Operational Notes
 
-- [ ] 4.3 Section - Establish failure evidence and operational notes for retry timer recovery replay hibernate and migration.
+- [x] 4.3 Section - Establish failure evidence and operational notes for retry timer recovery replay hibernate and migration.
 
   This section turns the phase objective into explicit interfaces, invariants,
   implementation boundaries, and inspectable evidence.
 
-  - [ ] 4.3.1 Task - Complete the failure evidence and operational notes work.
+  - [x] 4.3.1 Task - Complete the failure evidence and operational notes work.
 
     This task is the section-sized implementation and commit boundary.
 
@@ -55,12 +55,12 @@ Back to milestone: [README](./README.md)
 
 ## 4.4 Section - Phase 4 Integration Tests
 
-- [ ] 4.4 Section - Verify retry timer recovery replay hibernate and migration across its real dependency boundaries.
+- [x] 4.4 Section - Verify retry timer recovery replay hibernate and migration across its real dependency boundaries.
 
   This section proves the phase works as an integrated behavior and preserves
   reproducible evidence for later milestone and release gates.
 
-  - [ ] 4.4.1 Task - Run the phase integration scenarios.
+  - [x] 4.4.1 Task - Run the phase integration scenarios.
 
     The scenarios must exercise observable contracts rather than private
     implementation structure.
