@@ -2,7 +2,7 @@
 
 Extend durable single-agent semantics to agent relationships, delegation, coordination, topology reconciliation, placement, and recoverable multi-agent workflows.
 
-Current status: phase 2 complete; phases 3-5 pending.
+Current status: milestone complete (all 5 phases implemented).
 
 ## Purpose
 
