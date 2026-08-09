@@ -1045,7 +1045,7 @@ following existing chapters:
 > **Non-normative note.**
 The nine integration points above demonstrate that behavior and integration
 is the connective tissue between the contract and data model (section 36.1)
-and the operational evidence and failure diagnostics (section 36.3).
+and the failure evidence and operational notes (section 36.3).
 Every subsystem that interacts with child lifecycle events must be
 aware of the subscription model, restart policy semantics, and failure
 scenario invariants defined in this section.
@@ -1164,16 +1164,217 @@ be documented in the conformance profile when selected:
 The following items are NOT within the scope of this section:
 
 1. The specific implementation of the Extism instance termination function
-   (covered by
-   [Extism Invocation Boundary Instances And Output Validation](20-extism-invocation-boundary-instances-and-output-validation.md)).
+    (covered by
+    [Extism Invocation Boundary Instances And Output Validation](20-extism-invocation-boundary-instances-and-output-validation.md)).
 2. The specific implementation of the durable state journal write protocol
-   (covered by
-   [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md)
-   and
-   [Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md)).
+    (covered by
+    [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md)
+    and
+    [Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md)).
 3. The specific implementation of the lifecycle monitor's orphan detection
-   algorithm (covered by
-   [Agent Registry Activation Cancellation And Completion](22-agent-registry-activation-cancellation-and-completion.md)).
+    algorithm (covered by
+    [Agent Registry Activation Cancellation And Completion](22-agent-registry-activation-cancellation-and-completion.md)).
 4. The specific implementation of the grant revocation mechanism (covered
-   by
-   [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md)).
+    by
+    [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md)).
+
+## 36.3 Failure Evidence And Operational Notes
+
+### Failure outcomes
+
+> **Normative definition.**
+The host MUST define the following failure outcomes for child lifecycle
+cancellation monitoring and restart policy:
+
+1. **Malformed**: Input data does not conform to the expected schema.
+2. **Incompatible**: Data is incompatible with the current lifecycle policy
+   version or artifact version.
+3. **Conflicting**: Multiple principals attempt to control the same child
+   concurrently (optimistic concurrency conflict).
+4. **Unauthorized**: The caller does not have permission to perform the
+   operation on the target child.
+5. **Exhausted**: The system is out of resources (e.g., restart budget,
+   monitor subscription quota, grant scope).
+6. **Unavailable**: The child agent, the host's lifecycle monitor, or a
+   required dependency is unavailable.
+
+> **Normative definition.**
+Each failure outcome MUST be mapped to a specific error code and diagnostic
+message.
+The error codes defined below are the normative set for child lifecycle
+cancellation monitoring and restart policy.
+
+### Error codes
+
+> **Normative definition.**
+The host MUST use the following error codes for child lifecycle cancellation
+monitoring and restart policy:
+
+| Error Code | Description |
+|------------|-------------|
+| `child.create.malformed` | Child-create directive fails schema validation |
+| `child.create.manifest-artifact-mismatch` | Manifest does not declare the artifact (see [Agent Manifests Artifacts Schemas And Registries](03-agent-manifests-artifacts-schemas-and-registries.md)) |
+| `child.create.duplicate-directive-id` | Directive ID matches already-admitted directive |
+| `child.create.unauthorized` | Owner address not active in durable registry (see [Agent Registry Activation Cancellation And Completion](22-agent-registry-activation-cancellation-and-completion.md)) |
+| `child.create.incompatible` | Lifecycle policy reference does not name a defined policy |
+| `child.create.exhausted` | Restart budget or subscription quota exhausted (see [Retry Timer Recovery Replay Hibernate And Migration](28-retry-timer-recovery-replay-hibernate-and-migration.md)) |
+| `child.create.unavailable` | Agent registry or manifest registry unavailable |
+| `child.lifecycle.unauthorized` | Subscriber lacks `observe.child.lifecycle` capability (see [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md)) |
+| `child.lifecycle.subscription.conflict` | Multiple subscription requests for same child and event set concurrently |
+| `child.lifecycle.grant_revocation.unauthorized` | Cancelling principal lacks grant revocation capability |
+| `child.lifecycle.restart.exhausted` | `bounded-retry` policy `max_attempts` reached |
+| `child.lifecycle.restart.policy-violation` | Non-restartable failure code encountered |
+| `child.lifecycle.parent-loss.unauthorized` | Operator lacks parent-loss resolution capability |
+| `child.cancellation.unauthorized` | Cancelling principal lacks cancellation capability for target child |
+| `child.cancellation.conflict` | Cancellation conflicts with in-flight restart or lifecycle transition |
+| `child.cancellation.unavailable` | Child live actor or mailbox unavailable during cancellation |
+| `child.hard_stop.exhausted` | Hard stop exceeds bounded time |
+| `child.acknowledgement.timeout` | Cancellation acknowledgement timeout (see [Extism Invocation Boundary Instances And Output Validation](20-extism-invocation-boundary-instances-and-output-validation.md)) |
+| `child.monitor.unavailable` | Lifecycle monitor or subscription evaluation unavailable |
+
+> **Normative definition.**
+Each error code MUST be accompanied by a human-readable diagnostic message.
+The diagnostic message MUST identify the phase contract, profile, and failed
+boundary without exposing secrets.
+
+### Bounded diagnostics
+
+> **Normative definition.**
+The host MUST emit bounded diagnostics for each failure outcome.
+The diagnostics MUST include:
+
+1. **Error code**: The specific error code from the table above.
+2. **Context**: The operation that failed (e.g., child-create admission,
+   cancellation propagation, restart evaluation, subscription delivery).
+3. **Entity identifiers**: The `child_address`, `directive_id`,
+   `cancellation_id`, `subscription_id`, or `subscriber_address` involved
+   (without exposing sensitive data).
+4. **Timestamp**: The time the error occurred.
+5. **Retryable**: Whether the operation can be retried.
+6. **Restart policy impact**: If the failure interacts with a restart
+   policy, the diagnostic MUST indicate whether the failure is restartable
+   or terminal per the policy definition.
+
+> **Normative definition.**
+The host MUST NOT expose internal implementation details, secrets, or
+sensitive data in diagnostics.
+
+> **Non-normative note.**
+The `Restart policy impact` field is a critical differentiator for this
+chapter's diagnostics.
+Because child lifecycle failures are evaluated against restart policies,
+an operator MUST be able to distinguish from the diagnostic alone whether
+a failure will trigger a restart or transition the child to terminal status.
+This is consistent with the bounded-diagnostic requirement defined in
+[Signal Envelopes Causality Routing And Delivery](10-signals-causality-routing-and-delivery.md).
+
+### Bounded evidence requirements
+
+> **Normative definition.**
+The host MUST record the following evidence for each failure outcome:
+
+1. **Error code and diagnostic**: As defined in the diagnostics section.
+2. **Child address**: The `TenantQualifiedAgentAddress` of the affected child.
+3. **Directive identity** (if applicable): The `directive_id` or
+   `cancellation_id` associated with the failed operation.
+4. **Snapshot at failure**: The child's snapshot at the time of failure,
+   recorded as defined in
+   [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md).
+5. **Restart policy state**: The current restart policy state (attempt
+   count, next backoff delay, remaining budget) at the time of failure.
+6. **Timestamp**: The time the evidence was recorded.
+7. **Evidence digest**: A deterministic hash of the evidence record,
+   as defined in
+   [Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md).
+
+> **Non-normative note.**
+The evidence record provides operators with a durable, auditable trail of
+every failure outcome that affects a child agent.
+The `evidence_digest` field enables downstream systems (such as the
+provenance and audit layer) to verify that the evidence record has not
+been tampered with after creation.
+The `restart_policy_state` field is specific to child lifecycle and
+enables operators to reconstruct the full restart sequence for a failed
+child without consulting additional subsystem logs.
+
+### Implementation-defined choices
+
+> **Normative implementation-defined choice.**
+The following choices are implementation-defined and MUST be documented in the
+conformance profile:
+
+1. **Error code taxonomy extension**: Hosts MAY define additional error
+   codes beyond the table above for implementation-specific observations.
+   Additional codes MUST not conflict with the existing codes and MUST be
+   documented in the conformance profile.
+2. **Diagnostic format**: The exact format of diagnostic messages is
+   implementation-defined, provided they satisfy the bounded-diagnostic
+   requirements above.
+3. **Evidence retention**: The retention period for failure evidence records
+   is implementation-defined, provided it is at least as long as the
+   maximum restart budget (e.g., `max_attempts` for `bounded-retry`) plus
+   the operator-approved suspension period.
+4. **Diagnostic delivery**: The mechanism by which diagnostics are delivered
+   to operators (log file, structured output, external monitoring system)
+   is implementation-defined.
+5. **Restart policy state sampling**: The granularity of restart policy
+   state recording (e.g., every attempt boundary vs. continuous state) is
+   implementation-defined.
+
+### Deferred work
+
+> **Non-normative note.**
+The following work is deferred to later phases or host implementations:
+
+1. **Cross-process failure correlation**: Correlation of child lifecycle
+   failures across multiple host processes in a distributed deployment.
+   The protocol is language-neutral and does not require distributed
+   correlation for base conformance.
+2. **Failure pattern analysis**: Automated analysis of failure patterns
+   across children with the same restart policy or artifact to identify
+   systemic issues.
+   This is planned for future milestones.
+3. **Dynamic restart policy adjustment**: The ability to change a child's
+   restart policy after creation is deferred.
+   The policy is currently immutable for the lifetime of the child.
+4. **Operator-approved restart deadline**: A default deadline after which
+   an unapproved `operator-approved` policy child transitions to terminal
+   status.
+   The current specification holds indefinitely.
+5. **Failure evidence export API**: A formal API for exporting failure
+   evidence records to external systems.
+   The protocol is language-neutral and does not require an export API
+   for base conformance.
+
+### Results invalidating earlier milestones
+
+> **Non-normative note.**
+The following results from Phase 2 MAY invalidate earlier milestone
+assumptions:
+
+1. **Restart budget exhaustion rate**: If the rate of restart budget
+   exhaustion exceeds the capacity planned in earlier milestones, the
+   capacity plan MUST be revised.
+2. **Subscription evaluation overhead**: If subscription evaluation overhead
+   exceeds the turn timeout, the timeout or subscription model MUST be
+   revised.
+3. **Evidence record size**: If evidence record size exceeds storage
+   capacity planned in earlier milestones, the storage plan MUST be
+   revised.
+4. **Cancellation acknowledgement latency**: If cancellation acknowledgement
+   latency exceeds the `deadline`, the deadline or cancellation flow MUST
+   be revised.
+5. **Hard stop bounded time**: If hard stop exceeds the bounded time
+   documented in the conformance profile, the Extism invocation boundary
+   MUST be revised to support faster termination.
+6. **Duplicate event frequency**: If duplicate event delivery frequency is
+   higher than expected, the mailbox ordering and delivery guarantees
+   defined in
+   [Mailboxes Ordering Bounds Fairness And Turn Leases](21-mailboxes-ordering-bounds-fairness-and-turn-leases.md)
+   MUST be revised.
+
+> **Non-normative note.**
+If any result from Phase 2 invalidates an earlier milestone assumption, the
+affected milestone MUST be revised and re-validated.
+This is consistent with the cross-milestone revision protocol defined in
+[Specification Authority](../SPECIFICATION-AUTHORITY.md).
