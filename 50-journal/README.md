@@ -38,6 +38,9 @@ whose time and execution context matter.
 - [2026-08-09 Phase 3 Implementation](2026-08-09-phase-3-implementation.md)
   — documents Phase 3 of Milestone 7 implementation: branch creation, section-by-section
   implementation notes, key design decisions, cross-references, and open questions.
+- [2026-08-09 Phase 4 Implementation](2026-08-09-phase-4-implementation.md)
+  — documents Phase 4 of Milestone 7 implementation: section-by-section
+  implementation notes, key design decisions, cross-references, and open questions.
 
 ## Maintaining this index
 

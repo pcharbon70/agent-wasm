@@ -94,6 +94,23 @@ open workbenches in inquiries, and session evidence in the journal.
   — documents Section 3.4 implementation: successful flow tests, failure
   handling tests, timeout and cancellation tests, and cross-milestone
   compatibility tests.
+- [Phase 4 Contract And Data Model Implementation](m7-phase-04-contract-and-data-model-implementation.md)
+  — documents Section 4.1 implementation from Phase 4 plan: conversation
+  threads, messages, participants, causal links, content references, visibility,
+  redaction, retention, checkpoints as versioned projections, and memory
+  references with provenance, tenant scope, confidence, promotion, and
+  deletion policy.
+- [Phase 4 Behavior And Integration Implementation](m7-phase-04-behavior-and-integration-implementation.md)
+  — documents Section 4.2 implementation: approval requests workflow, quota
+  enforcement, and secret lease lifecycle.
+- [Phase 4 Failure Evidence And Operational Notes Implementation](m7-phase-04-failure-evidence-and-operational-notes-implementation.md)
+  — documents Section 4.3 implementation: failure outcomes, bounded
+  diagnostics, evidence emission, implementation-defined choices, and
+  deferred work.
+- [Phase 4 Integration Tests Implementation](m7-phase-04-integration-tests-implementation.md)
+  — documents Section 4.4 implementation: successful flow tests, failure
+  handling tests, timeout and cancellation tests, and cross-milestone
+  compatibility tests.
 
 ## Maintaining this index
 
