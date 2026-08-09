@@ -759,77 +759,227 @@ The error codes for this section follow the naming convention
 `instance.<subtype>` for mode-related failures and
 `residue.<subtype>` for residue verification failures.
 
-## Implementation-defined choices
+## 4.3 Failure Evidence And Operational Notes
+
+### Failure outcomes for synchronous host functions
+
+> **Non-normative note.**
+This subsection consolidates the canonical failure outcomes defined
+throughout this chapter.
+The failure outcomes listed here are exhaustive for the synchronous
+host function surface.
+Additional failure outcomes may be defined for specific sub-sections of
+this chapter, but they MUST fall under one of the six categories below.
+
+1. **Malformed**: The host function record, guest module, or invocation
+   context does not conform to the schema, module format, or context
+   contract defined in this chapter.
+2. **Incompatible**: A host function or WASI interface is technically
+   loadable and structurally valid but cannot operate within the bounds,
+   isolation, or determinism constraints defined in this chapter.
+3. **Conflicting**: Two or more host functions, WASI interfaces, or
+   capability grants conflict with each other such that they cannot
+   all be satisfied simultaneously without violating an isolation
+   invariant.
+4. **Unauthorized**: An invocation, host function, or WASI interface
+   lacks the capability grant, trust class, or operator approval
+   required by the capability policy or the host policy defined in
+   this chapter.
+5. **Exhausted**: A resource bound defined in this chapter is exceeded,
+   including but not limited to wall-clock time, memory, recursive
+   calls, native allocation, output bytes, and cancellation timeout.
+6. **Unavailable**: A dependency required by a host function or WASI
+   interface is unreachable, unresponsive, or otherwise unable to
+   complete the requested operation within a reasonable time.
+
+> **Normative definition.**
+Each failure outcome MUST be mapped to a specific error code and
+bounded diagnostic that identifies the phase contract, profile, and
+failed boundary without exposing secrets.
+The error codes for this consolidated section follow the naming
+convention `phase4.<failure-outcome>.<subtype>` where
+`<failure-outcome>` is one of `malformed`, `incompatible`,
+`conflicting`, `unauthorized`, `exhausted`, or `unavailable`.
+
+### Bounded diagnostics and evidence
+
+> **Normative definition.**
+The host MUST emit a bounded diagnostic for every failure outcome
+listed in the previous subsection.
+A bounded diagnostic is a structured report that contains exactly
+the following fields:
+
+| Field | Required | Content |
+|-------|----------|---------|
+| `error_code` | Yes | Stable diagnostic identifier following the naming convention defined in [Failure outcomes](#failure-outcomes-for-synchronous-host-functions). |
+| `phase` | Yes | The phase name, `phase-04-synchronous-host-functions-wasi-restrictions-and-tenant-isolation`. |
+| `contract` | Yes | The subsection of this chapter where the failure boundary was crossed. |
+| `profile` | Yes | The instance mode, tenant scope, or capability scope in effect at the time of failure. |
+| `failed_boundary` | Yes | A human-readable description of the specific invariant or bound that was violated. |
+| `invocation_id` | Conditional | Present if the failure occurred during an invocation; omitted for load-time or registration-time failures. |
+| `tenant_id` | Conditional | Present if the failure is tenant-scoped; omitted if the failure is system-scoped. |
+| `evidence_hash` | Yes | A cryptographic hash of the minimal evidence record that supports the diagnostic, computed as defined in the host conformance profile. |
+
+> **Normative definition.**
+The diagnostic MUST NOT contain any of the following:
+- Raw guest module bytecode or data section contents.
+- Tenant-specific state values or identifiers beyond `tenant_id`.
+- Capability grant values beyond their presence or absence.
+- Native memory addresses, stack traces, or process-internal pointers.
+- Secrets, keys, or credentials in any form.
+- Wall-clock timestamps beyond a coarse-grained duration window
+  documented in the conformance profile.
+
+> **Normative definition.**
+The `evidence_hash` field MUST be computed from a minimal evidence
+record that includes:
+- The type and count of the offending input or state element.
+- The declared bound or invariant that was violated.
+- The instance mode and tenant scope in effect.
+- A counter of how many times the same boundary was crossed within
+  the current agent activation.
+
+The exact hashing algorithm and evidence record format are
+implementation-defined choices documented in the conformance profile.
+
+> **Non-normative note.**
+Bounded diagnostics ensure that operators and automated test harnesses
+can detect, classify, and act on failures without depending on
+implementation-specific error formats.
+The evidence hash enables forensic correlation between a diagnostic
+and the underlying state that produced it without retaining the
+raw state itself.
+
+### Implementation-defined choices
 
 > **Normative implementation-defined choice.**
 The following choices are implementation-defined and MUST be documented
-in the conformance profile:
+in the conformance profile.
+These choices supplement the implementation-defined choices listed in
+[Eligibility criteria](#eligibility-criteria-for-synchronous-host-functions),
+[Import namespace](#import-namespace),
+[Tenant isolation model](#tenant-isolation-model), and
+[Instance modes](#instance-modes).
 
-1. **Import resolution algorithm**: The exact algorithm used to resolve
-   import names to namespace entries, as defined in
-   [Import namespace](#import-namespace).
-2. **Memory isolation mechanism**: The mechanism used to enforce
-   memory isolation between tenants, as defined in
-   [Tenant isolation model](#tenant-isolation-model).
-3. **State isolation mechanism**: The mechanism used to enforce state
-   isolation between tenants, as defined in
-   [Tenant isolation model](#tenant-isolation-model).
-4. **Cancellation enforcement**: The exact mechanism used to enforce
-   cancellation points, including the overhead model and the
-   implementation of `CancellationFrequency`.
-5. **Deadline enforcement granularity**: The host's internal timer
-   resolution and the overhead model for `deadline_ms` enforcement.
-6. **Output limit enforcement**: The exact mechanism used to enforce
-   `output_limit_bytes` on guest output, including how partial output
-   is handled when the limit is exceeded mid-write.
-7. **Tenant identifier validation**: The exact algorithm used to
-   validate tenant identifiers, including the format, source, and
-   revocation procedure.
-8. **WASI interface binding granularity**: Whether WASI interfaces
-   are bound at module load time, instance creation time, or
-   invocation time.
-   The binding MUST be re-evaluated on every instance creation.
-
-## Deferred work
+1. **Error code catalog**: The exact error code catalog for the
+   `phase4.<failure-outcome>.<subtype>` naming convention, including
+   the list of subtypes for each failure outcome.
+2. **Evidence record format**: The exact format of the minimal evidence
+   record used to compute `evidence_hash`, including the fields, types,
+   and ordering.
+3. **Evidence hashing algorithm**: The cryptographic hashing algorithm
+   used to compute `evidence_hash`, including the digest size and
+   collision resistance guarantee.
+4. **Diagnostic serialization format**: The wire format for bounded
+   diagnostics (JSON, MessagePack, CBOR, or another documented format).
+5. **Tenant identifier revocation**: The exact procedure used to
+   invalidate a `tenant_id` after a tenant-isolation violation,
+   including the propagation delay and the audit log entry format.
+6. **Diagnostic retention and query**: The retention policy, query
+   interface, and retention period for bounded diagnostics, including
+   the maximum retention period required for forensic analysis.
 
 > **Non-normative note.**
-The following work is deferred to later phases or host implementations:
+These implementation-defined choices do not alter the conformance
+obligations defined elsewhere in this chapter.
+They only define how an implementation realizes those obligations
+in a specific host language and runtime.
+
+### Deferred work
+
+> **Non-normative note.**
+The following work is deferred to later phases or host implementations.
+None of the items below are required for Phase 4 conformance.
+Deferred items MUST be tracked in the phase's planning document and
+MUST NOT be implied as mandatory by any normative text in this chapter.
 
 1. **Cross-tenant host functions**: Host functions that intentionally
    access state across multiple tenants, subject to strict policy
    controls.
+   This work requires a cross-tenant capability grant model and a
+   cross-tenant audit protocol.
 2. **Dynamic WASI interface addition**: Runtime addition of new WASI
-   interfaces to the closed list, subject to a formal extension
-   procedure.
+   interfaces to the closed list defined in
+   [Default-to-no-WASI and guest profile](#default-to-no-wasi-and-guest-profile),
+   subject to a formal extension procedure.
+   This work requires a WASI interface registry and a host policy
+   extension.
 3. **Tenant migration**: Live migration of a tenant's state and memory
    between host processes without interruption.
+   This work requires a tenant state snapshot and restore protocol.
 4. **Resource budget borrowing**: Temporary borrowing of resource
    budget from one tenant to another, subject to strict limits and
    audit.
+   This work requires a resource budget transfer protocol.
 5. **Host function hot-swap**: Live replacement of a host function
    without restarting guest instances.
+   This work requires a host function versioning and compatibility
+   protocol.
+6. **Adaptive cancellation frequency**: Runtime adjustment of
+   `CancellationFrequency` based on observed execution patterns,
+   subject to a minimum frequency floor documented in the conformance
+   profile.
+7. **Multi-region tenant identity**: Support for tenant identifiers
+   that are resolved across multiple identity providers, subject to
+   a tenant identity federation protocol.
 
-## Results invalidating earlier milestones
+> **Non-normative note.**
+Each deferred item above has a defined triggering condition that would
+promote it to a later phase:
+observable operator demand, a security audit recommendation, or
+a performance benchmark result that demonstrates a clear need.
+Deferral is not a default position; it requires an explicit trigger.
+
+### Results invalidating earlier milestones
 
 > **Non-normative note.**
 The following results from Phase 4 MAY invalidate earlier milestone
-assumptions:
+assumptions.
+Each invalidation triggers a revision of the affected milestone and
+a re-validation of the affected fixtures.
+The revision process is governed by
+[Specification Authority](../SPECIFICATION-AUTHORITY.md) and
+[Conformance Vocabulary](../CONFORMANCE-VOCABULARY.md).
 
 1. **Determinism violations**: If observed host functions violate
    determinism despite declared bounds, the determinism model in
    [Deterministic Reducer Semantics And Milestone Acceptance](14-deterministic-reducer-semantics-and-milestone-acceptance.md)
    MUST be revised.
+   The trigger is any host function whose observed output diverges
+   from its declared deterministic claim under identical input.
 2. **WASI performance**: If WASI-enabled guests exceed the turn timeout
    defined in
-   [Single-Agent Host Flow And Milestone Acceptance](24-single-agent-host-flow-and-milestone-acceptance.md),
-   the timeout or WASI enablement policy MUST be revised.
+   [Single-Agent Host Flow And Milestone Acceptance](24-single-agent-host-flow-and-milestone-acceptance.md)
+   under the policy constraints of this chapter, the timeout or
+   WASI enablement policy MUST be revised.
+   The trigger is a measured WASI invocation that exceeds the turn
+   timeout by more than the host's documented deadline-checking
+   overhead.
 3. **Tenant isolation overhead**: If the isolation mechanisms defined
    in this section exceed the resource budgets defined in
    [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md),
    the budget or isolation model MUST be revised.
+   The trigger is a measured per-tenant overhead that exceeds the
+   per-tenant resource budget by more than the host's documented
+   isolation overhead.
 4. **Import namespace scalability**: If the import namespace resolution
    algorithm does not scale to the expected number of host functions,
    the algorithm MUST be revised.
+   The trigger is a resolution latency that exceeds the host's
+   documented namespace resolution overhead for the expected host
+   function count.
+5. **Instance mode safety**: If any instance mode other than `fresh`
+   fails to meet the isolation oracle defined in
+   [Instance modes](#instance-modes), that mode MUST be restricted
+   or removed.
+   The trigger is any observed cross-tenant state leak or isolation
+   violation in a non-`fresh` mode.
+6. **Residue detection false negative**: If the residue verification
+   mechanism defined in
+   [Test residue](#test-residue) fails to detect a known residue
+   injection, the mechanism MUST be strengthened.
+   The trigger is a controlled residue injection test that passes
+   despite the presence of residue.
 
 > **Non-normative note.**
 If any result from Phase 4 invalidates an earlier milestone assumption,
@@ -837,6 +987,8 @@ the affected milestone MUST be revised and re-validated.
 The revision process is governed by
 [Specification Authority](../SPECIFICATION-AUTHORITY.md) and
 [Conformance Vocabulary](../CONFORMANCE-VOCABULARY.md).
+All invalidated assumptions MUST be recorded in the phase's journal
+evidence and in the affected milestone's revision history.
 
 ## Variability register
 
