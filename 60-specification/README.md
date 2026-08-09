@@ -67,6 +67,7 @@ themselves.
 - [Child Lifecycle Cancellation Monitoring And Restart Policy Contract And Data Model](36-child-lifecycle-cancellation-monitoring-and-restart-policy.md) — Phase 2 of Milestone 6; establishes the contract and data model for host-owned child agent spawning, lifecycle event observability, cancellation propagation, and restart policy selection.
 - [Fan-Out Fan-In Delegation And Result Aggregation Contract And Data Model](37-fan-out-fan-in-delegation-and-result-aggregation-contract-and-data-model.md) — Phase 3 of Milestone 6; establishes the contract and data model for coordinating parallel child work through durable directives and deterministic aggregation rather than shared mutable guest state.
 - [Fan-Out Fan-In Delegation And Result Aggregation Behavior And Integration](37-fan-out-fan-in-delegation-and-result-aggregation-behavior-and-integration.md) — Phase 3 of Milestone 6; establishes the behavior and integration rules for fan-out fan-in delegation and result aggregation, including aggregation policy evaluation, durable aggregation progress, and failure handling.
+- [Fan-Out Fan-In Delegation And Result Aggregation Failure Evidence And Operational Notes](37-fan-out-fan-in-delegation-and-result-aggregation-failure-evidence-and-operational-notes.md) — Phase 3 of Milestone 6; establishes the failure evidence and operational notes for fan-out fan-in delegation and result aggregation, including failure outcomes, bounded diagnostics, evidence emission, and implementation-defined choices.
 
 ## Maintaining this index
 
