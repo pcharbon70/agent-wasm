@@ -64,6 +64,7 @@ themselves.
 - [Synchronous Host Functions WASI Restrictions And Tenant Isolation](33-synchronous-host-functions-wasi-restrictions-and-tenant-isolation.md) — Phase 4 of Milestone 5; establishes the contract and data model for synchronous host functions, import namespace separation, default-to-no-WASI policy, and tenant isolation invariants.
 - [Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md) — Phase 5 of Milestone 5; establishes the contract and data model for artifact provenance admission, host-owned evidence recording, and evidence redaction that form the security gate for milestone acceptance.
 - [Agent Identity Addressing Ownership And Dependency Relations](35-agent-identity-addressing-ownership-and-dependency-relations.md) — Phase 1 of Milestone 6; defines tenant-qualified agent addresses, relationship types, creation authority, lifecycle, cardinality, visibility, and signal provenance that remain valid across agent migration and lifecycle changes.
+- [Child Lifecycle Cancellation Monitoring And Restart Policy Contract And Data Model](36-child-lifecycle-cancellation-monitoring-and-restart-policy.md) — Phase 2 of Milestone 6; establishes the contract and data model for host-owned child agent spawning, lifecycle event observability, cancellation propagation, and restart policy selection.
 
 ## Maintaining this index
 
