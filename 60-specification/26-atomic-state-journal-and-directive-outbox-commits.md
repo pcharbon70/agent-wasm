@@ -67,15 +67,17 @@ If any component fails to write, the host MUST abort the entire transaction.
 
 ```
 CommitUnit {
+  tenant_id: TenantId,
   expected_revision: u64,
   next_revision: u64,
   snapshot: AgentSnapshot?,
-  journal_facts: JournalEntry[],
+  journal_entries: JournalEntry[],
   directive_outbox_entries: OutboxEntry[],
   lifecycle_changes: LifecycleChange[]
 }
 
 LifecycleChange {
+  tenant_id: TenantId,
   agent_id: AgentId,
   from_state: LifecycleState,
   to_state: LifecycleState,
@@ -90,13 +92,16 @@ LifecycleChange {
 [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md).
 `LifecycleState` is defined in
 [Agent Registry Activation Cancellation And Completion](22-agent-registry-activation-cancellation-and-completion.md).
+`TenantId` and `AgentId` are defined in
+[Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md).
 
 | Field | Type | Required | Purpose |
 |-------|------|----------|---------|
+| `tenant_id` | TenantId | Yes | Tenant this commit unit belongs to (unique per `(tenant_id, agent_id, revision)`) |
 | `expected_revision` | u64 | Yes | The revision the host expects to see before commit |
 | `next_revision` | u64 | Yes | The revision after the commit |
 | `snapshot` | AgentSnapshot? | No | New snapshot or patch result (null if no state change) |
-| `journal_facts` | JournalEntry[] | Yes | Journal entries for this turn |
+| `journal_entries` | JournalEntry[] | Yes | Journal entries for this turn |
 | `directive_outbox_entries` | OutboxEntry[] | Yes | Directives to be dispatched |
 | `lifecycle_changes` | LifecycleChange[] | Yes | Lifecycle state changes |
 
@@ -121,6 +126,7 @@ The host MUST write outbox entries atomically with the state journal.
 
 ```
 OutboxEntry {
+  tenant_id: TenantId,
   entry_id: EntryId,
   agent_id: AgentId,
   directive_id: DirectiveId,
@@ -149,17 +155,30 @@ OutboxState {
 }
 ```
 
-`EntryId` and `DirectiveId` are defined in
+`EntryId` is defined in
 [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md).
+`DirectiveId` is defined in
+[Directives Strategies Continuations And Terminal States](13-directives-strategies-continuations-and-terminal-states.md) as `Directive.id`.
+
+`DirectiveTarget.type` and `Directive.id` from
+[Directives Strategies Continuations And Terminal States](13-directives-strategies-continuations-and-terminal-states.md)
+live in separate namespaces. `Directive.id` identifies the directive for the agent
+turn (assigned by the agent during reduction). `DirectiveTarget.type` identifies
+the dispatch category for the host outbox layer. The relationship is:
+an outbox entry with `target.type = Internal` and `address` matching a
+`Directive.id` refers to an in-process directive. Outbox entries for
+`Effect`, `Signal`, and `Timer` targets have their own `address` space and
+do not reference `Directive.id`.
 
 | Field | Type | Required | Purpose |
 |-------|------|----------|---------|
+| `tenant_id` | TenantId | Yes | Tenant this outbox entry belongs to (unique per `(tenant_id, entry_id)`) |
 | `entry_id` | EntryId | Yes | Unique outbox entry identifier |
 | `agent_id` | AgentId | Yes | Agent this outbox entry belongs to |
-| `directive_id` | DirectiveId | Yes | Directive this outbox entry represents |
+| `directive_id` | DirectiveId | Yes | Directive this outbox entry represents (same as `Directive.id` from file 13 for in-process directives) |
 | `payload_hash` | Bytes | Yes | Hash of the directive payload (computed before commit) |
 | `target` | DirectiveTarget | Yes | Target to dispatch to |
-| `attempt_number` | u32 | Yes | Number of dispatch attempts (starts at 1) |
+| `attempt_number` | u32 | Yes | Next dispatch attempt number (starts at 1; incremented on each attempt, capped at `u32::MAX`) |
 | `state` | OutboxState | Yes | Current outbox state |
 | `created_at` | UnixTimestamp | Yes | Outbox entry creation time |
 | `metadata` | JsonObject | Yes | Additional metadata |
@@ -172,6 +191,9 @@ The host MUST NOT allow outbox entries with missing or invalid `payload_hash`.
 > **Normative definition.**
 The `attempt_number` field is incremented on each dispatch attempt.
 The host MUST NOT allow `attempt_number` to be decremented or reset.
+If `attempt_number` reaches `u32::MAX`, the host MUST mark the outbox entry as
+`TerminalFailed` with `outbox.attempt_number_exhausted` and MUST NOT dispatch
+it again.
 
 > **Normative definition.**
 The `state` field follows the outbox state machine defined in
@@ -186,8 +208,11 @@ The host MUST NOT write commit units with unresolved directive identities or
 payload hashes.
 
 > **Normative definition.**
-The directive identity is derived from the directive type, target, and payload.
-The host MUST use a deterministic function to compute the directive identity.
+The `directive_id` field on `OutboxEntry` is the same identifier as
+`Directive.id` from
+[Directives Strategies Continuations And Terminal States](13-directives-strategies-continuations-and-terminal-states.md).
+The agent assigns `Directive.id` during reduction.
+The host MUST NOT derive a new identifier; it MUST use the agent-assigned value.
 
 > **Normative definition.**
 The payload hash is a hash of the directive payload (e.g., SHA-256).
@@ -324,11 +349,12 @@ directive-outbox commits:
 | `commit.missing_payload_hash` | Outbox entry missing payload hash |
 | `commit.unresolved_directive` | Directive identity not determined before commit |
 | `commit.orphaned_outbox` | Outbox entry without committed state transition |
-| `storage.snapshot.duplicate` | Snapshot ID already exists |
-| `storage.snapshot.not_found` | Snapshot ID does not exist |
-| `storage.snapshot.corruption` | Snapshot checksum verification failed |
-| `storage.journal.modified` | Attempt to modify append-only journal |
-| `storage.unavailable` | Storage backend unavailable |
+| `outbox.attempt_number_exhausted` | attempt_number reached u32::MAX |
+| `storage.snapshot.duplicate` | Snapshot ID already exists (see [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md)) |
+| `storage.snapshot.not_found` | Snapshot ID does not exist (see [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md)) |
+| `storage.snapshot.corruption` | Snapshot checksum verification failed (see [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md)) |
+| `storage.journal.modified` | Attempt to modify append-only journal (see [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md)) |
+| `storage.unavailable` | Storage backend unavailable (see [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md)) |
 
 > **Normative definition.**
 Each error code MUST be accompanied by a human-readable diagnostic message.
@@ -371,10 +397,16 @@ conformance profile:
 The following work is deferred to later phases or host implementations:
 
 1. **Outbox retry with backoff**: The retry strategy with exponential backoff.
-2. **Outbox deduplication**: The deduplication strategy for outbox entries.
+2. **Outbox deduplication**: The deduplication strategy for outbox entries, using
+   `DirectiveTarget.idempotency_key` when provided by the directive.
 3. **Outbox compaction**: The compaction strategy for completed outbox entries.
 4. **Cross-process fencing**: The fencing token strategy for multi-process
    deployments.
+5. **DirectiveTarget.type to DirectiveKindName mapping**: The relationship
+   between `DirectiveTarget.type` (Effect, Signal, Timer, Internal) and
+   `DirectiveKindName` ("emit", "timer", "effect", "child-lifecycle",
+   "approval", "topology") from
+   [Directives Strategies Continuations And Terminal States](13-directives-strategies-continuations-and-terminal-states.md).
 
 ### Results invalidating earlier milestones
 
