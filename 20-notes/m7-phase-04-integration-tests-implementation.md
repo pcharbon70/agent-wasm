@@ -235,13 +235,13 @@ No regressions were identified in earlier milestone fixtures.
 
 ### Earlier chapters
 
-- [44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md](../44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md)
-- [44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-behavior-and-integration.md](../44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-behavior-and-integration.md)
-- [44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-failure-evidence-and-operational-notes.md](../44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-failure-evidence-and-operational-notes.md)
+- [44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md](../60-specification/44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md)
+- [44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-behavior-and-integration.md](../60-specification/44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-behavior-and-integration.md)
+- [44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-failure-evidence-and-operational-notes.md](../60-specification/44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-failure-evidence-and-operational-notes.md)
 
 ### Related chapters
 
-- [25-revisioned-snapshots-journals-history-and-storage-contracts.md](../25-revisioned-snapshots-journals-history-and-storage-contracts.md)
-- [30-threat-model-principals-trust-classes-and-grant-vocabulary.md](../30-threat-model-principals-trust-classes-and-grant-vocabulary.md)
-- [31-capability-policy-attenuation-limits-and-enforcement.md](../31-capability-policy-attenuation-limits-and-enforcement.md)
-- [34-provenance-signing-audit-security-and-milestone-acceptance.md](../34-provenance-signing-audit-security-and-milestone-acceptance.md)
+- [25-revisioned-snapshots-journals-history-and-storage-contracts.md](../60-specification/25-revisioned-snapshots-journals-history-and-storage-contracts.md)
+- [30-threat-model-principals-trust-classes-and-grant-vocabulary.md](../60-specification/30-threat-model-principals-trust-classes-and-grant-vocabulary.md)
+- [31-capability-policy-attenuation-limits-and-enforcement.md](../60-specification/31-capability-policy-attenuation-limits-and-enforcement.md)
+- [34-provenance-signing-audit-security-and-milestone-acceptance.md](../60-specification/34-provenance-signing-audit-security-and-milestone-acceptance.md)

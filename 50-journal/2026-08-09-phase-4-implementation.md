@@ -5,6 +5,10 @@ created: "2026-08-09"
 tags:
   - milestone-07
   - phase-04
+  - implementation
+  - journal
+aliases:
+  - "M7-P4 Journal 2026-08-09"
 ---
 
 # 2026-08-09 Phase 4 Implementation
@@ -60,3 +64,9 @@ All changes validated by `validate_archive.py`:
 ## Next steps
 
 Create a single PR for all Phase 4 changes.
+
+See also:
+- [Phase 4 Contract And Data Model Implementation](../20-notes/m7-phase-04-contract-and-data-model-implementation.md)
+- [Phase 4 Behavior And Integration Implementation](../20-notes/m7-phase-04-behavior-and-integration-implementation.md)
+- [Phase 4 Failure Evidence And Operational Notes Implementation](../20-notes/m7-phase-04-failure-evidence-and-operational-notes-implementation.md)
+- [Phase 4 Integration Tests Implementation](../20-notes/m7-phase-04-integration-tests-implementation.md)

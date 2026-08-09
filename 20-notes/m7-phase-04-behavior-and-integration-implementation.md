@@ -317,13 +317,13 @@ Revocation behavior defines what happens when a lease is revoked.
 
 ### Earlier chapters
 
-- [13-directives-strategies-continuations-and-terminal-states.md](../13-directives-strategies-continuations-and-terminal-states.md)
-- [27-effect-handlers-attempts-idempotency-and-result-signals.md](../27-effect-handlers-attempts-idempotency-and-result-signals.md)
-- [30-threat-model-principals-trust-classes-and-grant-vocabulary.md](../30-threat-model-principals-trust-classes-and-grant-vocabulary.md)
-- [31-capability-policy-attenuation-limits-and-enforcement.md](../31-capability-policy-attenuation-limits-and-enforcement.md)
+- [13-directives-strategies-continuations-and-terminal-states.md](../60-specification/13-directives-strategies-continuations-and-terminal-states.md)
+- [27-effect-handlers-attempts-idempotency-and-result-signals.md](../60-specification/27-effect-handlers-attempts-idempotency-and-result-signals.md)
+- [30-threat-model-principals-trust-classes-and-grant-vocabulary.md](../60-specification/30-threat-model-principals-trust-classes-and-grant-vocabulary.md)
+- [31-capability-policy-attenuation-limits-and-enforcement.md](../60-specification/31-capability-policy-attenuation-limits-and-enforcement.md)
 
 ### Related chapters (Phase 4)
 
-- [44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md](../44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md)
-- [44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-failure-evidence-and-operational-notes.md](../44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-failure-evidence-and-operational-notes.md)
-- [44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-phase-4-integration-tests.md](../44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-phase-4-integration-tests.md)
+- [44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md](../60-specification/44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md)
+- [44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-failure-evidence-and-operational-notes.md](../60-specification/44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-failure-evidence-and-operational-notes.md)
+- [44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-phase-4-integration-tests.md](../60-specification/44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-phase-4-integration-tests.md)

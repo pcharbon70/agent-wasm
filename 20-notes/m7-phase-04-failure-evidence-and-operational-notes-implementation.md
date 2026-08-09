@@ -241,13 +241,13 @@ would invalidate an earlier milestone assumption.
 
 ### Earlier chapters
 
-- [10-signals-causality-routing-and-delivery.md](../10-signals-causality-routing-and-delivery.md)
-- [14-deterministic-reducer-semantics-and-milestone-acceptance.md](../14-deterministic-reducer-semantics-and-milestone-acceptance.md)
-- [29-crash-injection-durable-effects-and-milestone-acceptance.md](../29-crash-injection-durable-effects-and-milestone-acceptance.md)
-- [34-provenance-signing-audit-security-and-milestone-acceptance.md](../34-provenance-signing-audit-security-and-milestone-acceptance.md)
+- [10-signals-causality-routing-and-delivery.md](../60-specification/10-signals-causality-routing-and-delivery.md)
+- [14-deterministic-reducer-semantics-and-milestone-acceptance.md](../60-specification/14-deterministic-reducer-semantics-and-milestone-acceptance.md)
+- [29-crash-injection-durable-effects-and-milestone-acceptance.md](../60-specification/29-crash-injection-durable-effects-and-milestone-acceptance.md)
+- [34-provenance-signing-audit-security-and-milestone-acceptance.md](../60-specification/34-provenance-signing-audit-security-and-milestone-acceptance.md)
 
 ### Related chapters (Phase 4)
 
-- [44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md](../44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md)
-- [44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-behavior-and-integration.md](../44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-behavior-and-integration.md)
-- [44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-phase-4-integration-tests.md](../44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-phase-4-integration-tests.md)
+- [44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md](../60-specification/44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md)
+- [44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-behavior-and-integration.md](../60-specification/44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-behavior-and-integration.md)
+- [44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-phase-4-integration-tests.md](../60-specification/44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-phase-4-integration-tests.md)
