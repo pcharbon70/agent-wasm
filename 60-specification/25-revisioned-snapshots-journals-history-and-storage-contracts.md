@@ -325,6 +325,127 @@ The host MUST NOT apply a snapshot produced by an incompatible artifact version.
 If the artifact version is incompatible, the host MUST reject the snapshot with
 `storage.snapshot.incompatible_artifact`.
 
+## 4.2 Behavior And Integration
+
+### Transactional storage interfaces
+
+> **Normative definition.**
+The host MUST provide the following transactional storage interfaces:
+
+1. **Read**: Read a snapshot or journal entry by ID with isolation guarantees.
+2. **Compare-and-commit**: Atomically read, validate, and write with optimistic
+   conflict detection.
+3. **Snapshot**: Create a new snapshot with the next revision number.
+4. **Journal scan**: Scan journal entries within a revision range or time range.
+5. **Checkpoint**: Mark a point in the journal for quick recovery.
+6. **Retention**: Apply retention policies to old snapshots and journal entries.
+
+> **Normative definition.**
+Each storage interface MUST support the following isolation levels:
+
+- **Snapshot isolation**: Read operations see a consistent snapshot of the data.
+- **Serializable writes**: Write operations are serialized to prevent conflicts.
+
+> **Normative definition.**
+The host MUST support the following consistency guarantees:
+
+- **Atomicity**: Each operation is atomic (all-or-nothing).
+- **Consistency**: The storage is always in a consistent state.
+- **Durability**: Committed data is persisted and survives failures.
+- **Isolation**: Concurrent operations do not interfere with each other.
+
+### Consistent reads
+
+> **Normative definition.**
+The host MUST provide consistent reads for the following operations:
+
+1. **Snapshot read**: Read a snapshot by ID with version guarantee.
+2. **Journal read**: Read journal entries in order with no gaps.
+3. **Agent state projection**: Reconstruct agent state from the journal.
+
+> **Normative definition.**
+The host MUST reject reads for non-existent snapshots with `storage.snapshot.not_found`.
+The host MUST reject reads for journal entries that have been garbage collected
+with `storage.journal.garbage_collected`.
+
+### Optimistic conflict detection
+
+> **Normative definition.**
+The host MUST use optimistic concurrency control for snapshot writes.
+The host MUST detect conflicts when multiple writers attempt to write to the
+same `(tenant_id, agent_id, revision)` tuple.
+
+> **Normative definition.**
+If a conflict is detected, the host MUST abort the write and return
+`storage.snapshot.conflict`.
+The host MUST NOT silently overwrite existing data.
+
+> **Normative definition.**
+The host MUST support retry logic for transient conflicts.
+The host MUST limit the number of retries to prevent infinite loops.
+
+### Corruption detection
+
+> **Normative definition.**
+The host MUST verify the checksum of every snapshot on read.
+If the checksum does not match, the host MUST reject the read with
+`storage.snapshot.corruption` and log the incident.
+
+> **Normative definition.**
+The host MUST verify the integrity of journal entries on read.
+If a journal entry is corrupted, the host MUST reject the read with
+`storage.journal.corruption` and log the incident.
+
+> **Normative definition.**
+The host MUST support backup and recovery from corrupted data.
+The host MUST NOT allow corrupted data to propagate to state projections.
+
+### Unavailable store
+
+> **Normative definition.**
+The host MUST handle storage backend unavailability gracefully.
+If the storage backend is unavailable, the host MUST return `storage.unavailable`
+and NOT perform any state changes.
+
+> **Normative definition.**
+The host MUST support retry logic for transient storage failures.
+The host MUST limit the number of retries and back off exponentially.
+
+> **Normative definition.**
+If the storage backend remains unavailable after retries, the host MUST
+abort the operation and release all acquired resources (leases, locks).
+
+### Partial migration
+
+> **Normative definition.**
+The host MUST support storage backend migration without downtime.
+During migration, the host MUST serve reads from the new backend and writes
+to the old backend until migration is complete.
+
+> **Normative definition.**
+The host MUST verify data consistency after migration.
+If migration fails, the host MUST roll back to the old backend.
+
+> **Normative definition.**
+The host MUST NOT serve reads and writes from different backends simultaneously.
+The host MUST complete migration atomically.
+
+### Backend-neutral durability
+
+> **Normative definition.**
+The host MUST define durability, isolation, atomicity, ordering, and recovery
+capabilities in a backend-neutral manner.
+The host MUST NOT expose backend-specific implementation details in the
+specification.
+
+> **Normative definition.**
+The host MUST document the durability guarantees provided by the chosen
+storage backend in the conformance profile.
+
+> **Normative definition.**
+The host MUST support pluggable storage backends.
+The host MUST NOT hard-code storage backend logic in the core specification.
+
 ## Variability register
 
 | Item | Permission | Recommendation | Constraint |
@@ -333,3 +454,6 @@ If the artifact version is incompatible, the host MUST reject the snapshot with
 | State-schema migration | Deferred to host implementation | Document migration strategy | No automatic migration without consent |
 | Journal retention period | Implementation-defined | Document in conformance profile | Must comply with regulatory requirements |
 | Snapshot garbage collection | Implementation-defined | Document retention policy | Must preserve audit journal for cancelled/completed agents |
+| Storage backend | Choose any backend | Document in conformance profile | Must support ACID transactions |
+| Retry strategy | Implementation-defined | Exponential backoff | Must limit retries and back off |
+| Conflict resolution | Implementation-defined | Abort and retry | Must not silently overwrite data |
