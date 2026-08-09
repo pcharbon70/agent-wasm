@@ -256,3 +256,150 @@ The `nondeterministic_results` field records results that are nondeterministic
 (e.g., random numbers, timestamps).
 The host MUST reference the original nondeterministic results for replay
 consistency.
+
+## 4.2 Behavior And Integration
+
+### Hibernate and thaw
+
+> **Normative definition.**
+Hibernate is the process of deactivating an agent's runtime actor while
+preserving its durable state.
+Thaw is the process of reactivating an agent's runtime actor from its
+durable state.
+
+> **Normative definition.**
+
+```
+HibernateRecord {
+  hibernate_id: HibernateId,
+  tenant_id: TenantId,
+  agent_id: AgentId,
+  state_snapshot_id: SnapshotId,
+  journal_checkpoint: u64,
+  state: HibernateState,
+  metadata: JsonObject
+}
+
+HibernateId = string
+SnapshotId = Defined in [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md).
+HibernateState = Pending | Completed | Thawed
+```
+
+| Field | Type | Required | Purpose |
+|-------|------|----------|---------|
+| `hibernate_id` | HibernateId | Yes | Unique hibernate record identifier |
+| `tenant_id` | TenantId | Yes | Tenant this hibernate record belongs to |
+| `agent_id` | AgentId | Yes | Agent this hibernate record belongs to |
+| `state_snapshot_id` | SnapshotId | Yes | Snapshot ID for the hibernated state |
+| `journal_checkpoint` | u64 | Yes | Journal checkpoint for the hibernated state |
+| `state` | HibernateState | Yes | Current hibernate state |
+| `metadata` | JsonObject | Yes | Additional metadata |
+
+> **Normative definition.**
+The host MUST create a snapshot and journal checkpoint before deactivating the
+agent's runtime actor.
+The host MUST verify the snapshot and journal checkpoint are durable before
+deactivating the runtime actor.
+
+> **Normative definition.**
+The host MUST reactivate the agent's runtime actor from the snapshot and
+journal checkpoint.
+The host MUST verify the snapshot and journal checkpoint are valid before
+reactivating the runtime actor.
+
+### Migration authorization
+
+> **Normative definition.**
+Migration is the process of evolving an agent's state schema or artifact
+version.
+The host MUST require migration authorization before performing migration.
+
+> **Normative definition.**
+
+```
+MigrationRecord {
+  migration_id: MigrationId,
+  tenant_id: TenantId,
+  agent_id: AgentId,
+  source_schema_version: string,
+  target_schema_version: string,
+  source_artifact_version: string,
+  target_artifact_version: string,
+  authorization: MigrationAuthorization,
+  state: MigrationState,
+  checkpoint_snapshot_id: SnapshotId?,
+  rollback_snapshot_id: SnapshotId?,
+  metadata: JsonObject
+}
+
+MigrationId = string
+MigrationAuthorization = OperatorApproved | Automated
+MigrationState = Pending | InProgress | Completed | RolledBack
+```
+
+| Field | Type | Required | Purpose |
+|-------|------|----------|---------|
+| `migration_id` | MigrationId | Yes | Unique migration record identifier |
+| `tenant_id` | TenantId | Yes | Tenant this migration record belongs to |
+| `agent_id` | AgentId | Yes | Agent this migration record belongs to |
+| `source_schema_version` | string | Yes | Source state schema version |
+| `target_schema_version` | string | Yes | Target state schema version |
+| `source_artifact_version` | string | Yes | Source artifact version |
+| `target_artifact_version` | string | Yes | Target artifact version |
+| `authorization` | MigrationAuthorization | Yes | Migration authorization |
+| `state` | MigrationState | Yes | Current migration state |
+| `checkpoint_snapshot_id` | SnapshotId? | No | Snapshot ID for the migration checkpoint |
+| `rollback_snapshot_id` | SnapshotId? | No | Snapshot ID for the migration rollback |
+| `metadata` | JsonObject | Yes | Additional metadata |
+
+> **Normative definition.**
+The host MUST verify migration authorization before performing migration.
+Operator-approved migrations require explicit human approval.
+Automated migrations require the migration path to be pre-approved.
+
+> **Normative definition.**
+The host MUST create a checkpoint snapshot before migration.
+The host MUST store the checkpoint snapshot ID in the `checkpoint_snapshot_id`
+field.
+
+> **Normative definition.**
+The host MUST create a rollback snapshot before migration.
+The host MUST store the rollback snapshot ID in the `rollback_snapshot_id`
+field.
+
+### Audit records
+
+> **Normative definition.**
+The host MUST emit an audit record for every migration event.
+Audit records MUST include:
+
+1. `migration_id`: The migration record ID.
+2. `event_type`: The migration event type (e.g., `authorization`, `checkpoint`,
+   `completed`, `rolled_back`).
+3. `actor_id`: The ID of the actor that performed the event.
+4. `timestamp`: The time the event occurred.
+5. `details`: Additional event details.
+
+> **Normative definition.**
+The host MUST retain audit records for the lifetime of the migration record.
+Audit records MUST NOT be mutable after creation.
+
+### Recovery from failure
+
+> **Normative definition.**
+The host MUST define recovery behavior for the following failure scenarios:
+
+1. **Corrupt history**: If the journal is corrupt, the host MUST reconstruct
+   state from the nearest valid snapshot and replay valid journal entries.
+2. **Missing artifact**: If the artifact is missing, the host MUST reject
+   the operation with `artifact.missing`.
+3. **Incompatible migration path**: If the migration path is incompatible,
+   the host MUST reject the migration with `migration.incompatible_path`.
+4. **Expired retry**: If a retry has expired, the host MUST mark the retry
+   as `Expired` with `retry.expired`.
+5. **Duplicate timer**: If a duplicate timer is detected, the host MUST
+   reject the duplicate with `timer.duplicate`.
+
+> **Normative definition.**
+Each recovery action MUST be accompanied by an audit record.
+Recovery actions MUST NOT leave partial or unauthorized state.
