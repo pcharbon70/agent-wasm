@@ -46,7 +46,7 @@ Related chapters:
 [Agent Manifests Artifacts Schemas And Registries](03-agent-manifests-artifacts-schemas-and-registries.md),
 [Deterministic Reducer Semantics And Milestone Acceptance](14-deterministic-reducer-semantics-and-milestone-acceptance.md).
 
-## 1.1 Contract And Data Model
+## 3.1 Contract And Data Model
 
 ### Host invocation input
 
@@ -61,9 +61,9 @@ trace context.
 InvocationInput {
   auth_context: AuthContext,
   artifact_digest: Digest,
-  manifest: Manifest,
+  manifest: AgentManifest,
   state_snapshot: StateSnapshot,
-  grants: CapabilityGrants,
+  grants: Grant[],
   limits: InvocationLimits,
   deadline: UnixTimestamp,
   trace_context: TraceContext
@@ -94,16 +94,42 @@ TraceContext {
 }
 ```
 
+`AgentManifest` is defined in
+[Agent Manifests Artifacts Schemas And Registries](03-agent-manifests-artifacts-schemas-and-registries.md).
+`Grant` is defined in
+[Turn Lifecycle Protocols And Canonical Encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md#grants).
+
+`Subject`, `Scope`, `HashAlgorithm`, and `UnixTimestamp` are defined in
+[Stable Identities Versions Errors And Limits](02-stable-identities-versions-errors-and-limits.md).
+
 | Field | Type | Required | Purpose |
 |-------|------|----------|---------|
 | `auth_context` | AuthContext | Yes | Authentication and authorization context |
 | `artifact_digest` | Digest | Yes | Hash of the compiled WebAssembly artifact |
-| `manifest` | Manifest | Yes | Agent manifest with reducer configuration |
+| `manifest` | AgentManifest | Yes | Agent manifest with reducer configuration |
 | `state_snapshot` | StateSnapshot | Yes | Current state revision for the turn |
-| `grants` | CapabilityGrants | Yes | Granted capabilities for this invocation |
+| `grants` | Grant[] | Yes | Granted capabilities for this invocation |
 | `limits` | InvocationLimits | Yes | Resource limits for this invocation |
 | `deadline` | UnixTimestamp | Yes | Absolute deadline for invocation completion |
 | `trace_context` | TraceContext | Yes | Distributed tracing context |
+
+> **Normative definition.**
+
+```
+StateSnapshot {
+  revision: int,
+  schema_version: string,
+  state: JsonObject,
+  strategy_state: JsonObject?
+}
+```
+
+| Field | Type | Required | Purpose |
+|-------|------|----------|---------|
+| `revision` | int | Yes | Current state revision number |
+| `schema_version` | string | Yes | State schema version |
+| `state` | JsonObject | Yes | Current agent state |
+| `strategy_state` | JsonObject? | Yes | Current strategy state if applicable |
 
 > **Normative definition.**
 The `auth_context.subject` MUST be validated against the agent manifest's
@@ -172,7 +198,7 @@ manifest, memory, timeout, cancellation, and host-function configuration.
 
 ```
 InstanceConfig {
-  manifest: Manifest,
+  manifest: AgentManifest,
   memory_limit: u64,
   timeout_ms: u64,
   cancellation_token: CancellationToken,
@@ -196,9 +222,12 @@ FunctionSignature {
 }
 ```
 
+`AgentManifest` is defined in
+[Agent Manifests Artifacts Schemas And Registries](03-agent-manifests-artifacts-schemas-and-registries.md).
+
 | Field | Type | Required | Purpose |
 |-------|------|----------|---------|
-| `manifest` | Manifest | Yes | Agent manifest for this instance |
+| `manifest` | AgentManifest | Yes | Agent manifest for this instance |
 | `memory_limit` | u64 | Yes | Maximum memory in bytes |
 | `timeout_ms` | u64 | Yes | Execution timeout in milliseconds |
 | `cancellation_token` | CancellationToken | Yes | Token for cancellation |
@@ -242,14 +271,22 @@ InvocationAdapter {
   output_buffer: Bytes,
   usage: InvocationUsage
 }
+```
 
+> **Normative definition.**
+
+```
 ExportSet {
   describe: Option<Function>,
   initialize: Option<Function>,
   reduce: Option<Function>,
   migrate: Option<Function>
 }
+```
 
+> **Normative definition.**
+
+```
 InvocationUsage {
   input_bytes: u64,
   output_bytes: u64,
@@ -291,18 +328,70 @@ directives, and limits before exposing a result to host state logic.
 ```
 InvocationResult {
   status: InvocationStatus,
-  state_patch: Option<StatePatch>,
-  directives: Vec<Directive>,
-  diagnostics: Vec<Diagnostic>,
+  state_patch: StatePatch?,
+  directives: Directive[],
+  diagnostics: Diagnostic[],
   usage: InvocationUsage
 }
+```
 
+`StatePatch` is defined in
+[Turn Lifecycle Protocols And Canonical Encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md#state-patch).
+
+`Directive` is defined in
+[Directives Strategies Continuations And Terminal States](13-directives-strategies-continuations-and-terminal-states.md#directive).
+The chapter 13 definition supersedes the simpler chapter 04 definition for
+this chapter.
+The chapter 13 `Directive` is:
+
+> **Normative definition.**
+
+```
+Directive {
+  id: string,
+  kind: DirectiveKindName,
+  payload: JsonObject?,
+  requested_capability: CapabilityRef,
+  causal_metadata: CausalMetadata,
+  completion_signal: string?,
+  retry_class: RetryClass?,
+  result_contract: ResultContract?
+}
+
+DirectiveKindName = "emit" | "timer" | "effect" | "child-lifecycle" | "approval" | "topology"
+
+CausalMetadata {
+  turn_id: string,
+  instruction_id: string?,
+  action_name: string,
+  timestamp: timestamp
+}
+
+CapabilityRef {
+  name: string,
+  version: string?
+}
+
+RetryClass {
+  max_attempts: int,
+  backoff_ms: int,
+  jitter_ms: int?
+}
+```
+
+> **Normative definition.**
+
+```
 InvocationStatus {
   kind: StatusKind,
   message: String,
   diagnostic_code: Option<String>
 }
+```
 
+> **Normative definition.**
+
+```
 StatusKind {
   Success,
   Error(String),
@@ -323,7 +412,7 @@ The host MUST perform the following validation steps in order:
 3. **Schema validation**: Validate output against the expected schema.
 4. **Semantic validation**: Verify state patch semantics (revision, operations).
 5. **Revision validation**: Verify state patch revision matches expected revision.
-6. **Directives validation**: Validate directive structure and capabilities.
+6. **Directives validation**: Validate directive structure and capabilities per [Directives Strategies Continuations And Terminal States](13-directives-strategies-continuations-and-terminal-states.md).
 7. **Limits validation**: Verify all usage metrics are within configured limits.
 
 > **Normative definition.**
@@ -332,7 +421,7 @@ diagnostic with the appropriate error code.
 The host MUST NOT expose the invalid output to host state logic.
 
 > **Normative definition.**
-The host MUST validate that the `state_patch.revision` matches the expected
+The host MUST validate that the `state_patch` revision matches the expected
 revision from the `state_snapshot`.
 If the revision does not match, the host MUST reject with
 `extism.output.revision_mismatch`.
@@ -350,12 +439,20 @@ InstanceDisposition {
   action: DispositionAction,
   reason: DispositionReason
 }
+```
 
+> **Normative definition.**
+
+```
 DispositionAction {
   Dispose,
   Quarantine
 }
+```
 
+> **Normative definition.**
+
+```
 DispositionReason {
   SuccessfulCompletion,
   Trap,
