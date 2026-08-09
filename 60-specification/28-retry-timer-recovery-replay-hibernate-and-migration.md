@@ -91,7 +91,7 @@ RetryRecord {
 }
 
 RetryClassification = Transient | Permanent | OperatorIntervention
-RetryState = Pending | InProgress | Completed | Expired | TerminalFailed
+RetryState = Pending | InProgress | Completed | Failed | Cancelled | Expired | TerminalFailed
 ```
 
 `AttemptId`, `TenantId`, and `AgentId` are defined in
@@ -113,15 +113,19 @@ RetryState = Pending | InProgress | Completed | Expired | TerminalFailed
 | `metadata` | JsonObject | Yes | Additional metadata |
 
 > **Normative definition.**
-The `retry_number` field is incremented on each retry attempt.
-The host MUST NOT allow `retry_number` to exceed `max_retries`.
-If `retry_number` exceeds `max_retries`, the host MUST mark the retry as
-`TerminalFailed` with `retry.max_retries_exceeded`.
+The `retry_number` field represents the count of attempts including the one in
+progress. The host MUST increment `retry_number` before dispatching each attempt.
+The host MUST NOT dispatch an attempt if `retry_number` would exceed `max_retries`.
+If `retry_number` reaches `max_retries` and the attempt fails, the host MUST
+mark the retry as `TerminalFailed` with `retry.max_retries_exceeded`.
 
 > **Normative definition.**
 The `next_retry_at` field is computed as
-`current_time + backoff_ms * 2^retry_number + random(jitter_ms)`.
+`current_time + backoff_ms * 2^(retry_number - 1) + random(jitter_ms)`.
 The host MUST use the computed `next_retry_at` for scheduling retries.
+This gives a base delay of `backoff_ms` for the first retry, `2 * backoff_ms` for
+the second, and so on, with up to `jitter_ms` milliseconds of additional random
+jitter applied to each delay.
 
 > **Normative definition.**
 The `deadline` field is optional.
@@ -154,7 +158,7 @@ TimerRecord {
 
 TimerId = string
 SignalEnvelope = Defined in [Signal Envelopes Causality Routing And Delivery](10-signals-causality-routing-and-delivery.md).
-TimerState = Pending | Fired | Cancelled | Expired
+TimerState = Pending | InProgress | Fired | Cancelled | Expired | MissedFire
 ```
 
 | Field | Type | Required | Purpose |
@@ -193,6 +197,14 @@ The host MUST support the following missed-fire policies:
 > **Normative definition.**
 The missed-fire policy is configured per timer and is stored in the `metadata`
 field of the `TimerRecord`.
+
+> **Normative definition.**
+The host MUST mark a timer as `MissedFire` with `timer.missed_fire` when the
+timer's `fire_at` time has passed and the timer has not been fired within a
+reasonable grace period. The grace period is implementation-defined but MUST
+be documented in the conformance profile. The host MUST then apply the
+missed-fire policy (fire immediately, skip, or retry) based on the timer's
+configuration.
 
 ### Replay
 
@@ -242,7 +254,7 @@ NondeterministicResult {
 | `state_schema_version` | string | Yes | State schema version used for the replay |
 | `policy_version` | string | Yes | Policy version used for the replay |
 | `state` | ReplayState | Yes | Current replay state |
-| `nondeterministic_results` | NondeterministicResult[] | Yes | Nondeterministic results from the replay |
+| `nondeterministic_results` | NondeterministicResult[] | Yes (empty list allowed) | Nondeterministic results from the replay (empty if all results were deterministic) |
 | `metadata` | JsonObject | Yes | Additional metadata |
 
 > **Normative definition.**
@@ -282,7 +294,7 @@ HibernateRecord {
 
 HibernateId = string
 SnapshotId = Defined in [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md).
-HibernateState = Pending | Completed | Thawed
+HibernateState = Pending | InProgress | Completed | Failed | Thawed
 ```
 
 | Field | Type | Required | Purpose |
@@ -334,7 +346,7 @@ MigrationRecord {
 
 MigrationId = string
 MigrationAuthorization = OperatorApproved | Automated
-MigrationState = Pending | InProgress | Completed | RolledBack
+MigrationState = Pending | InProgress | Completed | Failed | RolledBack
 ```
 
 | Field | Type | Required | Purpose |
@@ -395,8 +407,10 @@ The host MUST define recovery behavior for the following failure scenarios:
    the operation with `artifact.missing`.
 3. **Incompatible migration path**: If the migration path is incompatible,
    the host MUST reject the migration with `migration.incompatible_path`.
-4. **Expired retry**: If a retry has expired, the host MUST mark the retry
-   as `Expired` with `retry.expired`.
+4. **Expired retry**: If a retry's `next_retry_at` has passed and the retry has
+   not been attempted within a reasonable grace period, the host MUST mark the
+   retry as `Expired` with `retry.expired`. This applies when the retry scheduler
+   has not dispatched the retry within a tolerance window after `next_retry_at`.
 5. **Duplicate timer**: If a duplicate timer is detected, the host MUST
    reject the duplicate with `timer.duplicate`.
 
@@ -437,6 +451,7 @@ hibernate, and migration:
 | `retry.max_retries_exceeded` | Maximum retry attempts exceeded |
 | `retry.deadline_exceeded` | Retry deadline exceeded |
 | `retry.expired` | Retry expired |
+| `retry.timeout` | Retry dispatch timed out |
 | `timer.expired` | Timer expired |
 | `timer.duplicate` | Duplicate timer detected |
 | `timer.missed_fire` | Timer missed scheduled fire time |
