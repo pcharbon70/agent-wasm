@@ -611,7 +611,7 @@ implementation MUST detect every attack vector defined below.
 
 | Exercise | Attack vector | Expected host response | Relevant checks |
 |----------|--------------|----------------------|-----------------|
-| **Malicious imports** | An artifact declares imports from modules that are not permitted by the host's capability policy. | Reject at admission with `artifact.dependency-unresolved` or `artifact.signature-invalid`. | Dependency resolution, signature validity. |
+| **Malicious imports** | An artifact declares imports from modules that are not permitted by the host's capability policy. | Reject at admission if the dependency resolution check identifies unresolvable imports; otherwise detect at invocation time with `invocation.failed` and `capability-policy-violation`. | Dependency resolution, capability policy, invocation boundary. |
 | **Oversized output** | An artifact produces an invocation output that exceeds the output size limit defined in
 [Synchronous Host Functions WASI Restrictions And Tenant Isolation](33-synchronous-host-functions-wasi-restrictions-and-tenant-isolation.md). | Truncate or reject at invocation time; record `invocation.failed` with `failure_type: output-oversize`. | Invocation boundary, output validation (see
 [Extism Invocation Boundary Instances And Output Validation](20-extism-invocation-boundary-instances-and-output-validation.md)). |
@@ -623,7 +623,7 @@ implementation MUST detect every attack vector defined below.
 
 > **Normative definition.**
 The malicious imports exercise tests that the dependency resolution check
-catchs imports that violate the capability policy defined in
+catches imports that violate the capability policy defined in
 [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md).
 An import is considered malicious if it references a module, function,
 or memory region that the host's capability policy does not grant to
@@ -963,8 +963,10 @@ section.
    invalid, expired, or produced by an unknown key.
 4. **Publisher untrusted**: The signing identity does not map to a
    known, active publisher in the trust store.
-5. **Publisher hint mismatch**: The `publisher_hint` field does not
-   match the identity derived from the artifact's signature.
+5. **Publisher hint advisory**: The `publisher_hint` field does not match
+   the identity derived from the artifact's signature.
+   This is an advisory outcome per [Artifact admission verification](#artifact-admission-verification);
+   the host MUST emit `artifact.publisher-hint-mismatch` but MUST NOT fail admission.
 6. **Build provenance invalid**: The build record is missing required
    fields or contains values that fail validation.
 7. **Dependency unresolved**: A declared dependency cannot be resolved
@@ -984,6 +986,27 @@ Each failure outcome MUST be mapped to a specific error code and
 bounded diagnostic following the naming convention
 `artifact.admission.<subtype>` where `<subtype>` corresponds to the
 failure outcome name in lowercase with hyphens.
+The following error codes are defined for artifact admission failures:
+
+| Error Code | Description |
+|------------|-------------|
+| `artifact.admission.digest-mismatch` | The artifact's computed digest does not match the recorded digest |
+| `artifact.admission.signature-invalid` | The artifact's signature is cryptographically invalid, expired, or produced by an unknown key |
+| `artifact.admission.publisher-untrusted` | The signing identity does not map to a known, active publisher in the trust store |
+| `artifact.admission.publisher-hint-mismatch` | The `publisher_hint` field does not match the signing identity (advisory only) |
+| `artifact.admission.build-provenance-invalid` | The build record is missing required fields or contains values that fail validation |
+| `artifact.admission.dependency-unresolved` | A declared dependency cannot be resolved to a verified, non-revoked artifact |
+| `artifact.admission.compiler-incompatible` | The artifact's compiler or PDK version is not in the compatibility policy |
+| `artifact.admission.revoked` | The artifact or its publisher is on an active revocation list |
+| `artifact.admission.dependency-cycle` | The artifact's dependency graph contains a cycle |
+| `artifact.admission.cache-failure` | The host cannot read or write its dependency cache |
+| `artifact.admission.trust-store-failure` | The host cannot read its publisher trust store or revocation lists |
+| `artifact.admission.malformed` | The admission request does not conform to the schema |
+| `artifact.admission.incompatible-version` | The admission request references a version the host does not support |
+| `artifact.admission.conflicting` | A conflict check fails during composition |
+| `artifact.admission.unauthorized` | The caller lacks the trust class required for the requested operation |
+| `artifact.admission.exhausted` | The host cannot allocate resources for the admission |
+| `artifact.admission.unavailable` | A required dependency is unavailable |
 
 ### Failure outcomes for evidence recording
 
@@ -1006,6 +1029,16 @@ Each failure outcome MUST be mapped to a specific error code and
 bounded diagnostic following the naming convention
 `evidence.<subtype>` where `<subtype>` corresponds to the failure
 outcome name in lowercase with hyphens.
+The following error codes are defined for evidence recording failures:
+
+| Error Code | Description |
+|------------|-------------|
+| `evidence.write-failure` | The host cannot durably write an evidence record |
+| `evidence.integrity-violation` | An evidence record's integrity check fails |
+| `evidence.retention-policy-violation` | An evidence record is deleted before the minimum retention period expires without operator action |
+| `evidence.audit-log-failure` | The host cannot write to the evidence access audit log |
+| `evidence.alert-path-failure` | The security alert path for isolation violations or residue detection fails to deliver the alert |
+| `evidence.index-failure` | The host cannot update an evidence record index entry |
 
 ### Failure outcomes for evidence redaction
 
@@ -1029,6 +1062,15 @@ Each failure outcome MUST be mapped to a specific error code and
 bounded diagnostic following the naming convention
 `redaction.<subtype>` where `<subtype>` corresponds to the failure
 outcome name in lowercase with hyphens.
+The following error codes are defined for evidence redaction failures:
+
+| Error Code | Description |
+|------------|-------------|
+| `redaction.policy-error` | The redaction policy is malformed or missing required fields |
+| `redaction.access-evaluation-error` | The host cannot evaluate the access policy for a field |
+| `redaction.reference-format-error` | The host cannot produce a valid stable reference for a redacted field |
+| `redaction.cache-invalidation-failure` | A redacted view cache entry is not invalidated after a policy change |
+| `redaction.query-interface-failure` | The host's evidence query interface is unavailable |
 
 ### Bounded diagnostics and evidence
 
@@ -1221,7 +1263,7 @@ The objectives below are exhaustive for Phase 5 integration evidence.
    [Host-owned evidence recording](#host-owned-evidence-recording)
    is exercised, including immutability, retention, audit logging,
    and integrity checking under both normal and adversarial conditions.
-5. **Adversarial resilience**: All six security exercise attack vectors
+5. **Adversarial resilience**: All seven security exercise attack vectors
    and all six adversarial isolation exercise attack vectors defined in
    [Security exercises](#security-exercises) and
    [Adversarial isolation exercises](#adversarial-isolation-exercises)
@@ -1266,12 +1308,13 @@ and constrained modes.
    for an artifact already cached from the first admission.
    The host MUST skip redundant verification checks and admit the
    artifact using the cached entry.
-4. **Parallel check execution**: Submit an `ArtifactAdmissionRequest`
-   and measure whether checks 3 through 9 execute in parallel.
-   The host MUST produce a deterministic admission result regardless
-   of execution order.
-   Parallel execution is an allowed optimization; it must not change
-   observable outcomes.
+4. **Deterministic outcomes under parallel execution**: Submit an
+   `ArtifactAdmissionRequest` and verify that checks 3 through 9 produce
+   a deterministic admission result regardless of execution order.
+   Parallel execution is an allowed optimization per
+   [Artifact admission verification](#artifact-admission-verification);
+   it must not change observable outcomes, but the test must not measure
+   whether parallelism is actually used.
 
 #### Evidence recording success
 
@@ -1353,7 +1396,7 @@ subtasks and defined in
 of this chapter.
 Each test simulates a deliberate attack and verifies that the system
 detects and rejects it.
-All 12 exercises (7 security + 6 adversarial isolation) MUST be
+All 13 exercises (7 security + 6 adversarial isolation) MUST be
 executed; a single failed exercise blocks phase promotion.
 
 #### Security exercise tests
