@@ -517,3 +517,153 @@ The following results from Phase 4 MAY invalidate earlier milestone assumptions:
 > **Non-normative note.**
 If any result from Phase 4 invalidates an earlier milestone assumption, the
 affected milestone MUST be revised and re-validated.
+
+## 4.4 Phase 4 Integration Tests
+
+### Integration test objectives
+
+> **Normative definition.**
+The Phase 4 integration tests MUST verify the following objectives:
+
+1. **Canonical successful flow**: The host handles retries, timers, recovery,
+   replay, hibernate, and migration successfully.
+2. **Failure handling**: The host handles malformed, incompatible, stale,
+   duplicate, and boundary-limit inputs correctly.
+3. **Transient failure recovery**: The host recovers from timeout, cancellation,
+   unavailable dependency, and retry behavior without leaving unauthorized or
+   partial state.
+4. **Cross-milestone compatibility**: The phase does not introduce regressions
+   in earlier milestones.
+
+> **Normative definition.**
+Each integration test MUST exercise observable contracts rather than private
+implementation structure.
+
+### Successful flow tests
+
+> **Normative definition.**
+The following tests MUST verify the canonical successful flow:
+
+1. **Retry classification**: Classify a retry as transient, permanent, or
+   operator-intervention and verify the classification.
+2. **Retry dispatch**: Dispatch a retry and verify the attempt state transitions
+   from `Pending` to `InProgress` to `Completed`.
+3. **Timer creation**: Create a timer and verify the timer is persisted.
+4. **Timer fire**: Fire a timer and verify the signal is delivered.
+5. **Replay**: Replay a journal and verify the reconstructed state matches the
+   snapshot.
+6. **Hibernate**: Hibernate an agent and verify the state is preserved.
+7. **Thaw**: Thaw an agent and verify the state is restored.
+8. **Migration**: Migrate an agent and verify the migration is completed.
+
+> **Normative definition.**
+Each test MUST record the following evidence:
+
+- Input data
+- Expected output
+- Actual output
+- Pass/fail status
+
+### Failure handling tests
+
+> **Normative definition.**
+The following tests MUST verify failure handling:
+
+1. **Retry max retries exceeded**: Attempt to exceed the maximum retry attempts
+   and verify the `retry.max_retries_exceeded` error code.
+2. **Retry deadline exceeded**: Attempt to exceed the retry deadline and verify
+   the `retry.deadline_exceeded` error code.
+3. **Timer expired**: Attempt to fire an expired timer and verify the
+   `timer.expired` error code.
+4. **Timer duplicate**: Attempt to create a duplicate timer and verify the
+   `timer.duplicate` error code.
+5. **Replay conflicting result**: Attempt a conflicting replay and verify the
+   `replay.conflicting_result` error code.
+6. **Hibernate checkpoint failed**: Simulate a hibernate checkpoint failure and
+   verify the `hibernate.checkpoint_failed` error code.
+7. **Thaw failed**: Simulate a thaw failure and verify the `hibernate.thaw_failed`
+   error code.
+8. **Migration authorization required**: Attempt a migration without
+   authorization and verify the `migration.authorization_required` error code.
+9. **Migration incompatible path**: Attempt a migration with an incompatible
+   path and verify the `migration.incompatible_path` error code.
+10. **Artifact missing**: Attempt an operation with a missing artifact and verify
+    the `artifact.missing` error code.
+
+> **Normative definition.**
+Each test MUST verify that the error code and diagnostic message match the
+expected values.
+
+### Transient failure recovery tests
+
+> **Normative definition.**
+The following tests MUST verify transient failure recovery:
+
+1. **Retry timeout**: Simulate a retry timeout and verify the attempt is marked
+   as `Failed` with `retry.timeout`.
+2. **Retry cancellation**: Simulate a retry cancellation and verify the attempt
+   is marked as `Cancelled`.
+3. **Storage unavailable**: Simulate a storage unavailability and verify the
+   operation is marked as `Failed` with `storage.unavailable`.
+4. **Timer missed fire**: Simulate a timer missed fire and verify the missed-fire
+   policy is applied.
+
+> **Normative definition.**
+Each test MUST verify that no unauthorized or partial state is left after the
+failure.
+
+### Cross-milestone compatibility tests
+
+> **Normative definition.**
+The following tests MUST verify cross-milestone compatibility:
+
+1. **Milestone 1 fixtures**: Run all Milestone 1 fixtures and verify no
+   regressions. Milestone 1 fixtures are defined in
+   [Guest SDK Contracts Fixtures And Milestone Acceptance](05-guest-sdk-contracts-fixtures-and-milestone-acceptance.md).
+2. **Milestone 2 fixtures**: Run all Milestone 2 fixtures and verify no
+   regressions. Milestone 2 fixtures are defined in the Phase 1-5 plans under
+   [Milestone 2](../.spec/planning/agentic-system/milestone-02-signals-actions-state-and-strategies/).
+3. **Milestone 3 fixtures**: Run all Milestone 3 fixtures and verify no
+   regressions. Milestone 3 fixtures are defined in the Phase 1-5 plans under
+   [Milestone 3](../.spec/planning/agentic-system/milestone-03-host-actor-runtime-and-lifecycle/).
+
+> **Normative definition.**
+If any regression is detected, the affected milestone MUST be revised and
+re-validated.
+
+### Integration test evidence
+
+> **Normative definition.**
+The Phase 4 integration tests MUST produce the following evidence:
+
+1. **Test report**: A report listing all tests with pass/fail status.
+2. **Retry evidence**: Evidence that retries are classified and dispatched
+   correctly.
+3. **Timer evidence**: Evidence that timers are created, fired, and recovered
+   correctly.
+4. **Replay evidence**: Evidence that replay reconstructs state correctly.
+5. **Hibernate evidence**: Evidence that hibernate preserves state correctly.
+6. **Thaw evidence**: Evidence that thaw restores state correctly.
+7. **Migration evidence**: Evidence that migration is authorized and completed
+   correctly.
+8. **Failure diagnostics**: Evidence that failure diagnostics are correct and
+   bounded.
+9. **Recovery evidence**: Evidence that transient failures are recovered from
+   correctly.
+
+> **Normative definition.**
+The integration test evidence MUST be retained for later milestone and release
+gates.
+
+## Variability register
+
+| Item | Permission | Recommendation | Constraint |
+|------|------------|----------------|------------|
+| Retry default policy | Implementation-defined | Document in conformance profile | Must not exceed turn timeout |
+| Missed-fire default policy | Implementation-defined | Document in conformance profile | Must be one of fire_immediately, skip, retry |
+| Hibernate timeout | Implementation-defined | Document in conformance profile | Must be bounded |
+| Thaw timeout | Implementation-defined | Document in conformance profile | Must be bounded |
+| Migration timeout | Implementation-defined | Document in conformance profile | Must be bounded |
+| Backoff strategy | Implementation-defined | Exponential backoff | Must be bounded |
+| State schema versioning | Implementation-defined | Document in conformance profile | Must support migration |
+| Artifact versioning | Implementation-defined | Document in conformance profile | Must support migration |
