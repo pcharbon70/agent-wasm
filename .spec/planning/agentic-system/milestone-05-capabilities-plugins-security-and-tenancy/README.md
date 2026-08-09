@@ -2,7 +2,7 @@
 
 Add host-owned authorization, composable framework plugins, artifact trust, resource governance, and defensible tenant isolation around untrusted guest code.
 
-Current status: planned; all phases and tasks are unchecked.
+Current status: phase 1 complete; phases 2-5 pending.
 
 ## Purpose
 
