@@ -538,13 +538,13 @@ The host MUST NOT partially apply any plugin whose composition fails.
 
 | Diagnostic | Trigger |
 |------------|---------|
-| `name-conflict` | Two plugins share a resolved name |
-| `route-conflict` | Two routes match the same pattern at the same priority |
-| `namespace-conflict` | Two plugins declare the same namespace |
-| `schema-conflict` | Two plugins declare conflicting schemas with the same id |
-| `migration-conflict` | Two migrations target the same namespace incompatibly |
-| `capability-conflict` | Trust model cannot satisfy all requested grants |
-| `lifecycle-conflict` | Publisher-owned lifecycle claims conflict with operator policy |
+| `plugin.name_conflict` | Two plugins share a resolved name |
+| `plugin.route_conflict` | Two routes match the same pattern at the same priority |
+| `plugin.namespace_conflict` | Two plugins declare the same namespace |
+| `plugin.schema_conflict` | Two plugins declare conflicting schemas with the same id |
+| `plugin.migration_conflict` | Two migrations target the same namespace incompatibly |
+| `plugin.capability_conflict` | Trust model cannot satisfy all requested grants |
+| `plugin.lifecycle_conflict` | Publisher-owned lifecycle claims conflict with operator policy |
 
 > **Non-normative note.**
 Failure to partially apply means that if any single conflict is detected,
@@ -760,16 +760,23 @@ boundary without exposing secrets.
 |------------|-------------|
 | `plugin.malformed_manifest` | The manifest does not conform to the schema |
 | `plugin.incompatible_version` | The manifest references an unsupported version |
-| `plugin.conflict` | A composition conflict was detected |
+| `plugin.conflict` | A composition conflict was detected (general) |
+| `plugin.name_conflict` | Two plugins share a resolved name |
+| `plugin.route_conflict` | Two routes match the same pattern at the same priority |
+| `plugin.namespace_conflict` | Two plugins declare the same namespace |
+| `plugin.schema_conflict` | Two plugins declare conflicting schemas with the same id |
+| `plugin.lifecycle_conflict` | Publisher-owned lifecycle claims conflict with operator policy |
 | `plugin.unauthorized` | The caller lacks the required trust class |
 | `plugin.exhausted` | Required resources are exhausted |
 | `plugin.unavailable` | A required dependency is unavailable |
 | `plugin.missing_dependency` | A referenced artifact or capability is missing |
 | `plugin.version_conflict` | The requested version conflicts with an installed version |
 | `plugin.circular_dependency` | Circular dependency detected among plugins |
-| `plugin.ambiguous_route` | Two routes match the same pattern at the same priority |
+| `plugin.ambiguous_route` | Two routes match the same pattern at the same priority (alias) |
 | `plugin.orphaned_state` | A plugin has active state references after removal |
 | `plugin.revoked_publisher` | The publisher's trust class has been revoked |
+| `plugin.schema_validation_failed` | A schema validation check failed |
+| `plugin.grant_unresolvable` | A requested grant cannot be resolved |
 
 ### Missing dependency
 
@@ -985,6 +992,14 @@ the affected milestone MUST be revised and re-validated.
 | Trust tier enforcement | Implementation-defined | Document in conformance profile | Must enforce all three trust tier rules |
 | Manifest version validation | Implementation-defined | Document in conformance profile | Must reject unsupported manifest versions |
 
+## Operational variability register
+
+| Item | Permission | Recommendation | Constraint |
+|------|------------|----------------|------------|
+| Diagnostic formatting | Implementation-defined | Document in conformance profile | Must produce parseable output |
+| Audit log retention | Implementation-defined | Document in conformance profile | Must support forensic analysis |
+| Failure detection granularity | Implementation-defined | Document in conformance profile | Must detect all twelve failure outcomes |
+
 ## 3.3 Failure Evidence And Operational Notes
 
 This section establishes the failure outcomes, bounded diagnostics, evidence
@@ -994,41 +1009,39 @@ lifecycle hooks.
 
 ### Failure outcomes
 
-> **Normative definition.**
-The host MUST define the following failure outcomes for framework plugin
-manifests composition and lifecycle hooks. Each outcome represents a
-distinct failure mode that the host MUST detect, classify, and report
-without exposing secrets to unprivileged callers.
+> **Non-normative note.**
+The canonical failure outcomes for framework plugin manifests composition
+and lifecycle hooks are defined in the failure semantics subsection of
+[Behavior And Integration](#32-behavior-and-integration). This section
+reiterates the six primary failure outcomes for operational clarity and
+references the canonical definitions.
 
 1. **Malformed**: The manifest does not conform to the declared schema
    or data model defined in [Contract And Data Model](#31-contract-and-data-model).
+   Canonical definition at [Failure semantics](#failure-semantics).
 2. **Incompatible**: The manifest references a manifest version, schema
    format, or trust tier that the host does not support.
+   Canonical definition at [Failure semantics](#failure-semantics).
 3. **Conflicting**: A conflict check fails during composition as defined
    in [Composition order and conflict checks](#composition-order-and-conflict-checks).
+   Canonical definition at [Failure semantics](#failure-semantics).
 4. **Unauthorized**: The caller lacks the trust class required for the
    requested lifecycle operation as defined in
    [Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md).
+   Canonical definition at [Failure semantics](#failure-semantics).
 5. **Exhausted**: The host cannot allocate resources for the plugin,
    including state namespace exhaustion, route table overflow, or
    capability grant exhaustion.
+   Canonical definition at [Failure semantics](#failure-semantics).
 6. **Unavailable**: A required dependency is unavailable, including
    missing artifacts, unresolved grants, or pending operator approval.
+   Canonical definition at [Failure semantics](#failure-semantics).
 
 > **Normative definition.**
-Each failure outcome MUST be mapped to a specific error code, a bounded
-diagnostic message, and the phase boundary at which the failure was
-detected. The diagnostic MUST identify the phase contract, the conformance
-profile, and the failed boundary without exposing secrets, internal
-state, or information accessible only to privileged callers.
-
-> **Non-normative note.**
-These six failure outcomes cover the primary failure modes for framework
-plugin manifests composition and lifecycle hooks. Additional failure
-outcomes are defined in the failure semantics subsection of
+Additional failure outcomes are defined in the failure semantics subsection of
 [Behavior And Integration](#32-behavior-and-integration), including
 missing dependency, version conflict, circular dependency, ambiguous
-route, orphaned state, and revoked publisher. Implementations SHOULD
+route, orphaned state, and revoked publisher. Implementations MUST
 emit diagnostics for all twelve failure outcomes to provide operators
 with comprehensive failure visibility.
 
@@ -1082,7 +1095,7 @@ monitoring. Operators SHOULD monitor the lifecycle audit log for
 patterns that indicate systemic issues, such as repeated malformed
 manifests from a specific publisher.
 
-### Implementation-defined choices
+### Operational implementation-defined choices
 
 > **Normative implementation-defined choice.**
 The following choices are implementation-defined and MUST be documented
@@ -1119,7 +1132,7 @@ optimize for their specific deployment environments while maintaining
 normative conformance. Operators SHOULD review the conformance profile
 to understand how the host implements these choices.
 
-### Deferred work
+### Operational deferred work
 
 > **Non-normative note.**
 The following work is deferred to later phases or host implementations.
