@@ -33,7 +33,7 @@ whose time and execution context matter.
   — documents Phase 1 of Milestone 7 implementation: PR merge, section-by-section
   implementation notes, key design decisions, cross-references, and open questions.
 - [2026-08-09 Phase 2 Implementation](2026-08-09-phase-2-implementation.md)
-  — documents Phase 2 of Milestone 7 implementation: branch creation, section-by-section
+  — documents Phase 2 of Milestone 7 implementation: PR merge, section-by-section
   implementation notes, key design decisions, cross-references, and open questions.
 
 ## Maintaining this index
