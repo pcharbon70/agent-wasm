@@ -1336,6 +1336,446 @@ delivery semantics, fault tolerance, and retry behavior; this section
 only governs how the provenance fields within those signals are
 populated and validated.
 
+## 6.3 Failure Evidence And Operational Notes
+
+### Failure outcome taxonomy
+
+> **Normative definition.**
+A failure outcome is the structured diagnostic returned when a
+contract, boundary, or invariant defined in this chapter is violated
+or cannot be satisfied.
+Failure outcomes are classified into six categories, each with a distinct
+diagnostic prefix, semantic meaning, and required downstream handling.
+The categories are: malformed, incompatible, conflicting, unauthorized,
+exhausted, and unavailable.
+
+> **Normative definition.**
+The **malformed** failure outcome occurs when a request, signal,
+relationship record, or address component fails structural validation
+at the boundary of this chapter's contract.
+Malformed inputs are rejected before any state mutation or relationship
+resolution occurs.
+The diagnostic prefix for malformed failures is `agent.identity.malformed`.
+The diagnostic MUST identify the specific structural element that failed
+validation (e.g., `agent.identity.malformed.address-invalid-tenant`,
+`agent.identity.malformed.address-empty-local-id`,
+`relationship.record.invalid-type`, `signal.provenance.malformed-field`).
+
+> **Normative definition.**
+The **incompatible** failure outcome occurs when a request is structurally
+valid but semantically inconsistent with the state or constraints of the
+system.
+Incompatible inputs are not rejected as malformed because their shape is
+correct; they are rejected because they cannot coexist with existing
+state or with the invariants defined in this chapter.
+The diagnostic prefix for incompatible failures is `agent.identity.incompatible`.
+The diagnostic MUST identify the conflicting constraint and the state
+that conflicts with it (e.g., `agent.identity.incompatible.address-tenant-mismatch`,
+`relationship.lifecycle.incompatible-state-transition`).
+
+> **Normative definition.**
+The **conflicting** failure outcome occurs when two or more concurrent
+or near-concurrent operations on the same relationship, agent address, or
+address-resolution cache produce an inconsistent state that cannot be
+resolved through normal conflict-resolution semantics.
+Conflicting outcomes are distinct from incompatible outcomes: an
+incompatible outcome is a static inconsistency with existing state,
+while a conflicting outcome is a dynamic inconsistency arising from
+concurrent operations.
+The diagnostic prefix for conflicting failures is `agent.identity.conflict`.
+The diagnostic MUST include the conflicting operation identifiers and
+the conflict-resolution action taken (e.g., `agent.identity.conflict.address-assignment-latest-wins`,
+`relationship.operation.conflict-rejected-second`).
+
+> **Normative definition.**
+The **unauthorized** failure outcome occurs when a principal attempts an
+operation without the required creation authority, consent, or trust
+tier defined in section 6.1.
+Unauthorized outcomes are the primary enforcement mechanism for the
+governance and authority model.
+The diagnostic prefix for unauthorized failures is `agent.identity.unauthorized`.
+The diagnostic MUST identify the relationship type or operation, the
+requesting principal, and the required authority (e.g.,
+`agent.identity.unauthorized.relationship-creation-no-consent`,
+`agent.identity.unauthorized.relationship-creation-trust-tier-too-low`).
+
+> **Normative definition.**
+The **exhausted** failure outcome occurs when a system resource or limit
+defined by this chapter is reached and the requested operation cannot
+proceed.
+Exhausted outcomes are distinct from malformed, incompatible, conflicting,
+and unauthorized outcomes because they indicate a capacity or cardinality
+limit rather than a correctness or authority problem.
+The diagnostic prefix for exhausted failures is `agent.identity.exhausted`.
+The diagnostic MUST identify the exhausted resource or limit
+(e.g., `agent.identity.exhausted.cardinality-parent-limit`,
+`agent.identity.exhausted.delegation-chain-max-length`,
+`agent.identity.exhausted.pending-relationship-timeout`).
+
+> **Normative definition.**
+The **unavailable** failure outcome occurs when the agent, relationship,
+or resolution subsystem required to complete the operation is currently
+unable to serve the request due to migration, suspension, host failure,
+or other transient conditions.
+Unavailable outcomes are distinguished from other failure categories by
+their transience: they MAY succeed on retry, whereas malformed,
+incompatible, conflicting, unauthorized, and exhausted outcomes
+typically require corrective action before retry is meaningful.
+The diagnostic prefix for unavailable outcomes is `agent.identity.unavailable`.
+The diagnostic SHOULD include the estimated or known recovery time or
+action required (e.g., `agent.identity.unavailable.agent-migration-in-progress`,
+`relationship.operation.unavailable-target-suspended`).
+
+> **Non-normative note.**
+The six-category taxonomy separates concerns: malformed is structural,
+incompatible is semantic, conflicting is concurrent, unauthorized is
+authority-based, exhausted is capacity-based, and unavailable is
+transience-based.
+This separation enables operators and agents to select the appropriate
+recovery action for each failure type without needing to inspect
+implementation-specific error codes.
+
+### Failure outcome reference
+
+> **Normative definition.**
+The following table summarizes the six failure outcome categories and
+their primary diagnostic prefixes:
+
+| Category | Diagnostic prefix | Trigger condition | Recovery action |
+|----------|------------------|-------------------|----------------|
+| Malformed | `agent.identity.malformed.*` | Structural validation failure | Correct the input and retry. |
+| Incompatible | `agent.identity.incompatible.*` | Semantic inconsistency with state | Revise the request to align with existing state. |
+| Conflicting | `agent.identity.conflict.*` | Concurrent operation inconsistency | Retry after conflict resolution, or resolve the conflict explicitly. |
+| Unauthorized | `agent.identity.unauthorized.*` | Insufficient authority or consent | Obtain the required authority, consent, or trust tier. |
+| Exhausted | `agent.identity.exhausted.*` | Resource or cardinality limit reached | Reduce the scope of the request or wait for resource release. |
+| Unavailable | `agent.identity.unavailable.*` | Transient inability to serve | Retry after the estimated recovery time, or take the indicated recovery action. |
+
+> **Non-normative note.**
+The recovery actions above are guidelines, not obligations.
+Agents and operators SHOULD select recovery actions appropriate to the
+specific diagnostic and the operational context.
+The taxonomy's purpose is to make the failure mode identifiable at a
+glance, not to prescribe a single recovery path.
+
+### Bounded diagnostics
+
+> **Normative definition.**
+A bounded diagnostic is a structured failure report that identifies the
+phase contract, profile, and failed boundary without exposing secrets,
+internal topology, or information that violates the cross-tenant
+isolation policy defined in
+[Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md).
+Bounded diagnostics are the contractually observable surface through
+which agents and operators learn about failure outcomes.
+
+> **Normative definition.**
+Every diagnostic emitted by this chapter's contracts MUST include:
+
+1. The failure outcome category (malformed, incompatible, conflicting,
+   unauthorized, exhausted, unavailable).
+2. The diagnostic code from the category's prefix.
+3. The affected agent addresses or relationship IDs (if any), subject
+   to the visibility policy in section 6.1.
+4. A human-readable message that describes the failure in domain terms.
+
+> **Normative definition.**
+Bounded diagnostics MUST NOT include:
+
+1. The internal implementation of validation logic, including specific
+   regex patterns, hash functions, or comparison algorithms.
+2. Information about agents, relationships, or principals that the
+   requesting principal has no visibility into under the policy in
+   section 6.1.
+3. Timing information that could be used to infer the existence or
+   state of resources the principal cannot observe (timing side
+   channel prevention, as required by
+   [Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md)).
+4. Stack traces, internal error codes, or memory addresses.
+5. The internal resolution of conflicts (e.g., which of two concurrent
+   operations won); the diagnostic SHOULD state that a conflict occurred
+   and the adopted resolution strategy, but MUST NOT reveal the losing
+   operation's identity to principals who could not observe it.
+
+> **Non-normative note.**
+The prohibition on timing side channels is derived from the threat model.
+A diagnostic that takes longer to return for an unknown agent address
+than for a known one leaks information about the agent's existence.
+Implementations MUST design their diagnostic paths to have constant
+latency with respect to observable input, or to use sampling or padding
+to prevent timing-based inference.
+
+> **Normative definition.**
+Diagnostics are emitted as evidence records in the format defined in
+[Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md).
+The evidence record for a diagnostic MUST include the same fields as
+the bounded diagnostic above, plus the standard provenance metadata
+(originating agent, originating principal, correlation ID, timestamp).
+Evidence records for diagnostics are subject to the same retention and
+redaction rules as other evidence records in that chapter.
+
+> **Normative implementation-defined choice.**
+The format of the human-readable message field is implementation-defined.
+Implementations MUST ensure the message is intelligible to a human
+operator without requiring access to internal documentation, and MUST
+not include implementation-specific jargon that would prevent an
+operator from understanding the failure without additional context.
+
+> **Normative implementation-defined choice.**
+The mechanism by which diagnostics are delivered to the requesting
+principal (synchronous return value, asynchronous event, log entry, or
+combination) is implementation-defined.
+The implementation MUST document its delivery mechanism in the
+conformance profile and MUST ensure that the diagnostic is observable
+by the requesting principal within a bounded time documented in the
+conformance profile.
+
+### Evidence requirements
+
+> **Normative definition.**
+Evidence for failure outcomes is the inspectable record that enables
+auditors, operators, and agents to verify that failures were handled
+correctly and that no unauthorized or partial state persists after a
+failure.
+Evidence requirements are bounded: they record what is necessary to
+establish conformance, not every internal step that led to the failure.
+
+> **Normative definition.**
+The following evidence is required for each failure outcome category:
+
+| Category | Required evidence fields |
+|----------|-------------------------|
+| Malformed | Diagnostic code, malformed field, structural validation rule violated. |
+| Incompatible | Diagnostic code, conflicting constraint, current state that conflicts. |
+| Conflicting | Diagnostic code, operation identifiers involved, resolution strategy adopted. |
+| Unauthorized | Diagnostic code, requesting principal, required authority, relationship type or operation. |
+| Exhausted | Diagnostic code, exhausted resource or limit, current count or usage. |
+| Unavailable | Diagnostic code, affected subsystem, estimated recovery time or required action. |
+
+> **Normative definition.**
+All evidence records MUST be written through the durable state layer
+defined in
+[Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md)
+and MUST be subject to the atomic commit protocol defined in
+[Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md).
+A failure that leaves partial state MUST not be recorded as successful
+until the partial state is resolved or rolled back.
+
+> **Non-normative note.**
+The evidence requirements above are minimal.
+Implementations MAY record additional evidence for operational
+diagnostics, performance monitoring, or compliance requirements, but
+the fields listed in the table are the minimum that MUST be recorded
+to establish conformance with this specification.
+
+> **Non-normative note.**
+Evidence for unauthorized failures is particularly important for audit
+and compliance.
+The combination of requesting principal, required authority, and
+relationship type enables auditors to reconstruct every unauthorized
+attempt and verify that it was correctly rejected.
+
+### Implementation-defined operational choices
+
+> **Normative definition.**
+The following choices are implementation-defined within this chapter.
+Each choice MUST be documented in the conformance profile and MUST
+not change the observable failure outcomes or diagnostic structure.
+
+> **Normative implementation-defined choice.**
+The maximum number of failure evidence records retained per agent
+or per relationship is implementation-defined.
+Implementations MUST retain evidence for at least as long as the
+evidence retention period documented in
+[Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md)
+and MUST document the retention period in the conformance profile.
+
+> **Normative implementation-defined choice.**
+The mechanism by which the host detects and reports conflicting
+operations on the same relationship or agent address is
+implementation-defined.
+Implementations MUST use a conflict-resolution strategy that is
+documented in the conformance profile and MUST ensure that the
+conflict is resolved within a bounded time documented in the conformance
+profile.
+Acceptable strategies include last-writer-wins, first-writer-wins,
+optimistic concurrency with retry, or application-defined resolution.
+
+> **Normative implementation-defined choice.**
+The threshold for classifying a transient unavailability as a permanent
+failure (i.e., when to transition from `unavailable` to a different
+failure category or to abort the operation entirely) is
+implementation-defined.
+Implementations MUST document the threshold and MUST not transition
+from `unavailable` to a non-transient category without explicit
+operator or policy intervention.
+
+> **Normative implementation-defined choice.**
+The level of detail included in the `conflicting` diagnostic's
+resolution description is implementation-defined, subject to the
+constraint that the description MUST not reveal the identity of
+operations or principals that the requesting principal has no
+visibility into (as defined in the bounded diagnostics section above).
+
+> **Non-normative note.**
+These implementation-defined choices give hosts flexibility to optimize
+for their specific deployment scenarios (e.g., high-throughput
+multi-tenant systems versus single-tenant embedded systems) while
+keeping the observable failure contract stable.
+
+### Deferred work
+
+> **Non-normative note.**
+The following items are deferred from this chapter.
+They are identified here so that future phases or extensions can
+address them without requiring changes to the contracts defined in
+this chapter.
+Deferred items do NOT create conformance obligations for this chapter.
+
+> **Non-normative note.**
+The cross-tenant conflict resolution protocol is deferred.
+When agents in different tenants attempt concurrent operations that
+affect shared infrastructure (e.g., a shared agent registry backend),
+the protocol for resolving conflicts across tenant boundaries is not
+defined in this chapter.
+This is deferred because cross-tenant operations require the full
+cross-tenant policy framework defined in
+[Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md)
+and
+[Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md)
+to be normative before a conflict resolution protocol can be specified
+safely.
+
+> **Non-normative note.**
+The distributed consensus protocol for address resolution across
+multiple host instances is deferred.
+This chapter defines that multiple host instances connected to a shared
+backend MUST converge on the same resolution state within a bounded
+time (as stated in section 6.1), but the specific consensus protocol
+(paxos, raft, causal broadcast, or other) is not defined here.
+This is deferred because the consensus protocol depends on the
+deployment topology and failure model, which are implementation-defined
+choices documented in the conformance profile.
+
+> **Non-normative note.**
+The relationship graph cycle-detection algorithm for non-governance
+types (`dependency`, `delegate`, `observer`) is not fully specified.
+This chapter defines that cycles in governance types (`parent`,
+`child`, `owner`) are rejected (see section 6.2), but does not define
+the specific algorithm for detecting cycles in non-governance types
+beyond the signal-level delegation-chain cycle detection.
+This is deferred because the cycle-detection requirements for
+non-governance types depend on the cardinality and operational semantics
+of those types, which are implementation-defined.
+
+> **Non-normative note.**
+The evidence correlation protocol for multi-step failures (e.g., a
+malformed signal that triggers an unauthorized relationship operation
+attempt) is deferred.
+This chapter records evidence for each failure outcome independently
+but does not define how correlated evidence records should be linked
+for audit and forensic analysis.
+This is deferred because the correlation protocol depends on the
+evidence storage and query infrastructure, which is defined in
+[Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md)
+and is not yet normative.
+
+> **Non-normative note.**
+The operational dashboard and alerting schema for failure outcomes is
+deferred.
+This chapter defines the failure outcomes and diagnostics but does not
+define the schema for operational dashboards, alerting rules, or
+SLO/SLA definitions based on failure rates.
+This is deferred because operational concerns are outside the scope
+of this specification chapter and belong in a separate operations
+guide or conformance profile supplement.
+
+### Results that could invalidate earlier milestones
+
+> **Non-normative note.**
+The following results from this phase, if realized, would invalidate
+assumptions made in earlier milestones.
+These are identified here so that reviewers can assess whether the
+assumptions are valid and, if not, update the earlier milestones before
+this phase is promoted to normative.
+
+> **Non-normative note.**
+The tenant-qualified agent address model assumes that a single durable
+identity can outlive any number of runtime instance changes.
+If integration tests reveal that address resolution cannot converge
+across host instances within the bounded time documented in the
+conformance profile, then the address stability assumption in
+[Milestone 1](../.spec/planning/agentic-system/milestone-01-contracts-profiles-and-artifacts/README.md)
+(through
+[Milestone 5](../.spec/planning/agentic-system/milestone-05-capabilities-plugins-security-and-tenancy/README.md))
+would need revision.
+Specifically, Milestones 1 through 5 assume that an agent's address is
+stable enough to be used as a foreign key in signals, directives,
+state patches, and relationship records.
+If addresses are not stable, those foreign keys would need to be
+replaced with indirection layers, which would affect every chapter
+that references agent addresses.
+
+> **Non-normative note.**
+The relationship authority model assumes that relationship records are
+the sole source of authority for inter-agent operations.
+If integration tests reveal that authority can be bypassed through
+signal provenance manipulation despite the validation rules in this
+chapter, then the authority assumptions in
+[Milestone 3](../.spec/planning/agentic-system/milestone-03-host-actor-runtime-and-lifecycle/README.md)
+and
+[Milestone 4](../.spec/planning/agentic-system/milestone-04-durable-state-effects-and-recovery/README.md)
+would need revision.
+Specifically, those milestones assume that the signal provenance and
+relationship layers, taken together, provide a complete authority
+model.
+If the provenance validation in this chapter has gaps that allow
+authority bypass, the authority model in those milestones is
+incomplete.
+
+> **Non-normative note.**
+The cross-tenant relationship invisibility assumption assumes that
+cross-tenant relationships are fully invisible to principals outside
+both tenants.
+If integration tests reveal that cross-tenant relationships can be
+inferred through side channels (timing, error messages, or resource
+usage patterns), then the tenant isolation assumptions in
+[Milestone 3](../.spec/planning/agentic-system/milestone-03-host-actor-runtime-and-lifecycle/README.md)
+(through
+[Milestone 5](../.spec/planning/agentic-system/milestone-05-capabilities-plugins-security-and-tenancy/README.md))
+would need revision.
+Specifically, those milestones assume tenant isolation at the
+infrastructure level; if the relationship layer leaks cross-tenant
+information, the isolation guarantee is weakened.
+
+> **Non-normative note.**
+The bounded delegation chain assumption assumes that delegation chains
+are bounded in length (maximum 128 elements, as stated in section 6.2).
+If integration tests reveal that delegation chains longer than 128
+elements are required for legitimate operational patterns, or that
+the 128-element limit causes legitimate operations to fail, then the
+delegation chain length limit and the related assumptions in
+[Milestone 4](../.spec/planning/agentic-system/milestone-04-durable-state-effects-and-recovery/README.md)
+would need revision.
+Specifically, that milestone assumes that delegation chains are short
+enough to be processed efficiently in memory during signal routing.
+If chains must be longer, the routing performance model needs
+recalibration.
+
+> **Non-normative note.**
+The pending relationship timeout assumption assumes that a bounded
+timeout (currently documented as 60 seconds by default) is sufficient
+for consent-based relationship transitions.
+If integration tests reveal that legitimate consent workflows require
+longer timeouts (e.g., due to human-in-the-loop approval steps or
+slow cross-tenant policy evaluation), then the timeout and the related
+assumptions in
+[Milestone 3](../.spec/planning/agentic-system/milestone-03-host-actor-runtime-and-lifecycle/README.md)
+(regarding relationship lifecycle) would need revision.
+Specifically, that milestone assumes that relationship state
+transitions complete within bounded time; if consent workflows are
+inherently unbounded (e.g., awaiting human approval that may never come),
+the lifecycle model needs a new state or a different timeout strategy.
+
 ## Variability register
 
 The following table enumerates every implementation-defined choice,
