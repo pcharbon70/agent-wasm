@@ -224,3 +224,122 @@ The crash matrix MUST include:
 > **Normative definition.**
 The crash matrix is published in the Phase 5 integration test evidence (section
 5.4).
+
+## 5.3 Failure Evidence And Operational Notes
+
+### Failure outcomes
+
+> **Normative definition.**
+The host MUST define the following failure outcomes for crash injection durable
+effects and milestone acceptance:
+
+1. **Malformed**: Input data does not conform to the expected schema.
+2. **Incompatible**: Data is incompatible with the current schema version or
+   handler version.
+3. **Conflicting**: Multiple writers attempt to write to the same record
+   (optimistic concurrency conflict).
+4. **Unauthorized**: The caller does not have permission to perform the operation.
+5. **Exhausted**: The system is out of resources (e.g., storage capacity, retry
+   budget).
+6. **Unavailable**: The storage backend is unavailable.
+7. **Crash before commit**: The host crashes before the commit is written.
+8. **Crash during commit**: The host crashes during the commit write.
+9. **Crash after commit**: The host crashes after the commit is written.
+10. **Crash before acknowledgement**: The host crashes before acknowledging
+    external success.
+11. **Crash after acknowledgement**: The host crashes after acknowledging
+    external success.
+
+> **Normative definition.**
+Each failure outcome MUST be mapped to a specific error code and diagnostic
+message.
+
+### Error codes
+
+> **Normative definition.**
+The host MUST use the following error codes for crash injection durable effects
+and milestone acceptance:
+
+| Error Code | Description |
+|------------|-------------|
+| `commit.before_failure` | Host crash before commit |
+| `commit.during_failure` | Host crash during commit |
+| `commit.after_failure` | Host crash after commit |
+| `dispatch.before_failure` | Host crash before dispatch |
+| `dispatch.after_lease_failure` | Host crash after lease acquisition |
+| `dispatch.after_external_success_failure` | Host crash after external success |
+| `dispatch.before_ack_failure` | Host crash before acknowledgement |
+| `dispatch.after_ack_failure` | Host crash after acknowledgement |
+| `recovery.snapshot_invalid` | Snapshot is invalid or corrupt |
+| `recovery.journal_gap` | Journal has gaps that cannot be recovered |
+| `recovery.outbox_inconsistent` | Outbox entries are inconsistent with state |
+| `recovery.timer_expired` | Timer expired during recovery |
+| `recovery.retry_expired` | Retry expired during recovery |
+| `recovery.hibernate_invalid` | Hibernate record is invalid |
+| `recovery.migration_incomplete` | Migration is incomplete |
+| `storage.snapshot.duplicate` | Snapshot ID already exists (see
+  [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md)) |
+| `storage.unavailable` | Storage backend unavailable (see
+  [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md)) |
+| `commit.conflict` | Optimistic concurrency conflict (see
+  [Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md)) |
+
+> **Normative definition.**
+Each error code MUST be accompanied by a human-readable diagnostic message.
+The diagnostic message MUST identify the phase contract, profile, and failed
+boundary without exposing secrets.
+
+### Bounded diagnostics
+
+> **Normative definition.**
+The host MUST emit bounded diagnostics for each failure outcome.
+The diagnostics MUST include:
+
+1. **Error code**: The specific error code from the table above.
+2. **Context**: The operation that failed (e.g., commit, dispatch, recovery).
+3. **Entity identifiers**: The tenant ID, agent ID, or record ID involved
+   (without exposing sensitive data).
+4. **Timestamp**: The time the error occurred.
+5. **Retryable**: Whether the operation can be retried.
+
+> **Normative definition.**
+The host MUST NOT expose internal implementation details, secrets, or
+sensitive data in diagnostics.
+
+### Implementation-defined choices
+
+> **Normative implementation-defined choice.**
+The following choices are implementation-defined and MUST be documented in the
+conformance profile:
+
+1. **Crash injection framework**: The framework used for crash injection testing.
+2. **Recovery timeout**: The maximum time allowed for crash recovery.
+3. **Outbox ack retry policy**: The retry policy for outbox acknowledgement.
+4. **Snapshot frequency**: The frequency of snapshot creation.
+5. **Journal compaction**: The strategy for journal compaction.
+
+### Deferred work
+
+> **Non-normative note.**
+The following work is deferred to later phases or host implementations:
+
+1. **Crash injection automation**: Automated crash injection testing.
+2. **Recovery metrics**: Metrics for crash recovery performance.
+3. **Crash matrix automation**: Automated crash matrix generation.
+4. **Milestone acceptance automation**: Automated milestone acceptance testing.
+
+### Results invalidating earlier milestones
+
+> **Non-normative note.**
+The following results from Phase 5 MAY invalidate earlier milestone assumptions:
+
+1. **Storage capacity**: If the storage capacity for crash recovery exceeds the
+   capacity planned in earlier milestones, the capacity plan MUST be revised.
+2. **Recovery time**: If the recovery time exceeds the turn timeout, the timeout
+   or recovery strategy MUST be revised.
+3. **Outbox size**: If the outbox size exceeds the capacity planned in earlier
+   milestones, the capacity plan MUST be revised.
+
+> **Non-normative note.**
+If any result from Phase 5 invalidates an earlier milestone assumption, the
+affected milestone MUST be revised and re-validated.
