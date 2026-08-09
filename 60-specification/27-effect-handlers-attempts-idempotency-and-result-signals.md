@@ -389,3 +389,261 @@ The retry policy includes:
 | Handler trust classes | Implementation-defined | Document in conformance profile | Must enforce trust boundaries |
 | Backoff strategy | Implementation-defined | Exponential backoff | Must be bounded |
 
+## 3.3 Failure Evidence And Operational Notes
+
+### Failure outcomes
+
+> **Normative definition.**
+The host MUST define the following failure outcomes for effect handlers
+attempts idempotency and result signals:
+
+1. **Malformed**: Input data does not conform to the expected schema.
+2. **Incompatible**: Data is incompatible with the current schema version or
+   handler version.
+3. **Conflicting**: Multiple writers attempt to write to the same attempt
+   (optimistic concurrency conflict).
+4. **Unauthorized**: The caller does not have permission to perform the operation.
+5. **Exhausted**: The system is out of resources (e.g., storage capacity, retry
+   budget).
+6. **Unavailable**: The storage backend is unavailable.
+
+> **Normative definition.**
+Each failure outcome MUST be mapped to a specific error code and diagnostic
+message.
+
+### Error codes
+
+> **Normative definition.**
+The host MUST use the following error codes for effect handlers attempts
+idempotency and result signals:
+
+| Error Code | Description |
+|------------|-------------|
+| `handler.not_registered` | Handler is not registered |
+| `handler.trust_violation` | Handler trust class is insufficient |
+| `handler.capability_violation` | Handler lacks required capability |
+| `handler.schema_mismatch` | Payload schema version does not match |
+| `handler.idempotency_key_expired` | Idempotency key has expired |
+| `handler.payload_too_large` | Payload exceeds size limit |
+| `handler.response_too_large` | Response exceeds byte limit |
+| `handler.duration_exceeded` | Dispatch exceeded duration limit |
+| `handler.diagnostics_too_large` | Diagnostics exceed byte limit |
+| `attempt.handler_crashed` | Handler crashed during dispatch |
+| `attempt.lease_expired` | Attempt lease expired |
+| `attempt.conflicting_replay` | Replayed attempt produced different result |
+| `attempt.max_retries_exceeded` | Maximum retry attempts exceeded |
+| `commit.conflict` | Optimistic concurrency conflict (see [Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md)) |
+| `storage.snapshot.duplicate` | Snapshot ID already exists (see [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md)) |
+| `storage.unavailable` | Storage backend unavailable (see [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md)) |
+
+> **Normative definition.**
+Each error code MUST be accompanied by a human-readable diagnostic message.
+The diagnostic message MUST identify the phase contract, profile, and failed
+boundary without exposing secrets.
+
+### Bounded diagnostics
+
+> **Normative definition.**
+The host MUST emit bounded diagnostics for each failure outcome.
+The diagnostics MUST include:
+
+1. **Error code**: The specific error code from the table above.
+2. **Context**: The operation that failed (e.g., handler dispatch, attempt
+   retry).
+3. **Entity identifiers**: The tenant ID, agent ID, attempt ID, or handler ID
+   involved (without exposing sensitive data).
+4. **Timestamp**: The time the error occurred.
+5. **Retryable**: Whether the operation can be retried.
+
+> **Normative definition.**
+The host MUST NOT expose internal implementation details, secrets, or
+sensitive data in diagnostics.
+
+### Implementation-defined choices
+
+> **Normative implementation-defined choice.**
+The following choices are implementation-defined and MUST be documented in the
+conformance profile:
+
+1. **Handler registry**: The handler registry implementation (in-memory,
+   database, etc.).
+2. **Retry policy defaults**: The default retry policy for effect handlers.
+3. **Idempotency key storage**: The idempotency key storage implementation.
+4. **Response size limit**: The default response size limit for effect
+   handlers.
+5. **Duration limit**: The default duration limit for effect handler
+   dispatches.
+
+### Deferred work
+
+> **Non-normative note.**
+The following work is deferred to later phases or host implementations:
+
+1. **Handler versioning**: The handler versioning strategy (canary, blue-green,
+   etc.).
+2. **Handler hot-reload**: The handler hot-reload strategy.
+3. **Effect handler metrics**: The effect handler metrics and monitoring.
+4. **Effect handler tracing**: The effect handler tracing and debugging.
+
+### Results invalidating earlier milestones
+
+> **Non-normative note.**
+The following results from Phase 3 MAY invalidate earlier milestone assumptions:
+
+1. **Handler registry**: If the handler registry implementation exceeds the
+   capacity planned in earlier milestones, the capacity plan MUST be revised.
+2. **Retry policy**: If the retry policy exceeds the turn timeout, the timeout
+   or retry policy MUST be revised.
+3. **Idempotency key storage**: If the idempotency key storage exceeds the
+   capacity planned in earlier milestones, the capacity plan MUST be revised.
+
+> **Non-normative note.**
+If any result from Phase 3 invalidates an earlier milestone assumption, the
+affected milestone MUST be revised and re-validated.
+
+## Variability register
+
+| Item | Permission | Recommendation | Constraint |
+|------|------------|----------------|------------|
+| Handler registry implementation | Implementation-defined | Document in conformance profile | Must support hot-reload |
+| Retry policy defaults | Implementation-defined | Document in conformance profile | Must not exceed turn timeout |
+| Idempotency key storage | Implementation-defined | Document in conformance profile | Must support tenant/agent/directive/global scopes |
+| Response size limit | Implementation-defined | Document in conformance profile | Must be bounded |
+| Duration limit | Implementation-defined | Document in conformance profile | Must be bounded |
+| Backoff strategy | Implementation-defined | Exponential backoff | Must be bounded |
+| Handler trust classes | Implementation-defined | Document in conformance profile | Must enforce trust boundaries |
+
+## 3.4 Phase 3 Integration Tests
+
+### Integration test objectives
+
+> **Normative definition.**
+The Phase 3 integration tests MUST verify the following objectives:
+
+1. **Canonical successful flow**: The host dispatches effect handlers, retains
+   every attempt, and returns results as new signals.
+2. **Failure handling**: The host handles malformed, incompatible, stale,
+   duplicate, and boundary-limit inputs correctly.
+3. **Transient failure recovery**: The host recovers from timeout, cancellation,
+   unavailable dependency, and retry behavior without leaving unauthorized or
+   partial state.
+4. **Cross-milestone compatibility**: The phase does not introduce regressions
+   in earlier milestones.
+
+> **Normative definition.**
+Each integration test MUST exercise observable contracts rather than private
+implementation structure.
+
+### Successful flow tests
+
+> **Normative definition.**
+The following tests MUST verify the canonical successful flow:
+
+1. **Handler registration**: Register an effect handler and verify it is
+   registered correctly.
+2. **Attempt creation**: Create an effect attempt and verify it is created
+   correctly.
+3. **Pre-dispatch validation**: Validate the handler policy and payload before
+   dispatch and verify the validation passes.
+4. **Dispatch**: Dispatch the effect handler and verify the attempt state
+   transitions from `Pending` to `Dispatched` to `Completed`.
+5. **Result signal creation**: Create a result signal for the successful
+   dispatch and verify the signal is causally linked.
+6. **Idempotency key check**: Check the idempotency key before dispatch and
+   verify the key has not been used.
+
+> **Normative definition.**
+Each test MUST record the following evidence:
+
+- Input data
+- Expected output
+- Actual output
+- Pass/fail status
+
+### Failure handling tests
+
+> **Normative definition.**
+The following tests MUST verify failure handling:
+
+1. **Handler not registered**: Attempt to dispatch an unregistered handler and
+   verify the `handler.not_registered` error code.
+2. **Trust violation**: Attempt to dispatch a handler with insufficient trust
+   class and verify the `handler.trust_violation` error code.
+3. **Capability violation**: Attempt to dispatch a handler with insufficient
+   capability and verify the `handler.capability_violation` error code.
+4. **Schema mismatch**: Attempt to dispatch a handler with a mismatched schema
+   version and verify the `handler.schema_mismatch` error code.
+5. **Idempotency key expired**: Attempt to dispatch with an expired idempotency
+   key and verify the `handler.idempotency_key_expired` error code.
+6. **Payload too large**: Attempt to dispatch with a payload that exceeds the
+   size limit and verify the `handler.payload_too_large` error code.
+7. **Response too large**: Simulate a response that exceeds the byte limit and
+   verify the `handler.response_too_large` error code.
+8. **Duration exceeded**: Simulate a dispatch that exceeds the duration limit
+   and verify the `handler.duration_exceeded` error code.
+
+> **Normative definition.**
+Each test MUST verify that the error code and diagnostic message match the
+expected values.
+
+### Transient failure recovery tests
+
+> **Normative definition.**
+The following tests MUST verify transient failure recovery:
+
+1. **Handler crash**: Simulate a handler crash during dispatch and verify the
+   attempt is marked as `Failed` with `attempt.handler_crashed` and the attempt
+   is retried.
+2. **Lease expiry**: Simulate a lease expiry during dispatch and verify the
+   attempt is marked as `Failed` with `attempt.lease_expired` and the attempt
+   is retried.
+3. **Late response**: Simulate a late response from the external provider and
+   verify the response is discarded.
+4. **Duplicate response**: Simulate a duplicate response from the external
+   provider and verify all responses after the first are discarded.
+5. **Conflicting replay**: Simulate a conflicting replay and verify the
+   replayed attempt is marked as `Failed` with `attempt.conflicting_replay`.
+6. **Max retries exceeded**: Simulate exceeding the maximum retry attempts and
+   verify the attempt is marked as `Failed` with `attempt.max_retries_exceeded`.
+
+> **Normative definition.**
+Each test MUST verify that no unauthorized or partial state is left after the
+failure.
+
+### Cross-milestone compatibility tests
+
+> **Normative definition.**
+The following tests MUST verify cross-milestone compatibility:
+
+1. **Milestone 1 fixtures**: Run all Milestone 1 fixtures and verify no
+   regressions.
+2. **Milestone 2 fixtures**: Run all Milestone 2 fixtures and verify no
+   regressions.
+3. **Milestone 3 fixtures**: Run all Milestone 3 fixtures and verify no
+   regressions.
+
+> **Normative definition.**
+If any regression is detected, the affected milestone MUST be revised and
+re-validated.
+
+### Integration test evidence
+
+> **Normative definition.**
+The Phase 3 integration tests MUST produce the following evidence:
+
+1. **Test report**: A report listing all tests with pass/fail status.
+2. **Handler registration evidence**: Evidence that effect handlers are
+   registered correctly.
+3. **Attempt retention evidence**: Evidence that every attempt is retained for
+   audit purposes.
+4. **Result signal evidence**: Evidence that results are returned as new
+   signals with correct causality metadata.
+5. **Failure diagnostics**: Evidence that failure diagnostics are correct and
+   bounded.
+6. **Recovery evidence**: Evidence that transient failures are recovered from
+   correctly.
+
+> **Normative definition.**
+The integration test evidence MUST be retained for later milestone and release
+gates.
+
