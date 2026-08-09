@@ -15,7 +15,7 @@ Back to milestone: [README](./README.md)
   This section turns the phase objective into explicit interfaces, invariants,
   implementation boundaries, and inspectable evidence.
 
-  - [ ] 4.1.1 Task - Complete the contract and data model work.
+  - [x] 4.1.1 Task - Complete the contract and data model work.
 
     This task is the section-sized implementation and commit boundary.
 
