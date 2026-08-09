@@ -266,3 +266,126 @@ deterministic for the same payload.
 | Duration limit | Implementation-defined | Document in conformance profile | Must be bounded |
 | Handler trust classes | Implementation-defined | Document in conformance profile | Must enforce trust boundaries |
 
+## 3.2 Behavior And Integration
+
+### Pre-dispatch validation
+
+> **Normative definition.**
+The host MUST validate the handler policy and payload immediately before
+dispatching an attempt.
+The host MUST NOT dispatch attempts that fail pre-dispatch validation.
+
+> **Normative definition.**
+Pre-dispatch validation includes:
+1. **Handler registration**: The handler is registered and active.
+2. **Trust class**: The handler's trust class is sufficient for the dispatch.
+3. **Capability**: The handler has the required capability for the dispatch.
+4. **Schema version**: The payload matches the handler's schema version.
+5. **Idempotency key**: The idempotency key has not expired or been used.
+6. **Payload bounds**: The payload is within the size limit.
+
+> **Normative definition.**
+The host MUST bound the response bytes, duration, and diagnostics for each
+dispatch:
+- **Response bytes**: The response MUST NOT exceed `handler.response_bytes_limit`
+  bytes.
+- **Duration**: The dispatch MUST NOT exceed `handler.duration_limit`
+  milliseconds.
+- **Diagnostics**: The diagnostics MUST be bounded to `handler.diagnostics_limit`
+  bytes.
+
+> **Normative definition.**
+If pre-dispatch validation fails, the host MUST reject the attempt with the
+appropriate error code:
+- `handler.not_registered`: Handler is not registered.
+- `handler.trust_violation`: Handler trust class is insufficient.
+- `handler.capability_violation`: Handler lacks required capability.
+- `handler.schema_mismatch`: Payload schema version does not match.
+- `handler.idempotency_key_expired`: Idempotency key has expired.
+- `handler.payload_too_large`: Payload exceeds size limit.
+- `handler.response_too_large`: Response exceeds byte limit.
+- `handler.duration_exceeded`: Dispatch exceeded duration limit.
+- `handler.diagnostics_too_large`: Diagnostics exceed byte limit.
+
+### Outcome translation
+
+> **Normative definition.**
+The host MUST translate effect handler outcomes into causally linked result
+signals for the agent turn.
+
+> **Normative definition.**
+The host MUST translate the following outcomes:
+
+1. **Success**: The external provider returned successfully. The host MUST
+   create a result signal with `signal.kind = effect_result` and
+   `signal.payload` containing the provider's response.
+2. **Domain failure**: The external provider returned a domain error. The host
+   MUST create a result signal with `signal.kind = effect_result` and
+   `signal.payload` containing the error details.
+3. **Infrastructure failure**: The external provider is unavailable or
+   encountered an infrastructure error. The host MUST create a result signal
+   with `signal.kind = infrastructure_failure` and `signal.payload` containing
+   the error details.
+4. **Timeout**: The external provider did not respond within the duration
+   limit. The host MUST create a result signal with `signal.kind = timeout`
+   and `signal.payload` containing the timeout details.
+5. **Cancellation**: The turn was cancelled before the dispatch completed.
+   The host MUST create a result signal with `signal.kind = cancellation`
+   and `signal.payload` containing the cancellation details.
+6. **Approval**: The directive requires user approval. The host MUST create a
+   result signal with `signal.kind = approval_required` and `signal.payload`
+   containing the approval request details.
+
+> **Normative definition.**
+Each result signal MUST include the following causality metadata:
+- `signal.causality.turn_id`: The turn ID that produced the result signal.
+- `signal.causality.outbox_entry_id`: The outbox entry ID for the dispatched
+  directive.
+- `signal.causality.attempt_id`: The attempt ID for the dispatched attempt.
+
+### Failure behavior
+
+> **Normative definition.**
+The host MUST define the following failure behavior for effect handlers:
+
+1. **Handler crash**: If the handler crashes during dispatch, the host MUST
+   mark the attempt as `Failed` with `attempt.handler_crashed` and MUST
+   retry the attempt according to the retry policy.
+2. **Lease expiry**: If the attempt lease expires during dispatch, the host
+   MUST mark the attempt as `Failed` with `attempt.lease_expired` and MUST
+   retry the attempt according to the retry policy.
+3. **Late response**: If the external provider responds after the attempt is
+   marked as `Failed`, the host MUST discard the response and MUST NOT
+   update the attempt outcome.
+4. **Duplicate response**: If the external provider responds multiple times
+   for the same attempt, the host MUST discard all responses after the first
+   and MUST NOT update the attempt outcome multiple times.
+5. **Conflicting replay**: If a replayed attempt produces a different result
+   than the original attempt, the host MUST mark the replayed attempt as
+   `Failed` with `attempt.conflicting_replay` and MUST log the conflict for
+   audit purposes.
+6. **Unsupported idempotency**: If the external provider does not support
+   idempotency keys, the host MUST log a warning and MUST dispatch the
+   attempt without idempotency protection.
+
+> **Normative definition.**
+The host MUST retry failed attempts according to the retry policy defined in
+the effect handler registration.
+The retry policy includes:
+- **Max retries**: The maximum number of retry attempts.
+- **Backoff strategy**: The backoff strategy for retries (e.g., exponential).
+- **Backoff multiplier**: The multiplier for exponential backoff.
+- **Backoff cap**: The maximum backoff duration.
+
+## Variability register
+
+| Item | Permission | Recommendation | Constraint |
+|------|------------|----------------|------------|
+| Handler registry implementation | Implementation-defined | Document in conformance profile | Must support hot-reload |
+| Retry policy defaults | Implementation-defined | Document in conformance profile | Must not exceed turn timeout |
+| Idempotency key scope | Implementation-defined | Document in conformance profile | Must support tenant/agent/directive/global |
+| Response size limit | Implementation-defined | Document in conformance profile | Must be bounded |
+| Duration limit | Implementation-defined | Document in conformance profile | Must be bounded |
+| Handler trust classes | Implementation-defined | Document in conformance profile | Must enforce trust boundaries |
+| Backoff strategy | Implementation-defined | Exponential backoff | Must be bounded |
+
