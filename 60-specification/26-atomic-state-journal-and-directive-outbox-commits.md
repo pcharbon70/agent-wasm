@@ -214,6 +214,81 @@ The host MUST NOT silently overwrite committed data.
 The host MUST support retry logic for transient conflicts.
 The host MUST limit the number of retries to prevent infinite loops.
 
+## 2.2 Behavior And Integration
+
+### Outbox state machine
+
+> **Normative definition.**
+The host MUST enforce the following outbox state machine:
+
+1. **Pending**: The outbox entry is created and waiting for dispatch.
+2. **Leased**: The outbox entry is being dispatched (exclusive lease).
+3. **Completed**: The outbox entry has been successfully dispatched.
+4. **TerminalFailed**: The outbox entry has failed permanently and will not
+   be retried.
+5. **Cancelled**: The outbox entry has been cancelled (e.g., by agent lifecycle
+   change).
+6. **Superseded**: The outbox entry has been superseded by a newer entry with
+   the same directive identity.
+
+> **Normative definition.**
+The host MUST NOT transition from `Completed`, `TerminalFailed`, `Cancelled`, or
+`Superseded` to any other state.
+
+> **Normative definition.**
+The host MUST transition from `Pending` to `Leased` when dispatch begins.
+The host MUST transition from `Leased` to `Completed` on successful dispatch.
+The host MUST transition from `Leased` to `TerminalFailed` on permanent failure.
+The host MUST transition from `Pending` or `Leased` to `Cancelled` on cancellation.
+The host MUST transition from `Pending` to `Superseded` when a newer entry with
+the same directive identity is created.
+
+### Prevent dispatch without commit
+
+> **Normative definition.**
+The host MUST NOT dispatch an outbox entry whose originating state transition
+did not commit.
+The host MUST verify the outbox entry exists in a committed commit unit before
+dispatching.
+
+> **Normative definition.**
+If a commit unit is rolled back, the host MUST delete the corresponding outbox
+entries.
+The host MUST NOT leave orphaned outbox entries.
+
+> **Normative definition.**
+The host MUST log all outbox entry deletions for audit purposes.
+
+### Ambiguous commit resolution
+
+> **Normative definition.**
+If the host crashes or loses network connectivity during a commit, the host MAY
+be left in an ambiguous state where it does not know whether the commit
+succeeded.
+The host MUST resolve ambiguous commits by rereading the durable revision and
+directive identities before retrying.
+
+> **Normative definition.**
+To resolve an ambiguous commit, the host MUST:
+
+1. Read the current durable revision for the agent.
+2. If the current revision is greater than or equal to `next_revision`, the
+   commit succeeded. The host MUST NOT retry.
+3. If the current revision is less than `expected_revision`, the commit failed.
+   The host MUST retry the commit.
+4. If the current revision is between `expected_revision` and `next_revision`,
+   the commit is ambiguous. The host MUST inspect the journal and outbox for
+   the directive identities to determine the outcome.
+
+> **Normative definition.**
+If the directive identities are present in the journal and outbox, the commit
+succeeded. The host MUST NOT retry.
+If the directive identities are not present in the journal and outbox, the
+commit failed. The host MUST retry the commit.
+
+> **Normative definition.**
+The host MUST log all ambiguous commit resolutions for audit purposes.
+
 ## Variability register
 
 | Item | Permission | Recommendation | Constraint |
