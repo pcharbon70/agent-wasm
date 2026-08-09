@@ -78,7 +78,10 @@ Related chapters:
 [Provider-Neutral Model Requests Responses Streaming And Usage Contract And Data Model](41-provider-neutral-model-requests-responses-streaming-and-usage-contract-and-data-model.md),
 [Provider-Neutral Model Requests Responses Streaming And Usage Behavior And Integration](41-provider-neutral-model-requests-responses-streaming-and-usage-behavior-and-integration.md),
 [Provider-Neutral Model Requests Responses Streaming And Usage Failure Evidence And Operational Notes](41-provider-neutral-model-requests-responses-streaming-and-usage-failure-evidence-and-operational-notes.md),
-[Provider-Neutral Model Requests Responses Streaming And Usage Phase 1 Integration Tests](41-provider-neutral-model-requests-responses-streaming-and-usage-phase-1-integration-tests.md).
+[Provider-Neutral Model Requests Responses Streaming And Usage Phase 1 Integration Tests](41-provider-neutral-model-requests-responses-streaming-and-usage-phase-1-integration-tests.md),
+[Tool Catalogs Retrieval Code Execution And Connectors Behavior And Integration](42-tool-catalogs-retrieval-code-execution-and-connectors-behavior-and-integration.md),
+[Tool Catalogs Retrieval Code Execution And Connectors Failure Evidence And Operational Notes](42-tool-catalogs-retrieval-code-execution-and-connectors-failure-evidence-and-operational-notes.md),
+[Tool Catalogs Retrieval Code Execution And Connectors Phase 2 Integration Tests](42-tool-catalogs-retrieval-code-execution-and-connectors-phase-2-integration-tests.md).
 
 ## 42.1 Contract And Data Model
 
@@ -283,4 +286,30 @@ earlier chapters:
    [Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md)
    for questions of tool-specific provenance requirements.
 5. Where both sections are applicable and agree, they are mutually
-   reinforcing.
+    reinforcing.
+
+## Variability register
+
+The following table lists every implementation-defined choice,
+non-normative disposition, and permitted presentation documented in this
+chapter.
+
+| Item | Location | Nature | Constraint |
+|------|----------|--------|------------|
+| Tool descriptor identity derivation | Section 42.1 | MAY | Must be deterministic across implementations. |
+| Side-effect class assignment | Section 42.1 | MAY | Must be one of `read_only`, `write`, `network`, `stateful`. |
+| Capability identifier format | Section 42.1 | MAY | Must match `tool.<name>.<operation>` pattern. |
+| Tool descriptor field order | Section 42.1 | SHOULD | Must include all required fields. Order is informational. |
+| Retrieval request field order | Section 42.1 | SHOULD | Must include all required fields. Order is informational. |
+| Code-execution request field order | Section 42.1 | SHOULD | Must include all required fields. Order is informational. |
+| Connector capability list | Section 42.1 | MAY | Must include at least `list_tools` and `execute_tool`. |
+| Framework plugin query order | Section 42.2 | MAY | Must query all approved framework plugins. Order is informational. |
+| Tool execution timeout | Section 42.3 | MAY | Must be at least the minimum execution duration. Documented in conformance profile. |
+| Code execution timeout | Section 42.3 | MAY | Must be at least the minimum execution duration. Documented in conformance profile. |
+| Retrieval timeout | Section 42.3 | MAY | Must be at least the minimum execution duration. Documented in conformance profile. |
+| Sandbox memory limit | Section 42.3 | MAY | Must be at least 64 MB. Documented in conformance profile. |
+| Sandbox network access | Section 42.3 | MAY | Must be configurable per tool or globally. Documented in conformance profile. |
+| Diagnostic message format | Section 42.3 | MAY | Must include all required fields. Free-text portion is informational. |
+| Evidence record field order | Section 42.3 | SHOULD | Must include all required fields. Order is informational. |
+| Integration test ordering | Section 42.4 | MAY | Must cover all required scenarios. Order is informational. |
+| Cross-milestone fixture selection | Section 42.4 | MUST | Must include all fixtures listed in section 42.4.4. |

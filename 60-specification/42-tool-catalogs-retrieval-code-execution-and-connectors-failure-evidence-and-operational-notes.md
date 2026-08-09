@@ -81,7 +81,8 @@ Related chapters:
 [Provider-Neutral Model Requests Responses Streaming And Usage Failure Evidence And Operational Notes](41-provider-neutral-model-requests-responses-streaming-and-usage-failure-evidence-and-operational-notes.md),
 [Provider-Neutral Model Requests Responses Streaming And Usage Phase 1 Integration Tests](41-provider-neutral-model-requests-responses-streaming-and-usage-phase-1-integration-tests.md),
 [Tool Catalogs Retrieval Code Execution And Connectors Contract And Data Model](42-tool-catalogs-retrieval-code-execution-and-connectors-contract-and-data-model.md),
-[Tool Catalogs Retrieval Code Execution And Connectors Behavior And Integration](42-tool-catalogs-retrieval-code-execution-and-connectors-behavior-and-integration.md).
+[Tool Catalogs Retrieval Code Execution And Connectors Behavior And Integration](42-tool-catalogs-retrieval-code-execution-and-connectors-behavior-and-integration.md),
+[Tool Catalogs Retrieval Code Execution And Connectors Phase 2 Integration Tests](42-tool-catalogs-retrieval-code-execution-and-connectors-phase-2-integration-tests.md).
 
 ## 42.3 Failure Evidence And Operational Notes
 
@@ -240,7 +241,7 @@ Every evidence record MUST include the following fields:
 
 | Field | Content | Source |
 |-------|---------|--------|
-| `evidence_type` | The evidence type (`tool.execution.requested`, `tool.execution.completed`, `tool.execution.failed`, `tool.execution.cancelled`, `tool.execution.result`, `retrieval.requested`, `retrieval.completed`, `retrieval.failed`, `code.requested`, `code.completed`, `code.failed`, `code.completed`). | Host runtime |
+| `evidence_type` | The evidence type (`tool.execution.requested`, `tool.execution.completed`, `tool.execution.failed`, `tool.execution.cancelled`, `tool.execution.result`, `retrieval.requested`, `retrieval.completed`, `retrieval.failed`, `code.requested`, `code.completed`, `code.failed`, `code.cancelled`). | Host runtime |
 | `request_id` | The `request_id` of the tool/retrieval/code execution request. | Host runtime |
 | `agent_address` | The `TenantQualifiedAgentAddress` of the agent that originated the request. | Host runtime |
 | `tool_id` | The `tool_id` of the tool executed (for tool executions). | Host runtime |
@@ -355,4 +356,26 @@ following earlier chapters:
    [Framework Plugin Manifests Composition And Lifecycle Hooks](32-framework-plugin-manifests-composition-and-lifecycle-hooks.md)
    for questions of tool-specific plugin behavior.
 6. Where both sections are applicable and agree, they are mutually
-   reinforcing.
+    reinforcing.
+
+## Variability register
+
+The following table lists every implementation-defined choice,
+non-normative disposition, and permitted presentation documented in this
+chapter.
+
+| Item | Location | Nature | Constraint |
+|------|----------|--------|------------|
+| Maximum concurrent tool executions | Section 42.3 | MAY | Must be at least 1 and at most the implementation-defined maximum. Documented in conformance profile. |
+| Maximum concurrent code executions | Section 42.3 | MAY | Must be at least 1 and at most the implementation-defined maximum. Documented in conformance profile. |
+| Maximum concurrent retrieval requests | Section 42.3 | MAY | Must be at least 1 and at most the implementation-defined maximum. Documented in conformance profile. |
+| Tool execution timeout | Section 42.3 | MAY | Must be at least the minimum execution duration. Documented in conformance profile. |
+| Code execution timeout | Section 42.3 | MAY | Must be at least the minimum execution duration. Documented in conformance profile. |
+| Retrieval timeout | Section 42.3 | MAY | Must be at least the minimum execution duration. Documented in conformance profile. |
+| Sandbox memory limit | Section 42.3 | MAY | Must be at least 64 MB and at most the implementation-defined maximum. Documented in conformance profile. |
+| Sandbox network access | Section 42.3 | MAY | Must be configurable per tool or globally. Documented in conformance profile. |
+| Diagnostic message format | Section 42.3 | MAY | Must include all required fields. Free-text portion is informational. |
+| Evidence record field order | Section 42.3 | SHOULD | Must include all required fields. Order is informational. |
+| Evidence record hash algorithm | Section 42.3 | MAY | Must be deterministic. Documented in conformance profile. |
+| Integration test ordering | Section 42.4 | MAY | Must cover all required scenarios. Order is informational. |
+| Cross-milestone fixture selection | Section 42.4 | MUST | Must include all fixtures listed in section 42.4.4. |
