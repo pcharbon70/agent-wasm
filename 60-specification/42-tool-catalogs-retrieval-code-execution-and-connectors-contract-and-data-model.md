@@ -1,0 +1,286 @@
+---
+title: "Tool Catalogs Retrieval Code Execution And Connectors Contract And Data Model"
+kind: specification
+created: "2026-08-09"
+status: draft
+spec_version: "0.1.0"
+tags:
+  - milestone-07
+  - phase-02
+  - tool-catalogs
+  - retrieval
+  - code-execution
+  - connectors
+  - capabilities
+aliases:
+  - "M7-P2 Contract And Data Model"
+---
+
+# Tool Catalogs Retrieval Code Execution And Connectors Contract And Data Model
+
+## Status and authority
+
+This chapter is a draft specification produced by
+[Phase 2](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/phase-02-tool-catalogs-retrieval-code-execution-and-connectors.md)
+of
+[Milestone 7](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/README.md)
+--
+AI, Tools, Memory, And Human Control.
+It establishes the contract and data model for tool catalogs, retrieval,
+code execution, and connectors, including tool descriptors, retrieval
+requests, code-execution requests, and the capability policy that binds
+them.
+
+This chapter is normative by default within its stated scope.
+Material visibly marked non-normative does not create conformance
+obligations.
+Promotion to `status: normative` requires evidence from the Phase 2
+integration tests and a passing cross-milestone fixture run.
+
+Governing policies:
+[Specification Authority](../SPECIFICATION-AUTHORITY.md)
+and
+[Conformance Vocabulary](../CONFORMANCE-VOCABULARY.md).
+
+Related chapters:
+[Signal Envelopes Causality Routing And Delivery](10-signals-causality-routing-and-delivery.md),
+[Actions Instructions Validation Plans And Results](11-actions-instructions-validation-plans-and-results.md),
+[State Operations Patches Revisions And Conflicts](12-state-operations-patches-revisions-and-conflicts.md),
+[Directives Strategies Continuations And Terminal States](13-directives-strategies-continuations-and-terminal-states.md),
+[Deterministic Reducer Semantics And Milestone Acceptance](14-deterministic-reducer-semantics-and-milestone-acceptance.md),
+[Extism Invocation Boundary Instances And Output Validation](20-extism-invocation-boundary-instances-and-output-validation.md),
+[Mailboxes Ordering Bounds Fairness And Turn Leases](21-mailboxes-ordering-bounds-fairness-and-turn-leases.md),
+[Agent Registry Activation Cancellation And Completion](22-agent-registry-activation-cancellation-and-completion.md),
+[Sensors Schedules Timers And External Signal Ingress](23-sensors-schedules-timers-and-external-signal-ingress.md),
+[Single-Agent Host Flow And Milestone Acceptance](24-single-agent-host-flow-and-milestone-acceptance.md),
+[Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md),
+[Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md),
+[Effect Handlers Attempts Idempotency And Result Signals](27-effect-handlers-attempts-idempotency-and-result-signals.md),
+[Retry Timer Recovery Replay Hibernate And Migration](28-retry-timer-recovery-replay-hibernate-and-migration.md),
+[Crash Injection Durable Effects And Milestone Acceptance](29-crash-injection-durable-effects-and-milestone-acceptance.md),
+[Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md),
+[Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md),
+[Framework Plugin Manifests Composition And Lifecycle Hooks](32-framework-plugin-manifests-composition-and-lifecycle-hooks.md),
+[Synchronous Host Functions WASI Restrictions And Tenant Isolation](33-synchronous-host-functions-wasi-restrictions-and-tenant-isolation.md),
+[Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md),
+[Agent Identity Addressing Ownership And Dependency Relations](35-agent-identity-addressing-ownership-and-dependency-relations.md),
+[Child Lifecycle Cancellation Monitoring And Restart Policy Contract And Data Model](36-child-lifecycle-cancellation-monitoring-and-restart-policy.md),
+[Fan-Out Fan-In Delegation And Result Aggregation Contract And Data Model](37-fan-out-fan-in-delegation-and-result-aggregation-contract-and-data-model.md),
+[Fan-Out Fan-In Delegation And Result Aggregation Behavior And Integration](37-fan-out-fan-in-delegation-and-result-aggregation-behavior-and-integration.md),
+[Fan-Out Fan-In Delegation And Result Aggregation Failure Evidence And Operational Notes](37-fan-out-fan-in-delegation-and-result-aggregation-failure-evidence-and-operational-notes.md),
+[Pod Topology Placement Activation Leases And Reconciliation Contract And Data Model](38-pod-topology-placement-activation-leases-and-reconciliation-contract-and-data-model.md),
+[Pod Topology Placement Activation Leases And Reconciliation Behavior And Integration](38-pod-topology-placement-activation-leases-and-reconciliation-behavior-and-integration.md),
+[Pod Topology Placement Activation Leases And Reconciliation Failure Evidence And Operational Notes](38-pod-topology-placement-activation-leases-and-reconciliation-failure-evidence-and-operational-notes.md),
+[Multi-Agent Recovery Clustering Seams And Milestone Acceptance Contract And Data Model](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-contract-and-data-model.md),
+[Multi-Agent Recovery Clustering Seams And Milestone Acceptance Behavior And Integration](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-behavior-and-integration.md),
+[Multi-Agent Recovery Clustering Seams And Milestone Acceptance Failure Evidence And Operational Notes](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-failure-evidence-and-operational-notes.md),
+[Multi-Agent Recovery Clustering Seams And Milestone Acceptance Phase 5 Integration Tests](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-phase-5-integration-tests.md),
+[Provider-Neutral Model Requests Responses Streaming And Usage Contract And Data Model](41-provider-neutral-model-requests-responses-streaming-and-usage-contract-and-data-model.md),
+[Provider-Neutral Model Requests Responses Streaming And Usage Behavior And Integration](41-provider-neutral-model-requests-responses-streaming-and-usage-behavior-and-integration.md),
+[Provider-Neutral Model Requests Responses Streaming And Usage Failure Evidence And Operational Notes](41-provider-neutral-model-requests-responses-streaming-and-usage-failure-evidence-and-operational-notes.md),
+[Provider-Neutral Model Requests Responses Streaming And Usage Phase 1 Integration Tests](41-provider-neutral-model-requests-responses-streaming-and-usage-phase-1-integration-tests.md).
+
+## 42.1 Contract And Data Model
+
+### Tool descriptor identity and properties
+
+> **Normative definition.**
+A tool descriptor is a durable record that describes an external ability
+available to agents through the host runtime.
+The descriptor captures the tool's identity, version, schemas, capability,
+side-effect class, idempotency, timeout, result limits, and provenance
+requirements.
+
+> **Normative definition.**
+Every tool descriptor MUST include the following fields:
+
+| Field | Content | Source |
+|-------|---------|--------|
+| `tool_id` | A deterministic tool identity derived from the tool name, version, and framework plugin identifier. | Host runtime. |
+| `name` | The tool name (e.g., `search`, `code_interpreter`, `email_send`). | Framework plugin. |
+| `version` | The semantic version of the tool (e.g., `1.2.3`). | Framework plugin. |
+| `description` | A human-readable description of the tool's purpose and behavior. | Framework plugin. |
+| `input_schema` | The JSON Schema for the tool's input parameters. | Framework plugin. |
+| `output_schema` | The JSON Schema for the tool's output result. | Framework plugin. |
+| `capability` | The capability identifier granted to agents for using this tool (e.g., `tool.search.read`, `tool.code.execute`). | Capability policy. |
+| `side_effect_class` | The side-effect class: `read_only`, `write`, `network`, `stateful`. | Framework plugin. |
+| `idempotent` | Whether the tool is idempotent (safe to retry without side effects). | Framework plugin. |
+| `timeout_ms` | The maximum execution time in milliseconds. | Framework plugin. |
+| `result_limits` | Limits on the result size (e.g., `max_bytes`, `max_tokens`, `max_items`). | Framework plugin. |
+| `provenance_required` | Whether provenance evidence is required for this tool's results. | Framework plugin. |
+| `framework_plugin` | The framework plugin identifier that provides this tool. | Framework plugin. |
+| `created_at` | The ISO 8601 timestamp of descriptor creation. | Host clock. |
+| `status` | The current status: `active`, `deprecated`, `suspended`. | Host runtime. |
+
+> **Non-normative note.**
+The `tool_id` is deterministic to enable idempotent tool resolution and
+to ensure that the same tool version from the same framework plugin
+produces the same identifier.
+This is consistent with the deterministic reducer semantics defined in
+[Deterministic Reducer Semantics And Milestone Acceptance](14-deterministic-reducer-semantics-and-milestone-acceptance.md).
+
+### Tool capability and side-effect classes
+
+> **Normative definition.**
+Tools are classified by their side-effect class to enable capability
+policy enforcement and resource bounding.
+The side-effect class determines the minimum capability required to use
+the tool and the resource budget applied.
+
+| Side-effect class | Description | Minimum capability | Resource budget |
+|-------------------|-------------|-------------------|-----------------|
+| `read_only` | No state or network changes. | `tool.<name>.read` | Default read budget. |
+| `write` | State changes within the agent's scope. | `tool.<name>.write` | Default write budget. |
+| `network` | Network requests to external services. | `tool.<name>.network` | Network budget. |
+| `stateful` | Persistent state changes or long-running operations. | `tool.<name>.stateful` | Extended budget. |
+
+> **Non-normative note.**
+The side-effect class hierarchy ensures that tools with broader side
+effects require higher-privilege capabilities.
+This is consistent with the capability policy defined in
+[Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md).
+
+### Retrieval request and result schema
+
+> **Normative definition.**
+Retrieval requests and results capture the semantics of search, knowledge
+base lookup, and content retrieval operations.
+The retrieval contract includes tenant scope, query, filters, ranking
+metadata, citations, and bounded content references.
+
+> **Normative definition.**
+Every retrieval request MUST include the following fields:
+
+| Field | Content | Source |
+|-------|---------|--------|
+| `request_id` | A deterministic retrieval request identity derived from the agent address, query hash, and timestamp. | Host runtime. |
+| `agent_address` | The `TenantQualifiedAgentAddress` of the agent that originated the request. | Agent. |
+| `query` | The search query or knowledge base lookup string. | Agent. |
+| `tenant_scope` | The tenant scope for the retrieval (e.g., `self`, `team`, `organization`). | Agent. |
+| `filters` | The filters applied to the retrieval (e.g., `source_type`, `date_range`, `tags`). | Agent. |
+| `ranking` | The ranking metadata (e.g., `relevance`, `recency`, `authority`). | Agent. |
+| `max_results` | The maximum number of results to return. | Agent. |
+| `created_at` | The ISO 8601 timestamp of request creation. | Host clock. |
+| `status` | The current status: `pending`, `completed`, `failed`, `cancelled`. | Host runtime. |
+
+> **Normative definition.**
+Every retrieval result MUST include the following fields:
+
+| Field | Content | Source |
+|-------|---------|--------|
+| `result_id` | A deterministic retrieval result identity derived from the `request_id` and result sequence number. | Host runtime. |
+| `request_id` | The `request_id` of the associated retrieval request. | Normalized from retrieval source. |
+| `items` | The list of retrieved items (each with content, metadata, and citation). | Normalized from retrieval source. |
+| `total_results` | The total number of results available (before `max_results` limit). | Normalized from retrieval source. |
+| `ranking_metadata` | The ranking metadata used for this retrieval. | Normalized from retrieval source. |
+| `created_at` | The ISO 8601 timestamp of result creation. | Host clock. |
+
+> **Normative definition.**
+Each retrieval item MUST include the following fields:
+
+| Field | Content | Source |
+|-------|---------|--------|
+| `content` | The retrieved content (text, JSON, or binary reference). | Normalized from retrieval source. |
+| `metadata` | The item metadata (source, author, date, tags, relevance score). | Normalized from retrieval source. |
+| `citation` | The citation string for attribution and provenance. | Normalized from retrieval source. |
+| `content_ref` | A bounded content reference (hash or URL) for deduplication. | Normalized from retrieval source. |
+
+> **Non-normative note.**
+The `content_ref` field enables deduplication of retrieval results and
+prevents redundant storage of identical content.
+This is consistent with the storage contract defined in
+[Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md).
+
+### Code-execution request and result schema
+
+> **Normative definition.**
+Code-execution requests and results capture the semantics of sandboxed
+code execution operations.
+The code-execution contract includes immutable environment, inputs,
+capability policy, resource budget, output artifacts, and isolation class.
+
+> **Normative definition.**
+Every code-execution request MUST include the following fields:
+
+| Field | Content | Source |
+|-------|---------|--------|
+| `request_id` | A deterministic code-execution request identity derived from the agent address, code hash, and timestamp. | Host runtime. |
+| `agent_address` | The `TenantQualifiedAgentAddress` of the agent that originated the request. | Agent. |
+| `language` | The programming language of the code (e.g., `python`, `javascript`, `rust`). | Agent. |
+| `code` | The code to execute (redacted reference for storage). | Agent. |
+| `inputs` | The input data for the code execution. | Agent. |
+| `environment` | The immutable execution environment (e.g., `python:3.11-slim`, `node:20-alpine`). | Agent. |
+| `capability` | The capability identifier granted to agents for code execution (e.g., `code.execute`). | Capability policy. |
+| `resource_budget` | The resource budget for execution (e.g., `max_memory_mb`, `max_cpu_seconds`, `max_network_requests`). | Agent. |
+| `isolation_class` | The isolation class: `shared`, `tenant`, `isolated`. | Agent. |
+| `timeout_ms` | The maximum execution time in milliseconds. | Agent. |
+| `created_at` | The ISO 8601 timestamp of request creation. | Host clock. |
+| `status` | The current status: `pending`, `executing`, `completed`, `failed`, `cancelled`. | Host runtime. |
+
+> **Normative definition.**
+Every code-execution result MUST include the following fields:
+
+| Field | Content | Source |
+|-------|---------|--------|
+| `result_id` | A deterministic code-execution result identity derived from the `request_id` and result sequence number. | Host runtime. |
+| `request_id` | The `request_id` of the associated code-execution request. | Normalized from code executor. |
+| `exit_code` | The exit code of the code execution (0 for success, non-zero for failure). | Normalized from code executor. |
+| `stdout` | The standard output of the code execution (redacted reference for storage). | Normalized from code executor. |
+| `stderr` | The standard error of the code execution (redacted reference for storage). | Normalized from code executor. |
+| `artifacts` | The output artifacts (e.g., files, images, data). | Normalized from code executor. |
+| `resource_usage` | The resource usage (e.g., `memory_mb`, `cpu_seconds`, `network_requests`). | Normalized from code executor. |
+| `execution_time_ms` | The actual execution time in milliseconds. | Normalized from code executor. |
+| `created_at` | The ISO 8601 timestamp of result creation. | Host clock. |
+
+> **Non-normative note.**
+The `code`, `stdout`, and `stderr` fields are stored with redacted references
+to protect sensitive data.
+The actual content is stored in a separate, access-controlled storage
+layer as defined in
+[Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md).
+
+### Connector registration and discovery
+
+> **Normative definition.**
+Connectors are registered with the host and expose typed interfaces for
+external services (e.g., email, calendar, messaging, APIs).
+The host discovers available connectors from approved framework plugins
+and presents them to agents through the tool catalog.
+
+> **Normative definition.**
+Every connector MUST include the following capabilities:
+
+| Capability | Description |
+|------------|-------------|
+| `list_tools` | List the tools provided by this connector. |
+| `execute_tool` | Execute a tool provided by this connector. |
+| `authenticate` | Authenticate with the external service (if required). |
+| `refresh_token` | Refresh the authentication token (if required). |
+
+> **Non-normative note.**
+Connectors are implemented as framework plugins as defined in
+[Framework Plugin Manifests Composition And Lifecycle Hooks](32-framework-plugin-manifests-composition-and-lifecycle-hooks.md).
+Each connector is isolated in its own tenant and subject to the capability
+policy defined in
+[Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md).
+
+### Cross-references and precedence
+
+> **Non-normative note.**
+This section's contract and data model integrate with the following
+earlier chapters:
+
+1. For tool capability enforcement: this section takes precedence over
+   [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md)
+   for questions of tool-specific capability enforcement.
+2. For retrieval storage: this section takes precedence over
+   [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md)
+   for questions of retrieval-specific storage.
+3. For code execution isolation: this section takes precedence over
+   [Synchronous Host Functions WASI Restrictions And Tenant Isolation](33-synchronous-host-functions-wasi-restrictions-and-tenant-isolation.md)
+   for questions of code-execution-specific isolation.
+4. For provenance: this section takes precedence over
+   [Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md)
+   for questions of tool-specific provenance requirements.
+5. Where both sections are applicable and agree, they are mutually
+   reinforcing.
