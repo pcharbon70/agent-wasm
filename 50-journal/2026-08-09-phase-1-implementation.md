@@ -30,22 +30,22 @@ This journal entry documents the implementation of Phase 1 of Milestone 7:
 
 Created four implementation notes documenting each section of Phase 1:
 
-1. **[Phase 1 Contract And Data Model Implementation](./m7-phase-01-contract-and-data-model-implementation.md)**
+1. **[Phase 1 Contract And Data Model Implementation](../20-notes/m7-phase-01-contract-and-data-model-implementation.md)**
    - Documents Subtask 1.1.1.1: Model request identity and provider constraints (13 fields)
    - Documents Subtask 1.1.1.2: Response normalization (12 fields)
    - Documents Subtask 1.1.1.3: Streaming normalization (8 fields) and usage tracking (11 fields)
 
-2. **[Phase 1 Behavior And Integration Implementation](./m7-phase-01-behavior-and-integration-implementation.md)**
+2. **[Phase 1 Behavior And Integration Implementation](../20-notes/m7-phase-01-behavior-and-integration-implementation.md)**
    - Documents Subtask 1.2.1.1: Provider adapter registration and capability mapping (5 capabilities, 5 grants)
    - Documents Subtask 1.2.1.2: Model resolution, streaming normalization, and signal conversion (8 signals)
    - Documents Subtask 1.2.1.3: Cancellation, retry classification (10 failure types), and outcome definitions (8 outcomes)
 
-3. **[Phase 1 Failure Evidence And Operational Notes Implementation](./m7-phase-01-failure-evidence-and-operational-notes-implementation.md)**
+3. **[Phase 1 Failure Evidence And Operational Notes Implementation](../20-notes/m7-phase-01-failure-evidence-and-operational-notes-implementation.md)**
    - Documents Subtask 1.3.1.1: Failure outcomes (28 diagnostics across 7 categories)
    - Documents Subtask 1.3.1.2: Bounded diagnostics (8 required fields) and evidence emission (7 evidence types)
    - Documents Subtask 1.3.1.3: Implementation-defined choices (5 choices) and deferred work (4 items)
 
-4. **[Phase 1 Integration Tests Implementation](./m7-phase-01-integration-tests-implementation.md)**
+4. **[Phase 1 Integration Tests Implementation](../20-notes/m7-phase-01-integration-tests-implementation.md)**
    - Documents Subtask 1.4.1.1: Successful flow tests (20 tests)
    - Documents Subtask 1.4.1.2: Failure handling tests (22 tests)
    - Documents Subtask 1.4.1.3: Timeout and cancellation tests (9 tests)
