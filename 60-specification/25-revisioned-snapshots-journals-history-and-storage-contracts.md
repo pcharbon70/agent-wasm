@@ -53,7 +53,7 @@ Related chapters:
 [Sensors Schedules Timers And External Signal Ingress](23-sensors-schedules-timers-and-external-signal-ingress.md),
 [Single-Agent Host Flow And Milestone Acceptance](24-single-agent-host-flow-and-milestone-acceptance.md).
 
-## 4.1 Contract And Data Model
+## 1.1 Contract And Data Model
 
 ### Agent snapshot
 
@@ -169,6 +169,9 @@ PolicyEvidenceKind {
 }
 ```
 
+`TurnResult` is defined in [Turn Lifecycle Protocols And Canonical Encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md).
+`Directive` is defined in [Directives Strategies Continuations And Terminal States](13-directives-strategies-continuations-and-terminal-states.md).
+
 | Field | Type | Required | Purpose |
 |-------|------|----------|---------|
 | `entry_id` | EntryId | Yes | Unique journal entry identifier |
@@ -236,12 +239,23 @@ ReconstructionJournal {
 
 ConversationEntry {
   entry_id: EntryId,
+  agent_id: AgentId,
+  signal_id: String,
   role: User | Assistant,
   content: String,
   timestamp: UnixTimestamp,
-  signal_id: String
+  directives: Directive[]
 }
 ```
+
+`ConversationEntry` is derived from `JournalEntry` by projecting the following fields:
+- `entry_id` from `JournalEntry.entry_id`
+- `agent_id` from `JournalEntry.agent_id`
+- `signal_id` from `JournalEntry.signal_id`
+- `role` derived from `JournalEntry.directives` (User or Assistant based on directive type)
+- `content` derived from `JournalEntry.directives` (filtered for user-facing content)
+- `timestamp` derived from `JournalEntry.entry_id` (or host-provided timestamp)
+- `directives` from `JournalEntry.directives` (filtered for user-facing directives)
 
 > **Normative definition.**
 The audit journal is immutable and append-only.
@@ -325,7 +339,7 @@ The host MUST NOT apply a snapshot produced by an incompatible artifact version.
 If the artifact version is incompatible, the host MUST reject the snapshot with
 `storage.snapshot.incompatible_artifact`.
 
-## 4.2 Behavior And Integration
+## 1.2 Behavior And Integration
 
 ### Transactional storage interfaces
 
@@ -387,11 +401,6 @@ The host MUST limit the number of retries to prevent infinite loops.
 ### Corruption detection
 
 > **Normative definition.**
-The host MUST verify the checksum of every snapshot on read.
-If the checksum does not match, the host MUST reject the read with
-`storage.snapshot.corruption` and log the incident.
-
-> **Normative definition.**
 The host MUST verify the integrity of journal entries on read.
 If a journal entry is corrupted, the host MUST reject the read with
 `storage.journal.corruption` and log the incident.
@@ -404,8 +413,8 @@ The host MUST NOT allow corrupted data to propagate to state projections.
 
 > **Normative definition.**
 The host MUST handle storage backend unavailability gracefully.
-If the storage backend is unavailable, the host MUST return `storage.unavailable`
-and NOT perform any state changes.
+If the storage backend is unavailable, the host MUST return
+`storage.unavailable` and MUST NOT perform any state changes.
 
 > **Normative definition.**
 The host MUST support retry logic for transient storage failures.
@@ -419,16 +428,23 @@ abort the operation and release all acquired resources (leases, locks).
 
 > **Normative definition.**
 The host MUST support storage backend migration without downtime.
-During migration, the host MUST serve reads from the new backend and writes
-to the old backend until migration is complete.
+The host MUST perform migration in phases:
+
+1. **Preparation**: Provision the new backend and verify connectivity.
+2. **Data replication**: Copy data from the old backend to the new backend.
+3. **Cutover**: Atomically switch all reads and writes to the new backend.
+4. **Verification**: Verify data consistency on the new backend.
+5. **Cleanup**: Decommission the old backend after the retention period.
 
 > **Normative definition.**
 The host MUST verify data consistency after migration.
-If migration fails, the host MUST roll back to the old backend.
+If migration fails at any phase, the host MUST roll back to the old backend.
 
 > **Normative definition.**
-The host MUST NOT serve reads and writes from different backends simultaneously.
-The host MUST complete migration atomically.
+The host MUST NOT serve reads and writes from different backends simultaneously
+except during the data replication phase, where reads MUST be served from the
+old backend and writes MUST be served from both backends (with the new backend
+as the source of truth).
 
 ### Backend-neutral durability
 
@@ -446,7 +462,7 @@ storage backend in the conformance profile.
 The host MUST support pluggable storage backends.
 The host MUST NOT hard-code storage backend logic in the core specification.
 
-## 4.3 Failure Evidence And Operational Notes
+## 1.3 Failure Evidence And Operational Notes
 
 ### Failure outcomes
 
@@ -512,7 +528,7 @@ sensitive data in diagnostics.
 
 ### Implementation-defined choices
 
-> **Normative definition.**
+> **Normative implementation-defined choice.**
 The following choices are implementation-defined and MUST be documented in the
 conformance profile:
 
@@ -525,7 +541,7 @@ conformance profile:
 
 ### Deferred work
 
-> **Normative definition.**
+> **Non-normative note.**
 The following work is deferred to later phases or host implementations:
 
 1. **State-schema migration**: The migration strategy between compatible schema
@@ -537,7 +553,7 @@ The following work is deferred to later phases or host implementations:
 
 ### Results invalidating earlier milestones
 
-> **Normative definition.**
+> **Non-normative note.**
 The following results from Phase 1 MAY invalidate earlier milestone assumptions:
 
 1. **Storage requirements**: If the storage requirements exceed the capacity
@@ -547,11 +563,11 @@ The following results from Phase 1 MAY invalidate earlier milestone assumptions:
 3. **Checksum algorithm**: If the chosen checksum algorithm has known weaknesses,
    the algorithm MUST be changed.
 
-> **Normative definition.**
+> **Non-normative note.**
 If any result from Phase 1 invalidates an earlier milestone assumption, the
 affected milestone MUST be revised and re-validated.
 
-## 4.4 Phase 1 Integration Tests
+## 1.4 Phase 1 Integration Tests
 
 ### Integration test objectives
 
