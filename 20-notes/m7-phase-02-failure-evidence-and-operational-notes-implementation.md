@@ -138,7 +138,7 @@ Every evidence record MUST include the following fields:
 
 | Field | Content | Source |
 |-------|---------|--------|
-| `evidence_type` | The evidence type (`tool.execution.requested`, `tool.execution.completed`, `tool.execution.failed`, `tool.execution.cancelled`, `tool.execution.result`, `retrieval.requested`, `retrieval.completed`, `retrieval.failed`, `code.requested`, `code.completed`, `code.failed`, `code.completed`). | Host runtime |
+| `evidence_type` | The evidence type (`tool.execution.requested`, `tool.execution.completed`, `tool.execution.failed`, `tool.execution.cancelled`, `tool.execution.result`, `retrieval.requested`, `retrieval.completed`, `retrieval.failed`, `code.requested`, `code.completed`, `code.failed`, `code.cancelled`). | Host runtime |
 | `request_id` | The `request_id` of the tool/retrieval/code execution request. | Host runtime |
 | `agent_address` | The `TenantQualifiedAgentAddress` of the agent that originated the request. | Host runtime |
 | `tool_id` | The `tool_id` of the tool executed (for tool executions). | Host runtime |

@@ -61,6 +61,22 @@ open workbenches in inquiries, and session evidence in the journal.
   — documents Section 1.4 implementation: successful flow tests, failure
   handling tests, timeout and cancellation tests, and cross-milestone
   compatibility tests.
+- [Phase 2 Contract And Data Model Implementation](m7-phase-02-contract-and-data-model-implementation.md)
+  — documents Section 2.1 implementation from Phase 2 plan: tool descriptor
+  identity and properties, retrieval request and result schema, and
+  code-execution request and result schema.
+- [Phase 2 Behavior And Integration Implementation](m7-phase-02-behavior-and-integration-implementation.md)
+  — documents Section 2.2 implementation: tool resolution, catalog policy
+  filtering, execution through durable effect attempts, and outcome
+  definitions.
+- [Phase 2 Failure Evidence And Operational Notes Implementation](m7-phase-02-failure-evidence-and-operational-notes-implementation.md)
+  — documents Section 2.3 implementation: failure outcomes, bounded
+  diagnostics, evidence emission, implementation-defined choices, and
+  deferred work.
+- [Phase 2 Integration Tests Implementation](m7-phase-02-integration-tests-implementation.md)
+  — documents Section 2.4 implementation: successful flow tests, failure
+  handling tests, timeout and cancellation tests, and cross-milestone
+  compatibility tests.
 
 ## Maintaining this index
 

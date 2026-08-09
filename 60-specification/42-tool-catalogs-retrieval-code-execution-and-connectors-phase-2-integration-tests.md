@@ -389,7 +389,7 @@ Evidence is the primary input for promotion from `status: draft` to
 
 > **Normative definition.**
 The following evidence items MUST be recorded for each test scenario
-defined in sections 42.4.1 through 42.4.5:
+defined in sections 42.4.1 through 42.4.4:
 
 | Evidence item | Content | Format |
 |---------------|---------|--------|
@@ -418,8 +418,8 @@ variations are acceptable (such as implementation-defined bounded times).
 > **Normative definition.**
 A run of all Phase 2 integration tests passes if and only if:
 
-1. Every test scenario defined in sections 42.4.1 through 42.4.5 produces
-   a `result` of `pass`.
+1. Every test scenario defined in sections 42.4.1 through 42.4.4 produces
+    a `result` of `pass`.
 2. Every cross-milestone compatibility test defined in section 42.4.4
    produces a `result` of `pass` and no new regressions are introduced.
 3. Every evidence record is complete (all required fields are present
@@ -469,4 +469,20 @@ chapters:
    [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md)
    for questions of tool-specific capability tests.
 5. Where both sections are applicable and agree, they are mutually
-   reinforcing.
+    reinforcing.
+
+## Variability register
+
+The following table lists every implementation-defined choice,
+non-normative disposition, and permitted presentation documented in this
+chapter.
+
+| Item | Location | Nature | Constraint |
+|------|----------|--------|------------|
+| Test execution order | Section 42.4 | MAY | Must cover all required scenarios. Order is informational. |
+| Test isolation strategy | Section 42.4 | MAY | May run tests in parallel or sequentially. Must not leave partial state. |
+| Evidence record hash algorithm | Section 42.4 | MAY | Must be deterministic. Documented in conformance profile. |
+| Evidence record signature algorithm | Section 42.4 | MAY | Must be cryptographically secure. Documented in conformance profile. |
+| Cross-milestone fixture execution order | Section 42.4 | MAY | Must include all fixtures listed in section 42.4.4. Order is informational. |
+| Approved variability documentation format | Section 42.4 | MAY | Must include scenario, deviation, rationale. Format is informational. |
+| Regression baseline selection | Section 42.4 | MAY | Must use most recent normative baseline. Documented in conformance profile. |

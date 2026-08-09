@@ -83,7 +83,9 @@ Related chapters:
 [Provider-Neutral Model Requests Responses Streaming And Usage Behavior And Integration](41-provider-neutral-model-requests-responses-streaming-and-usage-behavior-and-integration.md),
 [Provider-Neutral Model Requests Responses Streaming And Usage Failure Evidence And Operational Notes](41-provider-neutral-model-requests-responses-streaming-and-usage-failure-evidence-and-operational-notes.md),
 [Provider-Neutral Model Requests Responses Streaming And Usage Phase 1 Integration Tests](41-provider-neutral-model-requests-responses-streaming-and-usage-phase-1-integration-tests.md),
-[Tool Catalogs Retrieval Code Execution And Connectors Contract And Data Model](42-tool-catalogs-retrieval-code-execution-and-connectors-contract-and-data-model.md).
+[Tool Catalogs Retrieval Code Execution And Connectors Contract And Data Model](42-tool-catalogs-retrieval-code-execution-and-connectors-contract-and-data-model.md),
+[Tool Catalogs Retrieval Code Execution And Connectors Failure Evidence And Operational Notes](42-tool-catalogs-retrieval-code-execution-and-connectors-failure-evidence-and-operational-notes.md),
+[Tool Catalogs Retrieval Code Execution And Connectors Phase 2 Integration Tests](42-tool-catalogs-retrieval-code-execution-and-connectors-phase-2-integration-tests.md).
 
 ## 42.2 Behavior And Integration
 
@@ -330,4 +332,23 @@ earlier chapters:
    [Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md)
    for questions of tool-specific provenance requirements.
 6. Where both sections are applicable and agree, they are mutually
-   reinforcing.
+    reinforcing.
+
+## Variability register
+
+The following table lists every implementation-defined choice,
+non-normative disposition, and permitted presentation documented in this
+chapter.
+
+| Item | Location | Nature | Constraint |
+|------|----------|--------|------------|
+| Framework plugin query order | Section 42.2 | MAY | Must query all approved framework plugins. Order is informational. |
+| Catalog filtering order | Section 42.2 | MAY | Must apply all filters: status, capability, tenant scope. Order is informational. |
+| Tool resolution caching | Section 42.2 | MAY | May cache filtered catalog. Must invalidate on descriptor change. Documented in conformance profile. |
+| Tool execution timeout | Section 42.2 | MAY | Must be at least the minimum execution duration. Documented in conformance profile. |
+| Resource budget limits | Section 42.2 | MAY | Must respect implementation-defined maximums. Documented in conformance profile. |
+| Result normalization order | Section 42.2 | MAY | Must validate schema, filter content, capture provenance. Order is informational. |
+| Diagnostic message format | Section 42.2 | MAY | Must include all required fields. Free-text portion is informational. |
+| Evidence record field order | Section 42.2 | SHOULD | Must include all required fields. Order is informational. |
+| Integration test ordering | Section 42.4 | MAY | Must cover all required scenarios. Order is informational. |
+| Cross-milestone fixture selection | Section 42.4 | MUST | Must include all fixtures listed in section 42.4.4. |
