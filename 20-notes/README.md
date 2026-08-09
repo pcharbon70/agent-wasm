@@ -45,6 +45,22 @@ open workbenches in inquiries, and session evidence in the journal.
   — surveys conformance suites, plug-in frameworks, fuzzing, differential
   methods, replay, reduction, formal work, and a layered assurance design for
   the Jido-like Extism host.
+- [Phase 1 Contract And Data Model Implementation](m7-phase-01-contract-and-data-model-implementation.md)
+  — documents Section 1.1 implementation from Phase 1 plan: model request
+  identity, provider constraints, response normalization, streaming, and
+  usage tracking.
+- [Phase 1 Behavior And Integration Implementation](m7-phase-01-behavior-and-integration-implementation.md)
+  — documents Section 1.2 implementation: provider adapter behavior,
+  capability mapping, signal conversion, cancellation, retry classification,
+  and outcome definitions.
+- [Phase 1 Failure Evidence And Operational Notes Implementation](m7-phase-01-failure-evidence-and-operational-notes-implementation.md)
+  — documents Section 1.3 implementation: failure outcomes, bounded
+  diagnostics, evidence emission, implementation-defined choices, and
+  deferred work.
+- [Phase 1 Integration Tests Implementation](m7-phase-01-integration-tests-implementation.md)
+  — documents Section 1.4 implementation: successful flow tests, failure
+  handling tests, timeout and cancellation tests, and cross-milestone
+  compatibility tests.
 
 ## Maintaining this index
 

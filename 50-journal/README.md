@@ -29,7 +29,9 @@ whose time and execution context matter.
 
 ### Documents
 
-- None yet.
+- [2026-08-09 Phase 1 Implementation](2026-08-09-phase-1-implementation.md)
+  — documents Phase 1 of Milestone 7 implementation: PR merge, section-by-section
+  implementation notes, key design decisions, cross-references, and open questions.
 
 ## Maintaining this index
 
