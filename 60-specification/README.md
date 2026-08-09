@@ -68,6 +68,7 @@ themselves.
 - [Fan-Out Fan-In Delegation And Result Aggregation Contract And Data Model](37-fan-out-fan-in-delegation-and-result-aggregation-contract-and-data-model.md) — Phase 3 of Milestone 6; establishes the contract and data model for coordinating parallel child work through durable directives and deterministic aggregation rather than shared mutable guest state.
 - [Fan-Out Fan-In Delegation And Result Aggregation Behavior And Integration](37-fan-out-fan-in-delegation-and-result-aggregation-behavior-and-integration.md) — Phase 3 of Milestone 6; establishes the behavior and integration rules for fan-out fan-in delegation and result aggregation, including aggregation policy evaluation, durable aggregation progress, and failure handling.
 - [Fan-Out Fan-In Delegation And Result Aggregation Failure Evidence And Operational Notes](37-fan-out-fan-in-delegation-and-result-aggregation-failure-evidence-and-operational-notes.md) — Phase 3 of Milestone 6; establishes the failure evidence and operational notes for fan-out fan-in delegation and result aggregation, including failure outcomes, bounded diagnostics, evidence emission, and implementation-defined choices.
+- [Fan-Out Fan-In Delegation And Result Aggregation Phase 3 Integration Tests](37-fan-out-fan-in-delegation-and-result-aggregation-phase-3-integration-tests.md) — Phase 3 of Milestone 6; defines the integration tests that verify fan-out fan-in delegation and result aggregation across its real dependency boundaries.
 
 ## Maintaining this index
 
