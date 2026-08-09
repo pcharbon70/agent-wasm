@@ -436,7 +436,7 @@ section.
    or resource access attempt is detected.
 9. **Bound exceeded**: The function exceeds a declared resource bound.
 10. **Cancellation timeout**: The function does not respond to
-    cancellation within the bounded time.
+     cancellation within the bounded time.
 
 > **Normative definition.**
 Each failure outcome MUST be mapped to a specific error code and bounded
@@ -445,6 +445,319 @@ boundary without exposing secrets.
 The error codes for this section follow the naming convention
 `host-function.<subtype>` for function-level failures and
 `wasi.<subtype>` for WASI-level failures.
+
+## 4.2 Behavior And Integration
+
+### Invocation context binding
+
+> **Normative definition.**
+Every synchronous host function callback MUST be bound to the following
+invocation context fields, in addition to the function's declared inputs.
+The host MUST populate these fields at the moment the invocation enters
+the synchronous surface and MUST reject the invocation if any required
+field is missing or invalid.
+
+| Field | Required | Source | Constraint |
+|-------|----------|--------|------------|
+| `invocation_id` | Yes | Host-generated UUID | Unique per synchronous invocation. |
+| `tenant_id` | Yes | Turn principal identity | Derived as defined in
+[Tenant isolation model](#tenant-isolation-model). |
+| `principal_id` | Yes | Turn principal identity | As defined in
+[Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md). |
+| `agent_id` | Conditional | Initiating agent | Required if the turn was initiated by an agent;
+omitted for direct operator or timer invocations. |
+| `artifact_id` | Conditional | Loaded module identity | Required if the invocation executes inside a loaded
+plugin artifact; omitted for built-in host functions. |
+| `grants` | Yes | Approved capability list | Subset of the capability policy as defined in
+[Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md). |
+| `deadline_ms` | Yes | Turn policy | Hard wall-clock limit for the entire invocation,
+including all nested host function calls. |
+| `output_limit_bytes` | Yes | Turn policy | Hard byte limit on observable output produced
+by the invocation. |
+
+> **Normative definition.**
+The host MUST enforce `deadline_ms` as a hard limit on the total wall-clock
+time of the invocation, including all time spent in nested host function
+calls.
+Exceeding `deadline_ms` MUST cause the host to trap the guest with the
+diagnostic `invocation.deadline-exceeded` and roll back any partial state
+produced during the current invocation.
+
+> **Normative definition.**
+The host MUST enforce `output_limit_bytes` as a hard limit on the total
+number of bytes written to the guest's output buffer during the
+invocation.
+The host MUST trap the guest with the diagnostic `invocation.output-limit`
+if the limit is exceeded, and MUST NOT publish any output that exceeds
+the limit.
+Partial output produced before the limit is reached MUST be discarded
+unless the host's conformance profile explicitly documents a truncation
+mode.
+
+> **Normative definition.**
+The `grants` field acts as an explicit filter on the functions and
+interfaces available to the invocation.
+A host function whose capability requirements are not fully satisfied by
+the `grants` list MUST NOT be called, even if it is present in the
+application namespace.
+The host MUST emit the diagnostic `invocation.grant-missing` if a
+candidate host function is invoked with insufficient grants.
+
+> **Normative definition.**
+The `artifact_id` field is required when the invocation executes inside
+a loaded plugin artifact.
+This binding ensures that residue tracking, defined in
+[Test residue](#test-residue), can attribute every observable effect to
+the correct artifact and tenant combination.
+
+> **Non-normative note.**
+Binding every callback to this structured context is the mechanism that
+makes tenant isolation observable and auditable.
+Without it, a cross-tenant leak is indistinguishable from a within-tenant
+effect in the audit log.
+
+> **Normative implementation-defined choice.**
+The host defines the exact representation of `invocation_id` (format,
+entropy source, and collision guarantee).
+The representation MUST be globally unique across the host's lifetime
+and MUST be recorded in every audit log entry produced by the
+invocation.
+
+> **Normative implementation-defined choice.**
+The host defines the exact mechanism used to enforce `deadline_ms`
+including the timer resolution, the pre-emption model, and the overhead
+budget reserved for deadline checking.
+The enforcement MUST complete within the remaining time of the deadline
+minus the host's documented deadline-checking overhead.
+
+### Instance modes
+
+> **Normative definition.**
+The host MUST support exactly four instance creation modes for
+WebAssembly guest modules.
+Each mode defines the relationship between logical instances, their
+memory, their state, and their WASI bindings.
+
+| Mode | Memory | State | WASI bindings | Reuse |
+|------|--------|-------|---------------|-------|
+| `fresh` | New allocation | New, empty | Re-evaluated from capability record | Never reused |
+| `reset` | New allocation | New, empty | Re-evaluated from capability record | Reused after reset |
+| `pooled` | Shared region | Shared, isolated | Re-evaluated from capability record | Shared across tenants per pool |
+| `agent-pinned` | New allocation | New per agent | Re-evaluated from capability record | Pinned to one agent |
+
+> **Normative definition.**
+`fresh` is the reference oracle for all other modes.
+Every other mode MUST produce behavior that is at least as restrictive
+as `fresh` on every isolation invariant defined in
+[Tenant isolation model](#tenant-isolation-model).
+A mode that relaxes any isolation invariant relative to `fresh` MUST be
+rejected with the diagnostic `instance.mode-isolation-violation`.
+
+> **Normative definition.**
+`fresh` MUST create a new WebAssembly instance with a freshly allocated
+guest memory region, a freshly initialized linear memory, and no
+persistent state between invocations.
+WASI bindings MUST be re-evaluated from the module's capability record
+on every `fresh` creation.
+`fresh` instances MUST NOT be reused, pooled, or reset.
+
+> **Non-normative note.**
+`fresh` is the safest mode and the default mode for untrusted or
+cross-tenant workloads.
+It incurs the highest per-invocation overhead because every instance
+creation allocates and initializes fresh memory.
+
+> **Normative definition.**
+`reset` MUST create a new WebAssembly instance identical to `fresh` on
+first creation.
+After the first invocation completes, the host MAY recycle the instance
+for a subsequent invocation by resetting memory to its initial
+zeroed state and re-running the module's `_start` export (or equivalent
+initialization entry point).
+Before recycling, the host MUST verify that no tenant state leaked into
+the instance's memory or exports.
+If leakage is detected, the host MUST discard the instance and create
+a new `fresh` instance instead, emitting the diagnostic
+`instance.reset-leakage-detected`.
+
+> **Normative definition.**
+`pooled` MUST create a pool of pre-allocated instances, each belonging
+to a single tenant's isolation domain.
+Instances within a pool MUST share memory regions with other instances
+in the same pool only if the capability policy explicitly permits
+cross-instance memory sharing for the specific host function being called.
+WASI bindings MUST be re-evaluated from the capability record on every
+invocation, regardless of instance reuse.
+The host MUST enforce that a tenant's pooled instances are never
+accessed by another tenant's invocation.
+
+> **Non-normative note.**
+`pooled` is intended for high-throughput, same-tenant workloads where
+instance creation overhead is a bottleneck.
+It provides no cross-tenant safety benefit over `fresh`; its benefit
+is per-tenant performance.
+
+> **Normative definition.**
+`agent-pinned` MUST create a new WebAssembly instance pinned to a
+single `agent_id` for its entire lifetime within the agent's activation.
+The instance MUST be created with `fresh` semantics on first use,
+including fresh memory allocation and WASI re-evaluation.
+Subsequent invocations by the same agent MAY reuse the pinned instance
+without memory reset, provided the agent's capability policy permits
+stateful instances.
+Invocations by any other agent MUST NOT use the pinned instance and
+MUST create their own `fresh` instance.
+If the agent is deactivated or cancelled, the pinned instance MUST be
+destroyed with the agent.
+
+> **Non-normative note.**
+`agent-pinned` enables agent-level statefulness across turns without
+exposing that state to other agents or tenants.
+It is the only mode that permits inter-invocation state within a single
+agent's activation, and only with explicit policy permission.
+
+> **Normative definition.**
+The host MUST select the instance mode based on the following priority:
+
+1. If the invocation context specifies an `agent_id` and the agent's
+   manifest declares `agent-pinned` mode for the artifact, use
+   `agent-pinned`.
+2. If the invocation is cross-tenant or the artifact is untrusted, use
+   `fresh`.
+3. If the invocation is same-tenant, the artifact is trusted, and the
+   host's performance profile justifies pooling, use `pooled`.
+4. Otherwise, use `reset`.
+
+> **Non-normative note.**
+This priority ensures that isolation is never compromised for performance.
+`fresh` is the safe default; other modes are optimizations that require
+explicit policy or manifest approval.
+
+> **Normative implementation-defined choice.**
+The host defines the exact algorithm used to detect state leakage during
+`reset` recycling, including the memory comparison strategy and the
+tolerance for implementation-defined initialization bytes.
+The detection algorithm MUST be documented in the conformance profile.
+
+> **Normative implementation-defined choice.**
+The host defines the pool size, eviction policy, and health-check
+frequency for `pooled` instances.
+These parameters MUST be documented in the conformance profile and
+MUST not allow a single tenant's pool to starve other tenants of
+instances.
+
+### Test residue
+
+> **Normative definition.**
+Test residue is any observable state, side effect, resource consumption,
+or audit log entry that persists after a synchronous host function
+invocation completes, regardless of whether the invocation succeeded,
+trapped, timed out, or was cancelled.
+The host MUST verify that residue conforms to the expectations defined
+in this subsection for every combination of residue category and
+invocation outcome.
+
+> **Normative definition.**
+The following residue categories MUST be tested for every invocation:
+
+| Category | Scope | Expected behavior on success | Expected behavior on trap | Expected behavior on timeout | Expected behavior on cancellation |
+|----------|-------|-----------------------------|--------------------------|----------------------------|----------------------------------|
+| `tenant` | Tenant state | Unchanged unless explicitly modified by the function's declared effects | Unchanged | Unchanged | Unchanged unless the cancellation protocol commits a partial state transition |
+| `agent` | Agent state | Updated per agent's directive-outbox as defined in
+[Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md) | Rolled back per atomic commit protocol | Rolled back | Rolled back |
+| `artifact` | Artifact memory and exports | Initialized per module's `_start` or empty if no `_start` | Reset to initial state per instance mode rules | Reset to initial state | Reset to initial state |
+| `success` | Output buffer | Contains exactly the function's declared output, within `output_limit_bytes` | Empty or truncated per truncation policy | Empty or truncated | Empty or truncated |
+| `trap` | Guest memory | Zeroed or in implementation-defined safe state | Zeroed or in implementation-defined safe state | Zeroed or in implementation-defined safe state | Zeroed or in implementation-defined safe state |
+| `timeout` | All scopes | N/A (invocation did not complete) | N/A | Host MUST roll back all effects and emit `invocation.deadline-exceeded` | N/A |
+| `cancellation` | All scopes | N/A (invocation did not complete) | N/A | N/A | Host MUST roll back all effects and emit `invocation.cancelled` |
+| `memory-pressure` | Host memory | Within declared `max_native_alloc_bytes` | Within declared bounds | Within declared bounds | Within declared bounds |
+| `extism-variable` | Extism internal state | Extism variables (inputs, outputs, error) reset to pre-invocation state | Reset to pre-invocation state | Reset to pre-invocation state | Reset to pre-invocation state |
+
+> **Normative definition.**
+`memory-pressure` residue MUST be measured as the difference between
+the host's total native memory consumption before and after the
+invocation, excluding the guest's linear memory.
+This value MUST NOT exceed the function's declared
+`max_native_alloc_bytes` for any invocation outcome.
+
+> **Normative definition.**
+`extism-variable` residue refers to the state of Extism's internal
+input, output, and error buffers after the invocation completes.
+These buffers MUST be reset to their pre-invocation state (empty or
+containing only the caller-provided initial values) after every
+invocation, regardless of outcome.
+Failure to reset these buffers constitutes a cross-invocation leakage
+vulnerability and MUST be treated as an isolation violation.
+
+> **Non-normative note.**
+Testing residue across all nine categories and four failure outcomes
+produces a matrix of 36 distinct test scenarios per host function.
+This matrix is the primary evidence that the synchronous surface
+does not leak state between invocations, agents, or tenants.
+
+> **Normative definition.**
+The host MUST provide an observable mechanism for test residue
+verification.
+This mechanism MUST include:
+
+1. A pre-invocation snapshot of every residue category listed above.
+2. A post-invocation snapshot of every residue category.
+3. A diff report that identifies any deviation from expected behavior.
+4. An audit log entry that records the diff report with the
+   invocation's `invocation_id`.
+
+> **Non-normative note.**
+The snapshot and diff mechanism is intentionally lightweight and
+does not require a full memory dump.
+Implementations MAY use checksums, region watches, or capability
+tracking to detect residue without incurring prohibitive overhead.
+
+> **Normative implementation-defined choice.**
+The host defines the exact mechanism used to capture pre- and
+post-invocation snapshots for each residue category.
+The mechanism MUST be deterministic and MUST be documented in the
+conformance profile.
+
+> **Normative implementation-defined choice.**
+The host defines the format and retention policy for residue diff
+reports.
+The format MUST be parseable by automated test harnesses, and the
+retention policy MUST support forensic analysis of isolation
+violations.
+
+### Failure outcomes for behavior and integration
+
+> **Non-normative note.**
+The canonical failure outcomes for this section are defined below.
+Detailed failure semantics, error codes, and diagnostic format
+requirements are defined in the Phase 4
+[Failure Evidence And Operational Notes](../.spec/planning/agentic-system/milestone-05-capabilities-plugins-security-and-tenancy/phase-04-synchronous-host-functions-wasi-restrictions-and-tenant-isolation.md#43-section---failure-evidence-and-operational-notes)
+section.
+
+1. **Context missing**: A required field in the invocation context
+   is missing or invalid.
+2. **Deadline exceeded**: The invocation exceeds `deadline_ms`.
+3. **Output limit exceeded**: The invocation exceeds
+   `output_limit_bytes`.
+4. **Grant missing**: The invocation lacks a capability grant required
+   by the candidate host function.
+5. **Mode isolation violation**: An instance mode relaxes an isolation
+   invariant relative to `fresh`.
+6. **Reset leakage detected**: State leaks into a `reset` instance
+   between invocations.
+7. **Residue violation**: Observable residue persists after an
+   invocation in a category or outcome where it is not expected.
+8. **Snapshot failure**: The host cannot capture a pre- or
+   post-invocation snapshot for residue verification.
+
+> **Normative definition.**
+Each failure outcome MUST be mapped to a specific error code and bounded
+diagnostic that identifies the phase contract, profile, and failed
+boundary without exposing secrets.
+The error codes for this section follow the naming convention
+`invocation.<subtype>` for context and enforcement failures and
+`instance.<subtype>` for mode-related failures and
+`residue.<subtype>` for residue verification failures.
 
 ## Implementation-defined choices
 
@@ -539,6 +852,18 @@ The revision process is governed by
 | WASI interface binding granularity | Implementation-defined | Document in conformance profile | Must re-evaluate on every instance creation |
 | Guest profile evaluation gate | Must evaluate at composition/authorization gate | None | Cannot enable WASI after gate closes |
 | Host function bound enforcement | Must trap on bound exceedance | None | Bound exceedance is explicit runtime failure |
+| Invocation context binding | Must bind all eight context fields to every callback | Document required vs conditional fields in conformance profile | Missing required field MUST reject invocation |
+| Deadline enforcement mechanism | Implementation-defined | Document timer resolution and pre-emption model | Must enforce deadline as hard limit with documented overhead |
+| Output limit enforcement mechanism | Implementation-defined | Document truncation vs discard policy | Must not publish output exceeding limit |
+| Grants filtering | Must filter host functions by grants | Document grant-check algorithm | Must emit grant-missing diagnostic on insufficient grants |
+| Instance mode selection priority | Must follow four-rule priority | Document trust assumptions per rule | Isolation MUST never be compromised for performance |
+| Fresh instance oracle compliance | Must be at least as restrictive as fresh | Document any deviation from fresh semantics | Relaxing any isolation invariant is a violation |
+| Reset leakage detection | Implementation-defined | Document memory comparison strategy | Must discard instance and create fresh on leakage |
+| Pool size and eviction policy | Implementation-defined | Document size, eviction, and health-check frequency | Must not allow single-tenant pool starvation |
+| Agent-pinning lifetime | Must destroy pinned instance with agent deactivation | Document activation-lifetime binding | Must not persist pinned instance across agent lifetimes |
+| Residue verification mechanism | Implementation-defined | Document snapshot and diff strategy | Must cover all nine residue categories |
+| Residue diff report format | Implementation-defined | Document parseable format | Must support automated test harnesses and forensic analysis |
+| Extism variable reset | Must reset input, output, and error buffers | Document pre-invocation state restoration | Failure to reset is an isolation violation |
 
 ## Operational variability register
 
@@ -546,4 +871,6 @@ The revision process is governed by
 |------|------------|----------------|------------|
 | Diagnostic formatting | Implementation-defined | Document in conformance profile | Must produce parseable output |
 | Audit log retention | Implementation-defined | Document in conformance profile | Must support forensic analysis |
-| Failure detection granularity | Implementation-defined | Document in conformance profile | Must detect all ten failure outcomes in this section |
+| Failure detection granularity | Implementation-defined | Document in conformance profile | Must detect all eight behavior-and-integration failure outcomes in this section |
+| Residue diff report retention | Implementation-defined | Document in conformance profile | Must support isolation-violation forensics |
+| Invocation_id uniqueness guarantee | Implementation-defined | Document entropy source and collision bound | Must be globally unique across host lifetime |
