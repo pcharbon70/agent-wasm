@@ -61,6 +61,7 @@ themselves.
 - [Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md) — Phase 1 of Milestone 5; defines adversaries, protected assets, authenticated identities, trust zones, and the vocabulary used by every authorization decision.
 - [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md) — Phase 2 of Milestone 5; establishes host-owned policy decisions that bind every invocation and effect to minimum authority and resource budgets.
 - [Framework Plugin Manifests Composition And Lifecycle Hooks](32-framework-plugin-manifests-composition-and-lifecycle-hooks.md) — Phase 3 of Milestone 5; defines the declarative manifest contract, deterministic composition ordering, and trust-tier separation between framework plugins and individual Extism guest modules.
+- [Synchronous Host Functions WASI Restrictions And Tenant Isolation](33-synchronous-host-functions-wasi-restrictions-and-tenant-isolation.md) — Phase 4 of Milestone 5; establishes the contract and data model for synchronous host functions, import namespace separation, default-to-no-WASI policy, and tenant isolation invariants.
 
 ## Maintaining this index
 
