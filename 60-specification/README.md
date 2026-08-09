@@ -58,6 +58,7 @@ themselves.
 - [Effect Handlers Attempts Idempotency And Result Signals](27-effect-handlers-attempts-idempotency-and-result-signals.md) — Phase 3 of Milestone 4; interprets committed directives through typed handlers while retaining every attempt and returning results as new signals.
 - [Retry Timer Recovery Replay Hibernate And Migration](28-retry-timer-recovery-replay-hibernate-and-migration.md) — Phase 4 of Milestone 4; makes delayed work, runtime deactivation, state reconstruction, and schema evolution explicit durable operations.
 - [Crash Injection Durable Effects And Milestone Acceptance](29-crash-injection-durable-effects-and-milestone-acceptance.md) — Phase 5 of Milestone 4; proves state/effect invariants at every commit, dispatch, external-success, acknowledgement, and result-ingress boundary.
+- [Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md) — Phase 1 of Milestone 5; defines adversaries, protected assets, authenticated identities, trust zones, and the vocabulary used by every authorization decision.
 
 ## Maintaining this index
 
