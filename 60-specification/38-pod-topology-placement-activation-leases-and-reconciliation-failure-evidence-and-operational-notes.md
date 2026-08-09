@@ -66,9 +66,7 @@ Related chapters:
 [Child Lifecycle Cancellation Monitoring And Restart Policy Contract And Data Model](36-child-lifecycle-cancellation-monitoring-and-restart-policy.md),
 [Fan-Out Fan-In Delegation And Result Aggregation Contract And Data Model](37-fan-out-fan-in-delegation-and-result-aggregation-contract-and-data-model.md),
 [Fan-Out Fan-In Delegation And Result Aggregation Behavior And Integration](37-fan-out-fan-in-delegation-and-result-aggregation-behavior-and-integration.md),
-[Fan-Out Fan-In Delegation And Result Aggregation Failure Evidence And Operational Notes](37-fan-out-fan-in-delegation-and-result-aggregation-failure-evidence-and-operational-notes.md),
-[Pod Topology Placement Activation Leases And Reconciliation Contract And Data Model](38-pod-topology-placement-activation-leases-and-reconciliation-contract-and-data-model.md),
-[Fan-Out Fan-In Delegation And Result Aggregation Behavior And Integration](37-fan-out-fan-in-delegation-and-result-aggregation-behavior-and-integration.md).
+[Fan-Out Fan-In Delegation And Result Aggregation Failure Evidence And Operational Notes](37-fan-out-fan-in-delegation-and-result-aggregation-failure-evidence-and-operational-notes.md).
 
 ## 38.3 Failure Evidence And Operational Notes
 
@@ -92,6 +90,7 @@ host behavior.
 | `topology.directive.malformed-role` | Topology directive with unknown `role` value. | Reject directive; do NOT create partial topology state. |
 | `topology.directive.malformed-activation-mode` | Topology directive with unknown `activation_mode` value. | Reject directive; do NOT create partial topology state. |
 | `topology.directive.malformed-lifecycle-policy` | Topology directive with unknown `lifecycle_policy` value. | Reject directive; do NOT create partial topology state. |
+| `topology.directive.timeout` | Topology directive that exceeded the implementation-defined timeout. | Reject directive; do NOT create partial topology state. |
 | `topology.node.malformed` | Topology node with missing required fields. | Reject node; do NOT create partial node state. |
 | `topology.node.malformed-dependencies` | Topology node with invalid `dependencies` list. | Reject node; do NOT create partial node state. |
 | `topology.lease.malformed` | Activation lease with missing required fields. | Reject lease; do NOT apply lease. |
@@ -124,7 +123,7 @@ which is consistent with the validation rules defined in
 | Diagnostic | Cause | Host behavior |
 |------------|-------|---------------|
 | `topology.directive.duplicate-version` | Topology directive with `topology_version` that matches an already-admitted version. | Reject directive; do NOT create partial topology state. |
-| `topology.node.duplicate-node-id` | Two topology directives with the same `node_id` submitted concurrently. | Reject second directive; do NOT create partial node state. |
+| `topology.node.duplicate-node-id` | Two topology directives with the same `node_id` submitted concurrently (possible only due to hash collision, since `node_id` is deterministically derived from `topology_version`, role, `agent_address`, and position index; same `topology_version` is caught by `duplicate-version`). | Reject second directive; do NOT create partial node state. |
 | `topology.lease.expired-fence` | Activation lease with `fence_token` less than the current fence token for the same `node_id`. | Reject lease; do NOT apply lease. |
 | `topology.lease.expired-timeout` | Activation lease that has exceeded its `expires_at` timestamp. | Reject lease; do NOT apply lease. |
 | `topology.reconciliation.conflict` | Two reconciliation passes attempt to modify the same `node_id` concurrently. | Reject second reconciliation pass; do NOT apply updates. |
@@ -216,7 +215,7 @@ Every evidence record MUST include the following fields:
 
 | Field | Content | Source |
 |-------|---------|--------|
-| `evidence_type` | The evidence type (`topology.directive.admitted`, `topology.directive.rejected`, `topology.reconciliation.started`, `topology.reconciliation.completed`, `topology.reconciliation.failed`, `topology.node.created`, `topology.node.terminated`, `topology.node.restarted`). | Host runtime. |
+| `evidence_type` | The evidence type (`topology.directive.admitted`, `topology.directive.rejected`, `topology.reconciliation.started`, `topology.reconciliation.completed`, `topology.reconciliation.failed`, `topology.reconciliation.cancelled`, `topology.node.created`, `topology.node.terminated`, `topology.node.restarted`, `topology.node.cancelled`). | Host runtime. |
 | `topology_identity` | The deterministic topology identity. | Host runtime. |
 | `node_id` | The `node_id` of the topology node, if applicable. | Host runtime. |
 | `lease_id` | The `lease_id` of the activation lease, if applicable. | Host runtime. |

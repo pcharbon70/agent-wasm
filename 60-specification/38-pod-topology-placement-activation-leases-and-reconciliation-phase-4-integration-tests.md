@@ -66,12 +66,11 @@ Related chapters:
 [Fan-Out Fan-In Delegation And Result Aggregation Contract And Data Model](37-fan-out-fan-in-delegation-and-result-aggregation-contract-and-data-model.md),
 [Fan-Out Fan-In Delegation And Result Aggregation Behavior And Integration](37-fan-out-fan-in-delegation-and-result-aggregation-behavior-and-integration.md),
 [Fan-Out Fan-In Delegation And Result Aggregation Failure Evidence And Operational Notes](37-fan-out-fan-in-delegation-and-result-aggregation-failure-evidence-and-operational-notes.md),
-[Pod Topology Placement Activation Leases And Reconciliation Contract And Data Model](38-pod-topology-placement-activation-leases-and-reconciliation-contract-and-data-model.md),
-[Fan-Out Fan-In Delegation And Result Aggregation Behavior And Integration](37-fan-out-fan-in-delegation-and-result-aggregation-behavior-and-integration.md).
+[Pod Topology Placement Activation Leases And Reconciliation Contract And Data Model](38-pod-topology-placement-activation-leases-and-reconciliation-contract-and-data-model.md).
 
 ## 38.4 Phase 4 Integration Tests
 
-### Successful flow tests
+### 38.4.1 Successful flow tests
 
 > **Normative definition.**
 Successful flow tests verify that the host correctly executes pod topology
@@ -145,7 +144,7 @@ flow defined in section 38.2.
 Each test validates one of the five versioning operations and verifies
 that the host behaves correctly according to the operation.
 
-### Failure handling tests
+### 38.4.2 Failure handling tests
 
 > **Normative definition.**
 Failure handling tests verify that the host correctly rejects invalid inputs
@@ -256,7 +255,7 @@ that guards the atomic commit protocol.
 Without these tests, unavailable directives could bypass the agent
 registry and compromise system consistency.
 
-### Timeout and cancellation tests
+### 38.4.3 Timeout and cancellation tests
 
 > **Normative definition.**
 Timeout and cancellation tests verify that the host correctly handles
@@ -309,7 +308,7 @@ behavior defined in section 38.2.
 Each test validates one of the three `lifecycle_policy` settings and
 verifies that the host behaves correctly according to the policy.
 
-### Cross-milestone compatibility tests
+### 38.4.4 Cross-milestone compatibility tests
 
 > **Normative definition.**
 Cross-milestone compatibility tests verify that the Phase 4 contracts do
@@ -376,7 +375,7 @@ identifies 12 direct integration points with earlier chapters.
 The broader fixture scope accounts for indirect effects through shared
 subsystems (such as the agent registry, mailboxes, and durable journal).
 
-### Integration test evidence requirements
+### 38.4.5 Integration test evidence requirements
 
 > **Normative definition.**
 Integration test evidence is the durable, auditable record that the Phase 4
@@ -447,7 +446,7 @@ The written report provides context and narrative that structured
 evidence records cannot capture, such as explanations of approved
 variability or deviations from the baseline.
 
-### Cross-reference summary
+### 38.4.6 Cross-reference summary
 
 > **Non-normative note.**
 This section's integration tests integrate with the following earlier
