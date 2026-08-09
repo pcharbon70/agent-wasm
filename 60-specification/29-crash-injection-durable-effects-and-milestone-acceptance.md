@@ -151,3 +151,76 @@ The `CrashRecoveryState` is reconstructed from the durable store on host
 restart.
 The host MUST verify the consistency of all records before resuming normal
 operation.
+
+## 5.2 Behavior And Integration
+
+### Idempotency after ambiguous external success
+
+> **Normative definition.**
+After an ambiguous external success (where the host does not know whether the
+external provider received the result), the host MUST:
+
+1. **Check idempotency key**: Query the external provider for any existing
+   result using the idempotency key.
+2. **Return cached result**: If a result exists, return it without re-dispatching.
+3. **Cache result**: If no result exists, cache the result locally and mark
+   the attempt as `Completed` with `attempt.ambiguous_success_cached`.
+
+> **Normative definition.**
+The host MUST NOT re-dispatch an attempt that has already been successfully
+processed by the external provider.
+The idempotency key MUST be sent with every dispatch to enable the external
+provider to detect and reject duplicates.
+
+### Crash recovery behavior
+
+> **Normative definition.**
+On host restart, the host MUST perform the following recovery steps:
+
+1. **Load snapshots**: Load the latest valid snapshot from the durable store.
+2. **Replay journal**: Replay journal entries from the snapshot revision to
+   the latest committed revision.
+3. **Restore outbox**: Load all outbox entries that have not been acknowledged.
+4. **Restore timers**: Load all timers that have not expired and re-schedule
+   them.
+5. **Restore retries**: Load all retries that have not expired and re-schedule
+   them.
+6. **Restore hibernated agents**: Load all hibernated agents and verify their
+   hibernate records are valid.
+7. **Restore migrations**: Load all in-progress migrations and verify their
+   state is consistent.
+
+> **Normative definition.**
+Each recovery step MUST be logged with a diagnostic message identifying the
+recovered entity and its state.
+
+> **Normative definition.**
+If any recovery step fails, the host MUST:
+
+1. Log the failure with the error code and diagnostic message.
+2. Mark the affected entity as `Failed` (e.g., `outbox.pending_ack_failed`,
+   `timer.recovery_failed`, etc.).
+3. Continue recovering other entities.
+4. Report all failures to the operator via bounded diagnostics.
+
+### Crash matrix
+
+> **Normative definition.**
+The host MUST publish a crash matrix documenting the durable state, allowed
+outcomes, and evidence for each failure point enumerated in section 5.1.
+
+> **Normative definition.**
+The crash matrix MUST include:
+
+1. **Failure point**: The specific failure point (e.g., "before commit", "after
+   external success").
+2. **Durable state**: The state of all durable records after the failure.
+3. **Allowed outcomes**: The set of outcomes that are allowed after the failure
+   (e.g., "retry", "abort", "rollback").
+4. **Evidence**: The test evidence that verifies the outcome.
+5. **Unresolved limits**: Any limits or open questions that have not been
+   resolved.
+
+> **Normative definition.**
+The crash matrix is published in the Phase 5 integration test evidence (section
+5.4).
