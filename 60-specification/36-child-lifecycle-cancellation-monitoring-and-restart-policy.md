@@ -494,9 +494,581 @@ Every chapter that deals with agent lifecycle, state, grants, or
 provenance interacts with this chapter's contracts in well-defined ways.
 The cross-references above are the primary integration points.
 
+## 36.2 Behavior And Integration
+
+### Monitor subscriptions and durable lifecycle notifications
+
+> **Normative definition.**
+A monitor subscription is a durable, address-bound declaration by which a
+parent agent, a peer agent, or an operator agent declares an interest in
+observing child lifecycle events without requiring a live connection to
+the host's lifecycle monitor or holding a reference to a live actor
+instance.
+Monitor subscriptions are the sole mechanism through which external
+principals observe child lifecycle events over the agent's lifetime,
+including across host restarts, agent migrations, and engine instance
+failures.
+
+> **Normative definition.**
+A monitor subscription MUST include the following fields:
+
+| Field | Content | Source |
+|-------|---------|--------|
+| `subscriber_address` | The `TenantQualifiedAgentAddress` of the subscribing principal (parent, peer, or operator). | Subscription request. |
+| `target_child` | The `TenantQualifiedAgentAddress` of the child to observe, or `null` to observe all children of the subscriber's tenant. | Subscription request. |
+| `event_types` | A subset of the eight child lifecycle event types defined in section 36.1, or `all` to observe every event type. | Subscription request. |
+| `subscription_id` | A deterministic identifier derived from the subscriber address, target child address, event types set, and a monotonic sequence counter. | Subscription construction. |
+| `created_at` | The ISO 8601 timestamp of subscription creation. | Subscription construction. |
+
+> **Normative definition.**
+The host MUST NOT persist live monitor handles, active watch descriptors,
+or runtime-specific connection objects in durable storage as part of a
+monitor subscription.
+A monitor subscription is a declarative record, not an active connection.
+The host's lifecycle monitor is responsible for evaluating active
+subscriptions at the time an event is emitted and routing the event
+to the appropriate subscriber mailbox.
+This design ensures that monitor subscriptions survive host restarts
+without requiring re-registration, and that subscribers do not hold
+resources that could leak if the host process crashes.
+
+> **Normative implementation-defined choice.**
+The mechanism by which the host evaluates active subscriptions against
+emitted events is implementation-defined.
+Acceptable mechanisms include: in-memory subscription tables evaluated
+at event emission time with durable subscription records for persistence
+across restarts, a subscription-aware event bus that fans events to
+matching subscribers, or a polling mechanism where subscribers query a
+durable event log for events matching their subscription criteria.
+The implementation MUST document its subscription evaluation mechanism
+in the conformance profile.
+
+> **Non-normative note.**
+The prohibition on persisting live monitor handles is a deliberate
+design choice that prevents resource leaks and subscription staleness.
+A host that persists live handles would require explicit cleanup when
+a subscriber is deleted or when a child reaches a terminal status,
+introducing additional failure modes.
+By treating subscriptions as declarative records, the host can
+determine subscription validity at event emission time based solely
+on the current state of the durable registry.
+
+> **Normative definition.**
+When a child reaches a terminal status (cancelled, terminated, completed,
+or orphaned-and-deleted), the host MUST automatically close any open
+monitor subscriptions for that child by emitting a `subscription.closed`
+evidence record and removing the subscription from the active table.
+Closed subscriptions are NOT removed from the durable subscription log
+and MAY be replayed by subscribers that missed earlier events.
+
+> **Normative definition.**
+Every child lifecycle event emitted into the child's mailbox MUST also
+be evaluated against all active monitor subscriptions.
+An event matches a subscription if the subscription's `target_child`
+is `null` (observe all children) or matches the event's `child_address`,
+AND the subscription's `event_types` includes the event's type or is
+set to `all`.
+A matching event is delivered to the subscriber's mailbox as a
+`child.lifecycle.observed` signal that includes a copy of the original
+lifecycle event fields plus the `subscription_id` that matched.
+
+> **Non-normative note.**
+The `child.lifecycle.observed` signal is distinct from the original
+lifecycle event to prevent confusion between events received by the
+child's live actor (which drive the child's state machine) and events
+received by subscribers (which are purely observational).
+Subscribers have no authority to affect the child's lifecycle by
+processing `child.lifecycle.observed` signals; they are read-only
+notifications.
+This separation is consistent with the capability model defined in
+[Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md),
+where observation rights do not imply modification rights.
+
+> **Normative definition.**
+Monitor subscriptions are subject to the following lifecycle rules:
+
+1. A subscription is created when the host admits the subscription
+   request through the atomic commit protocol defined in
+   [Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md).
+2. A subscription is active while the target child exists in the
+   durable registry with a non-terminal status.
+3. A subscription is closed when the target child reaches a terminal
+   status, when the subscriber agent is deleted, or when the
+   subscriber explicitly cancels the subscription.
+4. A subscription is invalid if the subscriber's grants do not include
+   the `observe.child.lifecycle` capability for the target child.
+
+> **Non-normative note.**
+The grant-based access control on subscriptions is a critical security
+property.
+Without it, any agent in the tenant could subscribe to observe the
+lifecycle of any other agent, enabling surveillance of agent behavior
+without authorization.
+The `observe.child.lifecycle` capability is defined in
+[Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md)
+and is attenuated when granted to child agents.
+
+### Restart policies
+
+> **Normative definition.**
+A restart policy is a normative behavioral class that determines whether
+and how a child agent is restarted after a lifecycle termination event
+that is not a graceful cancellation.
+Restart policies are selected at child creation time via the
+`lifecycle_policy` field of the child-create directive and are immutable
+for the lifetime of the child.
+The following four restart policies are defined by this chapter.
+
+> **Normative definition.**
+The `never` restart policy is the default and most restrictive policy.
+A child with the `never` policy is terminated upon its first non-graceful
+termination and is NEVER restarted by the host.
+The `never` policy is appropriate for one-shot child agents whose failure
+is considered a terminal condition, such as batch processing tasks,
+one-time computations, or children whose sole purpose is to produce a
+single result.
+
+> **Normative implementation-defined choice.**
+The host MUST document the circumstances under which a `never` policy
+child is eligible for restart.
+Under no circumstances MAY the host restart a `never` policy child as
+a consequence of its own lifecycle policy evaluation.
+A `never` policy child MAY be restarted only if an operator issues an
+explicit restart directive through a mechanism outside the scope of this
+chapter, which is not a conformance requirement.
+
+> **Normative definition.**
+The `bounded-retry` restart policy is the most commonly used policy for
+long-running child agents that are expected to be resilient to transient
+failures.
+A child with the `bounded-retry` policy is restarted up to a maximum
+number of attempts, with an increasing backoff between attempts, when
+the child terminates due to a failure that the policy classifies as
+restartable.
+The following parameters define the `bounded-retry` policy:
+
+| Parameter | Content | Default |
+|-----------|---------|---------|
+| `max_attempts` | The maximum number of restart attempts. | 3 |
+| `initial_delay` | The delay before the first restart attempt. | 1 second |
+| `max_delay` | The maximum delay between restart attempts. | 60 seconds |
+| `backoff_multiplier` | The multiplier applied to the delay after each attempt. | 2 |
+| `restartable_failure_codes` | A list of failure codes for which the child is restartable. | `transient-engine-error`, `transient-resource-exhaustion` |
+| `non_restartable_failure_codes` | A list of failure codes for which the child is NOT restartable. | `policy-violation`, `malformed-state`, `unauthorized` |
+
+> **Normative definition.**
+The `bounded-retry` policy evaluates the child's failure code at each
+termination event.
+If the failure code is in the `non_restartable_failure_codes` list,
+the child is NOT restarted and transitions directly to terminal status.
+If the failure code is in the `restartable_failure_codes` list, the child
+is restarted after the current backoff delay, up to `max_attempts` total.
+If the failure code is in neither list, the host MUST treat it as a
+non-restartable failure and transition the child to terminal status.
+
+> **Normative definition.**
+The host MUST compute the backoff delay between restart attempts using
+exponential backoff with a ceiling, as defined by the formula
+`delay(n) = min(initial_delay * (backoff_multiplier ** n), max_delay)`
+where `n` is the zero-indexed attempt number.
+The host MUST pause the child's live actor during the delay period and
+MUST NOT emit any lifecycle events other than the periodic `child.lifecycle.retrying`
+heartbeat (see the event types section below).
+
+> **Non-normative note.**
+The formula above illustrates the exponential backoff computation
+used by the `bounded-retry` restart policy.
+It is provided for clarity and does not impose a specific implementation
+requirement beyond the bounded-time behavior defined in the surrounding
+normative text.
+
+> **Non-normative note.**
+The exponential backoff with a ceiling prevents both immediate retry
+storms and unbounded waiting.
+A `max_attempts` of 3 with `initial_delay` of 1 second and
+`backoff_multiplier` of 2 produces delays of 1s, 2s, and 4s before
+each retry attempt, which is sufficient to allow most transient
+infrastructure issues to resolve while limiting total restart time
+to under 10 seconds.
+
+> **Normative definition.**
+The `restart-on-infrastructure-failure` restart policy is a middle ground
+between `never` and `bounded-retry`.
+A child with the `restart-on-infrastructure-failure` policy is restarted
+only when the termination event's reason code is one of the
+infrastructure failure codes defined below.
+All other termination reasons result in a terminal child status with
+NO restart attempt.
+
+| Reason code | Is infrastructure failure | Is restartable |
+|------------|--------------------------|---------------|
+| `infrastructure-failure` | Yes | Yes |
+| `engine-instance-crash` | Yes | Yes |
+| `node-network-partition` | Yes | Yes |
+| `resource-exhaustion-host-level` | Yes | Yes |
+| `transient-engine-error` | No | No |
+| `policy-violation` | No | No |
+| `operator-requested` | No | No |
+| `parent-requested` | No | No |
+| `child-requested` | No | No |
+
+> **Non-normative note.**
+The `restart-on-infrastructure-failure` policy is appropriate for child
+agents that perform critical work where infrastructure failures should
+be transparent to the operator but application-level failures (such as
+policy violations or operator requests) should NOT be silently retried.
+This policy ensures that the child is restarted when the host is
+experiencing infrastructure issues but that the child is NOT restarted
+when the failure is attributable to the child's own behavior or to
+explicit human decisions.
+
+> **Normative definition.**
+The `operator-approved` restart policy requires explicit operator approval
+before any restart attempt is made.
+When a child with the `operator-approved` policy terminates due to a
+non-graceful reason, the host MUST:
+
+1. Transition the child to `suspended-pending-operator-approval` status.
+2. Emit a `child.lifecycle.pending-operator-approval` event into the
+   operator's mailbox (as defined in
+   [Sensors Schedules Timers And External Signal Ingress](23-sensors-schedules-timers-and-external-signal-ingress.md)).
+3. Hold the child in the `suspended-pending-operator-approval` status
+   until the operator issues an explicit restart directive or the child
+   is explicitly terminated by the operator.
+
+> **Normative implementation-defined choice.**
+The mechanism by which the host notifies the operator of a
+`suspended-pending-operator-approval` child is implementation-defined.
+Acceptable mechanisms include: emitting a signal into the operator's
+mailbox, sending an out-of-band notification (email, webhook,
+messaging system), or setting a flag in the operator's dashboard.
+The implementation MUST document its operator notification mechanism
+in the conformance profile.
+
+> **Normative definition.**
+An operator restart directive for a `operator-approved` policy child
+MUST include the following fields:
+
+| Field | Content | Source |
+|-------|---------|--------|
+| `operator_address` | The `TenantQualifiedAgentAddress` of the operator issuing the directive. | Operator request. |
+| `target_child` | The `TenantQualifiedAgentAddress` of the child to restart. | Operator request. |
+| `restart_nonce` | A random value that prevents replay of operator directives. | Operator request. |
+| `approved_at` | The ISO 8601 timestamp of operator approval. | Operator request. |
+
+> **Non-normative note.**
+The `restart_nonce` field prevents replay attacks where an adversary
+captures a previous operator approval and re-issues it to restart a
+child that the operator no longer wishes to restart.
+The nonce is recorded in the durable audit log and MUST be unique
+across all restart directives for the same child.
+
+> **Non-normative note.**
+The `operator-approved` policy is appropriate for child agents that
+perform sensitive operations (such as financial transactions,
+user-modifying actions, or system-level configuration changes) where
+automatic restart could amplify the impact of a failure.
+This policy ensures that a human operator reviews and explicitly
+approves each restart decision.
+
+### Failure scenarios
+
+> **Normative definition.**
+The following six failure scenarios are normative invariants that every
+host implementation MUST handle correctly for child agents under any
+of the four restart policies.
+Each scenario describes a specific race condition, edge case, or
+interaction between subsystems that, if handled incorrectly, could
+lead to resource leaks, inconsistent state, or security violations.
+
+#### Create/terminate races
+
+> **Normative definition.**
+A create/terminate race occurs when a child-create directive and a
+termination directive (cancellation, hard stop, or infrastructure
+termination) are issued concurrently for the same child address.
+The host MUST handle create/terminate races according to the following
+rules:
+
+1. If the child-create directive is admitted before the termination
+   directive, the child enters the `pending` status and the termination
+   directive is applied to the child in its current status.
+2. If the termination directive is admitted before the child-create
+   directive, the child-create directive MUST be rejected with the
+   diagnostic `child.create.terminated-before-created` and the child
+   address MUST be reserved for the duration of the termination
+   processing to prevent a race-condition-based address reuse attack.
+3. If both directives are admitted in the same journal commit, the
+   child-create directive takes precedence and the termination
+   directive is queued for application after the child reaches a
+   non-pending status.
+
+> **Non-normative note.**
+Rule 2 is a security invariant.
+Without address reservation, an adversary could issue a termination
+directive for an address, then issue a child-create directive for the
+same address, causing the newly created child to inherit the terminated
+status and potentially bypass lifecycle policy evaluation.
+The reservation duration must be documented in the conformance profile
+and MUST be at least as long as the maximum termination processing time.
+
+#### Parent loss
+
+> **Normative definition.**
+Parent loss occurs when a child's parent agent is deleted, terminated,
+or becomes unresolvable in the durable registry while the child is
+still active.
+The host MUST handle parent loss according to the following rules:
+
+1. When the host detects parent loss (via the orphan detection mechanism
+   defined in section 36.1), the host MUST emit a
+   `child.lifecycle.orphaned` event into the child's mailbox.
+2. The host MUST evaluate the child's restart policy to determine
+   whether the child should be restarted, held in suspended status,
+   or terminated.
+3. For the `never` policy: the child is NOT restarted and is held in
+   `suspended-parent-loss` status pending operator intervention.
+4. For the `bounded-retry` policy: the child is restarted according
+   to the standard `bounded-retry` schedule if the termination reason
+   is in the `restartable_failure_codes` list.
+5. For the `restart-on-infrastructure-failure` policy: the child is
+   NOT restarted because parent loss is not an infrastructure failure.
+6. For the `operator-approved` policy: the child transitions to
+   `suspended-pending-operator-approval` status and the operator
+   is notified via the mechanism defined in the restart-on-infrastructure-failure section.
+
+> **Non-normative note.**
+The differential handling of parent loss by restart policy reflects the
+expected operational intent of each policy.
+A `never` policy child is a one-shot task; its parent's loss means
+there is no one to orchestrate it, so it should not be restarted.
+A `bounded-retry` policy child is expected to be resilient; if the
+parent loss is coincident with a transient infrastructure issue,
+restarting the child is appropriate.
+A `restart-on-infrastructure-failure` policy child is only restarted
+for infrastructure failures; parent loss is not an infrastructure
+failure, so the child is not restarted.
+An `operator-approved` policy child requires explicit approval for
+any restart, which is appropriate for sensitive operations.
+
+#### Initialization failure
+
+> **Normative definition.**
+Initialization failure occurs when a child's live actor fails to
+complete initialization (the `child.lifecycle.activated` event is
+emitted but the `child.lifecycle.initialized` event is not emitted
+within the bounded initialization timeout) or fails during initialization
+due to an invalid initial state, missing capability, or host-level error.
+The host MUST handle initialization failure according to the following
+rules:
+
+1. If the child does not emit `child.lifecycle.initialized` within the
+   bounded initialization timeout (documented in the conformance
+   profile), the host MUST emit a `child.lifecycle.failed` event with
+   failure code `initialization-timeout` and apply the child's restart
+   policy to determine whether the child is restarted.
+2. If the child emits a `child.lifecycle.failed` event during
+   initialization with a failure code in the `non_restartable_failure_codes`
+   list of the child's restart policy, the child is NOT restarted.
+3. If the child emits a `child.lifecycle.failed` event during
+   initialization with a failure code in the `restartable_failure_codes`
+   list of the child's restart policy, the child is restarted according
+   to the standard restart schedule.
+4. If the child's initial state is structurally invalid against the
+   manifest's input schema, the child-create directive is rejected at
+   admission time (see section 36.1) and the child is never activated.
+
+> **Non-normative note.**
+The bounded initialization timeout prevents children from being stuck
+in the `pending` status indefinitely due to a hung initialization.
+The timeout must be documented in the conformance profile and MUST be
+longer than the maximum expected initialization time for any valid
+manifest, with headroom for infrastructure latency.
+The differentiation between restartable and non-restartable initialization
+failures is consistent with the `bounded-retry` policy's treatment of
+other failure codes: transient initialization issues (such as missing
+capabilities that are being provisioned) are retryable, while
+structural issues (such as invalid initial state) are not.
+
+#### Restart exhaustion
+
+> **Normative definition.**
+Restart exhaustion occurs when a child with the `bounded-retry` policy
+has been restarted the maximum number of times (`max_attempts`) and
+has failed again, or when a child with the `operator-approved` policy
+has been terminated and the operator has not issued a restart directive
+within a reasonable time.
+The host MUST handle restart exhaustion according to the following rules:
+
+1. For the `bounded-retry` policy: when the child has been restarted
+   `max_attempts` times and has failed again, the host MUST transition
+   the child to `terminated-restart-exhausted` status and emit a
+   `child.lifecycle.failed` event with reason code `restart-exhausted`.
+2. For the `operator-approved` policy: the child remains in
+   `suspended-pending-operator-approval` status indefinitely until the
+   operator issues a restart directive or a termination directive.
+   The host MUST periodically (at intervals documented in the conformance
+   profile) emit a `child.lifecycle.pending-operator-approval` reminder
+   into the operator's mailbox until the operator acts.
+
+> **Non-normative note.**
+Restart exhaustion is a terminal condition for `bounded-retry` children
+because the host has exhausted its budget for automatic recovery.
+The `restart-exhausted` reason code is one of the immediate escalation
+reasons in the cancellation taxonomy defined in section 36.1, which
+means that if a cancellation is in progress when restart exhaustion
+occurs, the host MUST escalate to termination immediately.
+For `operator-approved` children, the indefinite suspension is intentional:
+the operator is expected to act on the child's lifecycle, and the host
+should not make that decision on the operator's behalf.
+
+#### Duplicate lifecycle events
+
+> **Normative definition.**
+Duplicate lifecycle events occur when the same lifecycle event is
+delivered to the child's mailbox more than once, either due to
+network retries, host restarts, or subscription evaluation races.
+The host MUST handle duplicate lifecycle events according to the following
+rules:
+
+1. Every child lifecycle event includes a `sequence_number` that is
+   monotonically incremented for each event emitted into the child's
+   mailbox (see section 36.1).
+2. The child's live actor MUST track the highest `sequence_number`
+   it has processed and MUST discard any event with a `sequence_number`
+   less than or equal to the highest processed `sequence_number`.
+3. If a duplicate event is discarded, the host MUST record the discard
+   in the evidence log with the original `sequence_number` to enable
+   operators to detect and diagnose duplicate event delivery.
+
+> **Non-normative note.**
+The `sequence_number` field enables at-least-once delivery semantics
+with duplicate detection at the child agent level.
+Without this field, the child's live actor would have no way to
+distinguish a legitimate new event from a duplicate, leading to
+potential state corruption (e.g., processing a `child.lifecycle.accepted`
+event twice could cause the child to initialize twice).
+The evidence log recording of discarded duplicates provides operators
+with visibility into delivery reliability without adding overhead to
+the normal event processing path.
+
+> **Normative definition.**
+Duplicate detection is performed by the child's live actor, not by the
+host.
+The host is responsible for ensuring that the `sequence_number` field
+is correctly assigned and monotonically incremented.
+The child's live actor is responsible for implementing the duplicate
+detection logic using the `sequence_number` field.
+This separation of responsibilities is consistent with the
+single-agent host flow defined in
+[Single-Agent Host Flow And Milestone Acceptance](24-single-agent-host-flow-and-milestone-acceptance.md),
+where the host provides the signal envelope and the live actor processes
+the signal content.
+
+#### Grant revocation
+
+> **Normative definition.**
+Grant revocation occurs when a child agent's grants are revoked as a
+consequence of cancellation, termination, or lifecycle policy evaluation.
+Grant revocation MUST be performed according to the following rules:
+
+1. When a child is cancelled, the host MUST revoke all grants associated
+   with the child according to the `grant_revocation_scope` specified
+   in the cancellation directive (see section 36.1).
+2. When a child is terminated (non-gracefully), the host MUST revoke
+   all grants associated with the child with `grant_revocation_scope: all`,
+   regardless of the termination reason.
+3. When a child is completed, the host MUST revoke all grants associated
+   with the child with `grant_revocation_scope: derived-only`, revoking
+   only grants that were derived from the child (not the grants that
+   were inherited from the parent).
+4. Grant revocation is recorded in the evidence log with the `child_address`,
+   the `grant_revocation_scope`, and the `termination_id` or
+   `cancellation_id` that triggered the revocation.
+
+> **Non-normative note.**
+The differential grant revocation by lifecycle outcome reflects the
+principle of least privilege.
+A cancelled child's grants are revoked according to the cancelling
+principal's specification because the cancellation was a deliberate
+action.
+A terminated child's grants are always fully revoked because termination
+is a host-level safety action that assumes the child may have been
+compromised or misbehaving.
+A completed child's grants are only partially revoked because completion
+is a normal, expected outcome and the child's derived grants (grants
+obtained during execution that were not part of the original grant scope)
+should be revoked, but the child's original inherited grants should
+remain available for the child's parent.
+This is consistent with the grant scope attenuation model defined in
+[Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md).
+
+### Cross-reference summary
+
+> **Normative definition.**
+The behavior and integration defined in this section integrate with the
+following existing chapters:
+
+1. **Monitor subscriptions**: Subscription admission is governed by
+   the atomic commit protocol defined in
+   [Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md).
+   Subscription access control is governed by the capability model
+   defined in
+   [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md).
+   Subscription delivery routes events to subscriber mailboxes as
+   defined in
+   [Mailboxes Ordering Bounds Fairness And Turn Leases](21-mailboxes-ordering-bounds-fairness-and-turn-leases.md).
+2. **Restart policies**: The `bounded-retry` backoff schedule is
+   implemented by the host's scheduler as defined in
+   [Single-Agent Host Flow And Milestone Acceptance](24-single-agent-host-flow-and-milestone-acceptance.md).
+   The `operator-approved` operator notification is delivered via the
+   signal ingress mechanism defined in
+   [Sensors Schedules Timers And External Signal Ingress](23-sensors-schedules-timers-and-external-signal-ingress.md).
+   Restart policy selection is recorded as evidence in the format
+   defined in
+   [Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md).
+3. **Failure scenarios**: Create/terminate race address reservation
+   is enforced by the agent registry defined in
+   [Agent Registry Activation Cancellation And Completion](22-agent-registry-activation-cancellation-and-completion.md).
+   Parent loss orphan detection is performed by the lifecycle monitor
+   as defined in
+   [Agent Registry Activation Cancellation And Completion](22-agent-registry-activation-cancellation-and-completion.md).
+   Initialization failure timeout is bounded by the turn lease limits
+   defined in
+   [Mailboxes Ordering Bounds Fairness And Turn Leases](21-mailboxes-ordering-bounds-fairness-and-turn-leases.md).
+   Duplicate event detection uses the sequence number model defined in
+   [Signal Envelopes Causality Routing And Delivery](10-signals-causality-routing-and-delivery.md).
+   Grant revocation is enforced by the capability policy engine as
+   defined in
+   [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md).
+
+> **Non-normative note.**
+The nine integration points above demonstrate that behavior and integration
+is the connective tissue between the contract and data model (section 36.1)
+and the operational evidence and failure diagnostics (section 36.3).
+Every subsystem that interacts with child lifecycle events must be
+aware of the subscription model, restart policy semantics, and failure
+scenario invariants defined in this section.
+
 > **Normative definition.**
 When this section and another section of this specification appear to
 conflict on a behavior question, the following precedence rules apply:
+
+1. For monitor subscription lifecycle: this section takes precedence
+   over
+   [Mailboxes Ordering Bounds Fairness And Turn Leases](21-mailboxes-ordering-bounds-fairness-and-turn-leases.md)
+   for questions of subscription delivery timing and duplicate handling.
+2. For restart policy evaluation: this section takes precedence over
+   [Retry Timer Recovery Replay Hibernate And Migration](28-retry-timer-recovery-replay-hibernate-and-migration.md)
+   for questions of child-specific restart semantics.
+3. For grant revocation scope: this section takes precedence over
+   [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md)
+   for questions of child-specific grant revocation behavior.
+4. For operator notification: this section takes precedence over
+   [Sensors Schedules Timers And External Signal Ingress](23-sensors-schedules-timers-and-external-signal-ingress.md)
+   for questions of operator approval notification content and timing.
+
+## Variability and limits
 
 1. For child address and relationship semantics: this section takes
    precedence over
@@ -542,6 +1114,15 @@ variability register.
 | 36.1 Hard-stop behavior | Normative implementation-defined choice | The snapshot capture granularity at hard stop: full memory snapshot, last-completed-turn snapshot, or partial-turn snapshot. Must be documented in the conformance profile. |
 | 36.1 Orphan detection | Normative implementation-defined choice | The interval at which the host's lifecycle monitor performs orphan detection. Must be at most 60 seconds and documented in the conformance profile. |
 | 36.1 Orphan detection | Normative implementation-defined choice | The resolution strategy for orphaned children whose lifecycle policy is `operator-approved` and no operator is available: hold indefinitely, terminate, or migrate to a default owner. Must be documented in the conformance profile. |
+| 36.2 Monitor subscriptions | Normative implementation-defined choice | The mechanism by which the host evaluates active subscriptions against emitted events (in-memory tables, subscription-aware event bus, or polling). Must be documented in the conformance profile. |
+| 36.2 Monitor subscriptions | Normative implementation-defined choice | The maximum number of active monitor subscriptions per subscriber. Must be at least 100 and documented in the conformance profile. |
+| 36.2 Monitor subscriptions | Normative implementation-defined choice | The retention period for closed monitor subscriptions in the durable subscription log. Must be at least 24 hours and documented in the conformance profile. |
+| 36.2 Restart policies | Normative implementation-defined choice | The default parameter values for the `bounded-retry` restart policy (max_attempts, initial_delay, max_delay, backoff_multiplier, restartable_failure_codes, non_restartable_failure_codes). Must be documented in the conformance profile. |
+| 36.2 Restart policies | Normative implementation-defined choice | The mechanism by which the host notifies the operator of a `suspended-pending-operator-approval` child (mailbox signal, webhook, email, dashboard flag). Must be documented in the conformance profile. |
+| 36.2 Restart policies | Normative implementation-defined choice | The maximum restart_nonce entropy (in bits) for operator-approved restart directives. Must be at least 128 bits and documented in the conformance profile. |
+| 36.2 Failure scenarios | Normative implementation-defined choice | The address reservation duration for create/terminate races, in seconds. Must be at least 30 seconds and documented in the conformance profile. |
+| 36.2 Failure scenarios | Normative implementation-defined choice | The bounded initialization timeout for child live actors, in seconds. Must be at least 60 seconds and documented in the conformance profile. |
+| 36.2 Failure scenarios | Normative implementation-defined choice | The periodic reminder interval for `operator-approved` children in `suspended-pending-operator-approval` status, in seconds. Must be at most 3600 seconds (1 hour) and documented in the conformance profile. |
 
 ### Implementation limits
 
@@ -555,6 +1136,9 @@ variability register.
   [Signal Envelopes Causality Routing And Delivery](10-signals-causality-routing-and-delivery.md). |
 | Maximum cancellation reason message length | 1024 characters | Human-readable message field. |
 | Maximum grant revocation scope list | Unbounded by default | Hosts MAY impose local limits through policy. |
+| Maximum active monitor subscriptions per subscriber | 100 | Consistent with mailbox turn lease limits. |
+| Maximum operator restart_nonce entropy | 128 bits | Prevents replay attacks. |
+| Maximum subscription closed-log retention | Unbounded by default | Hosts MAY impose local limits; must be at least 24 hours. |
 
 ### Permitted variations
 
