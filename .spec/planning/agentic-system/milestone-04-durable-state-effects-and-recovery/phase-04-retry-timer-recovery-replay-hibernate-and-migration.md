@@ -2,7 +2,7 @@
 
 Back to milestone: [README](./README.md)
 
-- [ ] 4 Phase - Make delayed work, runtime deactivation, state reconstruction, and schema evolution explicit durable operations.
+- [x] 4 Phase - Make delayed work, runtime deactivation, state reconstruction, and schema evolution explicit durable operations.
 
   This phase is complete only when its contracts, behavior, failure semantics,
   and integration evidence are reviewable without relying on a host-language
