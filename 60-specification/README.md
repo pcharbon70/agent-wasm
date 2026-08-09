@@ -65,6 +65,7 @@ themselves.
 - [Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md) — Phase 5 of Milestone 5; establishes the contract and data model for artifact provenance admission, host-owned evidence recording, and evidence redaction that form the security gate for milestone acceptance.
 - [Agent Identity Addressing Ownership And Dependency Relations](35-agent-identity-addressing-ownership-and-dependency-relations.md) — Phase 1 of Milestone 6; defines tenant-qualified agent addresses, relationship types, creation authority, lifecycle, cardinality, visibility, and signal provenance that remain valid across agent migration and lifecycle changes.
 - [Child Lifecycle Cancellation Monitoring And Restart Policy Contract And Data Model](36-child-lifecycle-cancellation-monitoring-and-restart-policy.md) — Phase 2 of Milestone 6; establishes the contract and data model for host-owned child agent spawning, lifecycle event observability, cancellation propagation, and restart policy selection.
+- [Fan-Out Fan-In Delegation And Result Aggregation Contract And Data Model](37-fan-out-fan-in-delegation-and-result-aggregation-contract-and-data-model.md) — Phase 3 of Milestone 6; establishes the contract and data model for coordinating parallel child work through durable directives and deterministic aggregation rather than shared mutable guest state.
 
 ## Maintaining this index
 
