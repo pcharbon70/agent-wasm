@@ -225,23 +225,39 @@ leases are defined as follows:
 | Evidence type | Description |
 |---------------|-------------|
 | `thread.created` | Emitted when a thread is created. |
+| `thread.archived` | Emitted when a thread is archived. |
 | `thread.deleted` | Emitted when a thread is deleted. |
+| `thread.message_added` | Emitted when a message is added to a thread. |
+| `thread.participant_added` | Emitted when a participant is added to a thread. |
+| `thread.participant_left` | Emitted when a participant leaves a thread. |
 | `checkpoint.created` | Emitted when a checkpoint is created. |
+| `checkpoint.archived` | Emitted when a checkpoint is archived. |
 | `checkpoint.restored` | Emitted when a checkpoint is restored. |
+| `checkpoint.deleted` | Emitted when a checkpoint is deleted. |
 | `memory.created` | Emitted when memory is created. |
+| `memory.archived` | Emitted when memory is archived. |
 | `memory.promoted` | Emitted when memory is promoted. |
 | `memory.deleted` | Emitted when memory is deleted. |
 | `approval.requested` | Emitted when an approval is requested. |
-| `approval.decided` | Emitted when an approval is decided. |
+| `approval.approved` | Emitted when an approval is approved. |
+| `approval.rejected` | Emitted when an approval is rejected. |
+| `approval.modified` | Emitted when an approval is modified. |
+| `approval.delegated` | Emitted when an approval is delegated. |
 | `approval.expired` | Emitted when an approval expires. |
+| `approval.cancelled` | Emitted when an approval is cancelled. |
 | `quota.reserved` | Emitted when quota is reserved. |
 | `quota.consumed` | Emitted when quota is consumed. |
 | `quota.released` | Emitted when quota is released. |
 | `quota.reconciled` | Emitted when quota is reconciled. |
+| `quota.exhausted` | Emitted when quota is exhausted. |
+| `quota.suspended` | Emitted when quota is suspended. |
+| `quota.deleted` | Emitted when quota is deleted. |
 | `lease.created` | Emitted when a secret lease is created. |
 | `lease.accessed` | Emitted when a secret lease is accessed. |
 | `lease.renewed` | Emitted when a secret lease is renewed. |
+| `lease.expired` | Emitted when a secret lease expires. |
 | `lease.revoked` | Emitted when a secret lease is revoked. |
+| `lease.deleted` | Emitted when a secret lease is deleted. |
 
 > **Normative definition.**
 Evidence MUST be bounded. It MUST NOT expose:

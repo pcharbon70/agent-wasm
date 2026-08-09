@@ -199,7 +199,41 @@ Quota windows are defined as follows:
 When a quota is exhausted, the host MUST:
 1. Mark the quota as `exhausted`.
 2. Emit a `quota.exhausted` diagnostic.
-3. Reject further reservations or consumption (unless burst allowance is configured).
+3. Emit a `quota.exhausted` evidence entry.
+4. Reject further reservations or consumption (unless burst allowance is configured).
+
+> **Normative definition.**
+When a quota is suspended, the host MUST:
+1. Mark the quota as `suspended`.
+2. Emit a `quota.suspended` evidence entry.
+3. Reject further reservations or consumption.
+
+> **Normative definition.**
+When a quota is deleted, the host MUST:
+1. Mark the quota as `deleted`.
+2. Emit a `quota.deleted` evidence entry.
+3. Invalidate any active reservations.
+
+> **Normative definition.**
+When a thread is archived, the host MUST emit a `thread.archived` evidence entry.
+
+> **Normative definition.**
+When a message is added to a thread, the host MUST emit a `thread.message_added` evidence entry.
+
+> **Normative definition.**
+When a participant is added to a thread, the host MUST emit a `thread.participant_added` evidence entry.
+
+> **Normative definition.**
+When a participant leaves a thread, the host MUST emit a `thread.participant_left` evidence entry.
+
+> **Normative definition.**
+When a checkpoint is archived, the host MUST emit a `checkpoint.archived` evidence entry.
+
+> **Normative definition.**
+When a checkpoint is deleted, the host MUST emit a `checkpoint.deleted` evidence entry.
+
+> **Normative definition.**
+When memory is archived, the host MUST emit a `memory.archived` evidence entry.
 
 > **Normative definition.**
 The host MUST perform periodic reconciliation of quota usage.
@@ -259,8 +293,16 @@ When a secret lease is revoked, the host MUST:
 When a secret lease expires, the host MUST:
 1. Mark the lease as `expired`.
 2. Invalidate any active access using the lease.
-3. Emit a `secret.lease_expired` diagnostic.
-4. Log the expiry for audit.
+3. Emit a `lease.expired` diagnostic.
+4. Emit a `lease.expired` evidence entry.
+5. Log the expiry for audit.
+
+> **Normative definition.**
+When a secret lease is deleted, the host MUST:
+1. Mark the lease as `deleted`.
+2. Invalidate any active access using the lease.
+3. Emit a `lease.deleted` evidence entry.
+4. Log the deletion for audit.
 
 ## Variability register
 

@@ -121,8 +121,20 @@ The following tests verify evidence retention:
 | Test ID | Description | Expected outcome |
 |---------|-------------|------------------|
 | `evidence-thread-created` | Verify evidence is emitted when a thread is created. | `thread.created` evidence is emitted. |
+| `evidence-thread-archived` | Verify evidence is emitted when a thread is archived. | `thread.archived` evidence is emitted. |
+| `evidence-thread-message-added` | Verify evidence is emitted when a message is added. | `thread.message_added` evidence is emitted. |
 | `evidence-checkpoint-created` | Verify evidence is emitted when a checkpoint is created. | `checkpoint.created` evidence is emitted. |
+| `evidence-checkpoint-restored` | Verify evidence is emitted when a checkpoint is restored. | `checkpoint.restored` evidence is emitted. |
+| `evidence-memory-created` | Verify evidence is emitted when memory is created. | `memory.created` evidence is emitted. |
+| `evidence-memory-promoted` | Verify evidence is emitted when memory is promoted. | `memory.promoted` evidence is emitted. |
+| `evidence-approval-requested` | Verify evidence is emitted when an approval is requested. | `approval.requested` evidence is emitted. |
+| `evidence-approval-approved` | Verify evidence is emitted when an approval is approved. | `approval.approved` evidence is emitted. |
+| `evidence-approval-rejected` | Verify evidence is emitted when an approval is rejected. | `approval.rejected` evidence is emitted. |
 | `evidence-quota-reserved` | Verify evidence is emitted when quota is reserved. | `quota.reserved` evidence is emitted. |
+| `evidence-quota-consumed` | Verify evidence is emitted when quota is consumed. | `quota.consumed` evidence is emitted. |
+| `evidence-quota-exhausted` | Verify evidence is emitted when quota is exhausted. | `quota.exhausted` evidence is emitted. |
+| `evidence-lease-created` | Verify evidence is emitted when a lease is created. | `lease.created` evidence is emitted. |
+| `evidence-lease-revoked` | Verify evidence is emitted when a lease is revoked. | `lease.revoked` evidence is emitted. |
 
 ### Failure handling tests
 

@@ -49,13 +49,25 @@ checkpoints, memory, approvals, quotas, and secret leases.
 | `quota-reserve-success` | Reserve quota. | Quota is reserved and usage is updated. |
 | `lease-create-success` | Create a secret lease. | Lease is created with status `active`. |
 
-**Evidence retention tests (3 tests):**
+**Evidence retention tests (15 tests):**
 
 | Test ID | Description | Expected outcome |
 |---------|-------------|------------------|
 | `evidence-thread-created` | Verify evidence is emitted when a thread is created. | `thread.created` evidence is emitted. |
+| `evidence-thread-archived` | Verify evidence is emitted when a thread is archived. | `thread.archived` evidence is emitted. |
+| `evidence-thread-message-added` | Verify evidence is emitted when a message is added. | `thread.message_added` evidence is emitted. |
 | `evidence-checkpoint-created` | Verify evidence is emitted when a checkpoint is created. | `checkpoint.created` evidence is emitted. |
+| `evidence-checkpoint-restored` | Verify evidence is emitted when a checkpoint is restored. | `checkpoint.restored` evidence is emitted. |
+| `evidence-memory-created` | Verify evidence is emitted when memory is created. | `memory.created` evidence is emitted. |
+| `evidence-memory-promoted` | Verify evidence is emitted when memory is promoted. | `memory.promoted` evidence is emitted. |
+| `evidence-approval-requested` | Verify evidence is emitted when an approval is requested. | `approval.requested` evidence is emitted. |
+| `evidence-approval-approved` | Verify evidence is emitted when an approval is approved. | `approval.approved` evidence is emitted. |
+| `evidence-approval-rejected` | Verify evidence is emitted when an approval is rejected. | `approval.rejected` evidence is emitted. |
 | `evidence-quota-reserved` | Verify evidence is emitted when quota is reserved. | `quota.reserved` evidence is emitted. |
+| `evidence-quota-consumed` | Verify evidence is emitted when quota is consumed. | `quota.consumed` evidence is emitted. |
+| `evidence-quota-exhausted` | Verify evidence is emitted when quota is exhausted. | `quota.exhausted` evidence is emitted. |
+| `evidence-lease-created` | Verify evidence is emitted when a lease is created. | `lease.created` evidence is emitted. |
+| `evidence-lease-revoked` | Verify evidence is emitted when a lease is revoked. | `lease.revoked` evidence is emitted. |
 
 ### Subtask 4.4.1.2 - Failure handling
 
@@ -235,13 +247,13 @@ No regressions were identified in earlier milestone fixtures.
 
 ### Earlier chapters
 
-- [44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md](../60-specification/44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md)
-- [44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-behavior-and-integration.md](../60-specification/44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-behavior-and-integration.md)
-- [44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-failure-evidence-and-operational-notes.md](../60-specification/44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-failure-evidence-and-operational-notes.md)
-
-### Related chapters
-
 - [25-revisioned-snapshots-journals-history-and-storage-contracts.md](../60-specification/25-revisioned-snapshots-journals-history-and-storage-contracts.md)
 - [30-threat-model-principals-trust-classes-and-grant-vocabulary.md](../60-specification/30-threat-model-principals-trust-classes-and-grant-vocabulary.md)
 - [31-capability-policy-attenuation-limits-and-enforcement.md](../60-specification/31-capability-policy-attenuation-limits-and-enforcement.md)
 - [34-provenance-signing-audit-security-and-milestone-acceptance.md](../60-specification/34-provenance-signing-audit-security-and-milestone-acceptance.md)
+
+### Related chapters (Phase 4)
+
+- [44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md](../60-specification/44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md)
+- [44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-behavior-and-integration.md](../60-specification/44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-behavior-and-integration.md)
+- [44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-failure-evidence-and-operational-notes.md](../60-specification/44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-failure-evidence-and-operational-notes.md)
