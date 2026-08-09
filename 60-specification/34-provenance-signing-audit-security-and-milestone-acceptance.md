@@ -1212,20 +1212,27 @@ The objectives below are exhaustive for Phase 5 integration evidence.
    and boundary-limit inputs produce stable, bounded diagnostics and
    leave no unauthorized residue, as defined in
    [Failure Evidence And Operational Notes](#53-failure-evidence-and-operational-notes).
-3. **Adversarial isolation**: Malicious imports, forged identity,
-   stale grants, and audit tampering attempts are detected and
-   rejected, as defined in
+3. **Admission verification**: Every admission check defined in
    [Artifact admission verification](#artifact-admission-verification)
-   and
-   [Evidence recording](#host-owned-evidence-recording).
-4. **Redaction correctness**: Constrained-mode queries return correctly
-   redacted evidence that preserves field semantics without leaking
-   sensitive data, as defined in
-   [Evidence redaction](#evidence-redaction).
+   is exercised individually and as a combined gate, verifying that
+   a single check failure is sufficient to reject an artifact and
+   that all checks produce the correct diagnostic.
+4. **Evidence integrity**: Every evidence invariant defined in
+   [Host-owned evidence recording](#host-owned-evidence-recording)
+   is exercised, including immutability, retention, audit logging,
+   and integrity checking under both normal and adversarial conditions.
+5. **Adversarial resilience**: All six security exercise attack vectors
+   and all six adversarial isolation exercise attack vectors defined in
+   [Security exercises](#security-exercises) and
+   [Adversarial isolation exercises](#adversarial-isolation-exercises)
+   are simulated and verified to be detected and rejected.
 
 > **Non-normative note.**
-These four objectives correspond directly to the four subtasks of the
-Phase 5 integration test section defined in the planning document.
+These five objectives correspond to the subtasks of the Phase 5
+integration test section defined in the planning document, with
+objective 5 decomposed into the 12 exercise scenarios (7 security
++ 6 adversarial isolation, with output injection tested under
+objective 5 rather than duplicated).
 Each objective produces its own evidence bundle; the bundles are
 assembled together to satisfy the phase promotion criterion defined in
 this chapter's Status And Authority section.
@@ -1337,35 +1344,76 @@ produces a stable diagnostic and leaves no unauthorized state.
 
 ### Adversarial isolation tests
 
-> **Non-normative note.**
+> **Normative definition.**
 The adversarial isolation tests exercise the specific attack vectors
 listed in the Phase 5 planning document's behavior and integration
-subtasks.
+subtasks and defined in
+[Security exercises](#security-exercises) and
+[Adversarial isolation exercises](#adversarial-isolation-exercises)
+of this chapter.
 Each test simulates a deliberate attack and verifies that the system
 detects and rejects it.
+All 12 exercises (7 security + 6 adversarial isolation) MUST be
+executed; a single failed exercise blocks phase promotion.
 
-1. **Forged identity**: Submit an artifact with a signature produced
-   by a key that the operator attempts to impersonate as a trusted
-   publisher.
+#### Security exercise tests
+
+1. **Malicious imports**: Submit an artifact whose imports violate
+   the capability policy defined in
+   [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md).
+   The host MUST reject at admission with
+   `artifact.dependency-unresolved` or `artifact.signature-invalid`.
+2. **Oversized output**: Submit an artifact whose invocation output
+   exceeds the output size limit and verify that the host truncates
+   or rejects and records `invocation.failed` with `failure_type:
+   output-oversize`.
+3. **Invalid UTF-8**: Submit an artifact whose invocation output
+   contains invalid UTF-8 in a declared UTF-8 field and verify the
+   `invocation.failed` diagnostic with `failure_type: invalid-utf8`.
+4. **Forged identity**: Submit an artifact with a signature produced
+   by a key that impersonates a trusted publisher.
    The host MUST reject with `artifact.signature-invalid` or
    `artifact.publisher-untrusted`.
-2. **Stale grant**: Submit an artifact whose publisher was revoked
+5. **Stale grant**: Submit an artifact whose publisher was revoked
    between the artifact's build and its admission attempt.
    The host MUST reject with `artifact.revoked`.
-3. **Dependency poisoning**: Submit an artifact whose dependency
-   graph includes a dependency that resolves to a malicious artifact.
-   The host MUST reject with `artifact.dependency-unresolved`.
-4. **Audit tampering**: Modify an evidence record after writing and
-   verify the `evidence.integrity-violation` diagnostic and the
-   security alert path.
-5. **Redaction bypass**: Attempt to access unredacted secrets or
-   tenant-sensitive data through a constrained-mode query as a
-   non-operator consumer.
-   The host MUST redact the data per the access matrix.
-6. **Output injection**: Attempt to inject tenant-specific data into
+6. **Route confusion**: Submit an artifact that attempts to exploit
+   ambiguous routing between agent, tenant, and system invocation
+   paths to obtain unauthorized capabilities.
+   The host MUST deny the grant and record `tenant.isolation.violation`.
+7. **Output injection**: Attempt to inject tenant-specific data into
    another tenant's evidence records through a shared artifact.
    The host MUST isolate evidence records by tenant and reject
-   cross-tenant writes.
+   cross-tenant writes with `tenant.isolation.violation`.
+
+#### Adversarial isolation exercise tests
+
+1. **Tenant residue**: Run an invocation by Tenant A, then verify
+   that no state remains in Tenant B's scope.
+   If residue is detected, the host MUST emit `residue.detected`
+   and quarantine the instance.
+2. **Pool reset**: Run an invocation that leaves state in a pooled
+   instance, reset the instance, and verify that no state remains.
+   If residue is detected post-reset, the host MUST emit
+   `residue.detected` and quarantine the instance.
+3. **Cancellation races**: Trigger an invocation cancellation while
+   the artifact is committing state and verify that partial state
+   is rolled back.
+   If partial state remains, the host MUST emit `residue.detected`.
+4. **Capability revocation**: Revoke a capability grant mid-invocation
+   and verify that the instance immediately loses access to the
+   revoked capability.
+   If the instance retains access, the host MUST emit
+   `tenant.isolation.violation`.
+5. **Compromised plugin upgrade**: Replace a trusted plugin in an
+   agent's pin with an unverified copy without going through the
+   admission flow.
+   The host MUST reject with `artifact.admission.failed` and require
+   full re-admission.
+6. **Audit tampering**: Modify an evidence record after writing and
+   verify the `evidence.integrity-violation` diagnostic and the
+   security alert path.
+   If tampering is not detected, the exercise fails.
 
 ### Boundary and limit tests
 
@@ -1385,6 +1433,140 @@ limits defined in this chapter and in related chapters.
 4. **Redaction policy churn**: Apply many redaction policy changes in
    rapid succession and verify that cache invalidation keeps pace
    and no stale redacted views are served.
+
+### Cross-milestone compatibility tests
+
+> **Normative definition.**
+Cross-milestone compatibility tests verify that the Phase 5 artifact
+provenance, evidence, and redaction systems do not regress the
+behavior established by earlier milestones.
+These tests run the fixtures from each earlier milestone against the
+Phase 5 implementation and verify that no previously passing behavior
+is broken.
+Cross-milestone compatibility tests are a gating requirement for
+milestone acceptance; a regression in an earlier milestone's fixture
+blocks Phase 5 promotion unless the regression is documented and
+approved as an accepted variability in the
+[Variability register](#variability-register).
+
+1. **Milestone 1 fixtures**: Run all Milestone 1 fixtures that exercise
+   artifact loading and guest module instantiation.
+   Phase 5 MUST NOT break the basic artifact loading flow; the
+   admission gate MUST be transparent to fixtures that pre-date the
+   provenance system.
+2. **Milestone 2 fixtures**: Run all Milestone 2 fixtures that exercise
+   the host flow, agent activation, and directive processing.
+   Phase 5 MUST NOT alter the host flow's observable behavior for
+   admitted artifacts; the provenance gate is additive, not
+   substitutive.
+3. **Milestone 3 fixtures**: Run all Milestone 3 fixtures that exercise
+   capability grants, policy attenuation, and tenant isolation.
+   Phase 5 MUST preserve the capability grant policy's semantics;
+   the admission gate does not alter grant evaluation.
+4. **Milestone 4 fixtures**: Run all Milestone 4 fixtures that exercise
+   the atomic state journal, directive-outbox commits, and effect
+   handlers.
+   Phase 5 MUST preserve the atomicity invariants; evidence recording
+   MUST NOT interfere with journal commits or outbox delivery.
+5. **Milestone 5 partial fixtures**: Run the Milestone 5 fixtures
+   established by earlier phases (threat model, capability policy,
+   plugin manifests, host functions) that are not part of Phase 5's
+   own scope.
+   Phase 5 MUST NOT break the behavior established by those earlier
+   phases; the provenance and evidence systems are built on top of
+   them, not in place of them.
+
+> **Non-normative note.**
+Cross-milestone compatibility tests are a defense against specification
+creep and implementation drift.
+Without them, each new phase could inadvertently change the behavior
+of earlier phases without anyone noticing until a later integration
+test catches the regression.
+The fixtures from earlier milestones serve as a regression baseline;
+any deviation from the baseline is a regression that must be resolved
+or documented as an accepted variability.
+
+> **Normative definition.**
+A cross-milestone compatibility test failure is a regression.
+A regression MUST be resolved by either (a) fixing the Phase 5
+implementation to preserve the earlier milestone's behavior, or
+(b) revising the earlier milestone's fixture to account for the
+legitimate behavioral change introduced by Phase 5.
+A regression that is resolved by revision must be documented in the
+phase's journal evidence with a rationale explaining why the revision
+is correct.
+A regression that is not resolved blocks phase promotion.
+
+### Integration test evidence requirements
+
+> **Normative definition.**
+Integration test evidence requirements define the artifacts that must
+be produced by the Phase 5 integration tests to demonstrate that the
+security gate is ready for milestone acceptance.
+The evidence requirements below are exhaustive; producing all of them
+is a gating requirement for phase promotion.
+
+#### Security gate readiness evidence
+
+1. **Test execution log**: A timestamped log of every integration
+   test executed, including the test name, input, expected output,
+   actual output, and pass/fail result.
+2. **Evidence record audit**: A dump of every evidence record created
+   during the integration tests, verifying that the expected evidence
+   types were created and that no unexpected evidence types were
+   created.
+3. **Redaction verification**: A side-by-side comparison of operator-
+   mode and constrained-mode query results for a representative set
+   of evidence records, verifying that redaction is applied correctly
+   and that no sensitive data leaks through the redaction layer.
+4. **Adversarial test results**: The pass/fail status of every one of
+   the 12 adversarial exercise tests, with diagnostic output for any
+   failed test.
+5. **Cross-milestone regression report**: The pass/fail status of every
+   cross-milestone compatibility test, with a report of any regressions
+   and their resolution status.
+
+#### Threat-to-control matrix acceptance
+
+> **Normative definition.**
+The threat-to-control matrix produced during Phase 5 (see
+[Threat-to-control matrix publication](#threat-to-control-matrix-publication))
+must be validated against the integration test evidence.
+The validation verifies that every threat identified in the matrix
+has a corresponding adversarial test that passed, and that every
+control identified in the matrix has a corresponding test that
+demonstrated its effectiveness.
+
+1. **Threat coverage**: Every threat in the matrix MUST have at least
+   one adversarial test that exercises it.
+   A threat without a corresponding test is a gap in the security
+   review and blocks milestone acceptance.
+2. **Control effectiveness**: Every control in the matrix with
+   `residual_risk: mitigated` or `residual_risk: accepted` MUST have
+   a corresponding test that demonstrates the control's effectiveness.
+   A control without a corresponding test is unvalidated and blocks
+   milestone acceptance.
+3. **Test result consistency**: The `adversarial_test_result` field
+   for each threat-control pair in the matrix MUST match the actual
+   test result from the integration tests.
+   A mismatch is a documentation error and blocks milestone acceptance
+   until resolved.
+4. **Residual risk validation**: Every threat with
+   `residual_risk: accepted` MUST have a `residual_risk_rationale`
+   that references specific test evidence demonstrating why the
+   residual risk is acceptable.
+   A rationale without supporting evidence is incomplete and blocks
+   milestone acceptance.
+
+> **Non-normative note.**
+The threat-to-control matrix acceptance checks ensure that the matrix
+is not just a document but a validated artifact that accurately
+reflects the security posture of the implementation.
+Without these checks, the matrix could be stale, incomplete, or
+optimistic, providing a false sense of security to the milestone
+acceptance reviewers.
+The validation is a formality that prevents the matrix from becoming
+a paper exercise.
 
 ## Variability register
 
