@@ -57,6 +57,7 @@ themselves.
 - [Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md) — Phase 2 of Milestone 4; closes the crash gap between accepting a state transition and making its external requests durable.
 - [Effect Handlers Attempts Idempotency And Result Signals](27-effect-handlers-attempts-idempotency-and-result-signals.md) — Phase 3 of Milestone 4; interprets committed directives through typed handlers while retaining every attempt and returning results as new signals.
 - [Retry Timer Recovery Replay Hibernate And Migration](28-retry-timer-recovery-replay-hibernate-and-migration.md) — Phase 4 of Milestone 4; makes delayed work, runtime deactivation, state reconstruction, and schema evolution explicit durable operations.
+- [Crash Injection Durable Effects And Milestone Acceptance](29-crash-injection-durable-effects-and-milestone-acceptance.md) — Phase 5 of Milestone 4; proves state/effect invariants at every commit, dispatch, external-success, acknowledgement, and result-ingress boundary.
 
 ## Maintaining this index
 
