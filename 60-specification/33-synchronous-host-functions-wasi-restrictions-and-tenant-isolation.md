@@ -136,10 +136,11 @@ HostFunctionBounds {
   max_duration_ms: u64,
   max_memory_bytes: u64,
   max_recursive_calls: u32,
-  max_native_alloc_bytes: u64?
+  max_native_alloc_bytes: u64
 }
 
 CancellationFrequency = "every-iteration" | "every-N-calls" | "every-N-bytes"
+N: u32, N >= 1
 RetrySemantics = "idempotent" | "structured-partial"
 FunctionNamespace = "builtin" | "application"
 TenantIsolationMode = "tenant-scoped" | "shared"
@@ -147,6 +148,15 @@ TenantIsolationMode = "tenant-scoped" | "shared"
 
 Every eligible synchronous host function MUST be registered in the
 host's capability registry with the record defined above.
+
+> **Normative definition.**
+The `requested_grants` field is optional.
+When `requested_grants` is absent or empty, the function requires no
+additional grants beyond the base capability grant.
+The host MUST still filter host functions by grants as defined in the
+grants filtering variability item.
+An absent or empty `requested_grants` list means "no grants required"
+and does not trigger a grant-missing diagnostic.
 
 > **Normative definition.**
 The `bounds` field is authoritative.
@@ -446,6 +456,13 @@ The error codes for this section follow the naming convention
 `host-function.<subtype>` for function-level failures and
 `wasi.<subtype>` for WASI-level failures.
 
+> **Normative definition.**
+Error codes defined in [Failure Evidence And Operational Notes](#43-failure-evidence-and-operational-notes)
+use the naming convention `phase4.<failure-outcome>.<subtype>`. These codes
+are aliases or more specific variants of the codes defined in this section.
+When both conventions apply to the same failure, the `phase4.<subtype>`
+convention takes precedence for diagnostic stability across phases.
+
 ## 4.2 Behavior And Integration
 
 ### Invocation context binding
@@ -542,7 +559,7 @@ memory, their state, and their WASI bindings.
 |------|--------|-------|---------------|-------|
 | `fresh` | New allocation | New, empty | Re-evaluated from capability record | Never reused |
 | `reset` | New allocation | New, empty | Re-evaluated from capability record | Reused after reset |
-| `pooled` | Shared region | Shared, isolated | Re-evaluated from capability record | Shared across tenants per pool |
+| `pooled` | Per-instance (policy-gated sharing) | Shared, isolated | Re-evaluated from capability record | Shared across tenants per pool |
 | `agent-pinned` | New allocation | New per agent | Re-evaluated from capability record | Pinned to one agent |
 
 > **Normative definition.**
@@ -1389,6 +1406,15 @@ Phase 4:
 6. **Milestone 5 Phase 3** - Capability policy attenuation, limits,
    and enforcement: Verify that Phase 4 capability grants are
    properly attenuated by the capability policy.
+
+> **Non-normative note.**
+Milestone 2 (Actions, Instructions, Validation, Plans, and Results) is
+not listed because its fixtures do not exercise the synchronous host
+function surface, WASI, or tenant isolation.
+Milestone 2 focuses on action resolution and validation plans, which
+are independent of the synchronous import surface defined in Phase 4.
+If Milestone 2 fixtures are later extended to exercise host functions,
+they MUST be added to this list.
 
 #### Regression and variability recording
 
