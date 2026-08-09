@@ -1378,3 +1378,591 @@ If any result from Phase 2 invalidates an earlier milestone assumption, the
 affected milestone MUST be revised and re-validated.
 This is consistent with the cross-milestone revision protocol defined in
 [Specification Authority](../SPECIFICATION-AUTHORITY.md).
+
+## 36.4 Phase 2 Integration Tests
+
+### Test objectives
+
+> **Normative definition.**
+Phase 2 integration tests verify that the contracts defined in sections 36.1, 36.2,
+and 36.3 of this chapter operate correctly when exercised against the real
+dependency boundaries of the multi-agent coordination subsystem.
+Integration tests MUST exercise observable contracts rather than private
+implementation structure.
+This section defines the canonical test scenarios that MUST be run before
+this chapter may be promoted from `status: draft` to `status: normative`.
+
+> **Normative definition.**
+The following test objectives are the normative goals for Phase 2 integration
+testing.
+Every test scenario defined in this section maps to at least one of these
+objectives.
+
+| Objective | Description |
+|-----------|-------------|
+| Canonical flow | The host correctly executes the full child lifecycle from creation through terminal status under normal conditions. |
+| Failure handling | The host correctly rejects malformed, incompatible, stale, duplicate, and boundary-limit inputs with stable diagnostics. |
+| Lifecycle enforcement | The host correctly applies restart policies, monitors subscriptions, and lifecycle transitions under all conditions. |
+| Cancellation propagation | The host correctly propagates cancellations, handles acknowledgements, and escalates to hard stop when required. |
+| Restart policy enforcement | The host correctly enforces all four restart policies including never, bounded-retry, infrastructure-failure, and operator-approved. |
+| Cross-milestone compatibility | Earlier milestone fixtures continue to pass when the Phase 2 contracts are active. |
+
+> **Non-normative note.**
+These six objectives cover the full scope of the Phase 2 integration surface.
+A host implementation that passes all test scenarios defined below demonstrates
+conformance with this chapter's normative behavior under both normal and
+adversarial conditions.
+Promotion to `status: normative` requires evidence of a passing run of all
+scenarios in this section, recorded in the evidence log as defined in
+[Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md).
+
+### Successful flow tests
+
+> **Normative definition.**
+Successful flow tests verify that the host correctly executes the full child
+lifecycle under normal operating conditions.
+Each test scenario below describes the test setup, the expected observable
+behavior, and the retention requirements for test evidence.
+
+#### Child creation flow
+
+| Test ID | Description |
+|---------|-------------|
+| `P2-SF-001` | Create a child with a valid child-create directive and verify that all five atomic commit steps are executed (registry entry, parent/child relationships, directive journal entry, mailbox initialization, evidence emission). |
+| `P2-SF-002` | Create a child with a deterministic `directive_id` and verify that two identical directives produce the same `directive_id`. |
+| `P2-SF-003` | Create a child with all four restart policy types and verify that each policy is correctly recorded in the registry entry. |
+| `P2-SF-004` | Create a child with an attenuated grant scope and verify that the child's grants are strictly a subset of the parent's grants as defined in
+[Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md). |
+| `P2-SF-005` | Create a child with a valid `request_context` and verify that the context is recorded in the evidence emission. |
+
+> **Normative definition.**
+Test `P2-SF-001` is the primary creation test and MUST verify the complete
+atomic commit sequence defined in section 36.1.
+Each of the five steps MUST be observable as a separate entry in the
+durable state journal as defined in
+[Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md).
+
+> **Non-normative note.**
+Test `P2-SF-002` validates the determinism invariant of `directive_id`
+construction.
+This is a critical property for replay and deduplication.
+Without determinism, the same semantic directive could produce different
+identities on different hosts, breaking the durable journal replay
+guarantees defined in
+[Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md).
+
+#### Lifecycle progression flow
+
+| Test ID | Description |
+|---------|-------------|
+| `P2-SF-006` | Verify that a child transitions through the following lifecycle states in order: `pending`, `activated`, `initialized`, then `completed`, with each transition emitting the correct lifecycle event into the child's mailbox. |
+| `P2-SF-007` | Verify that each lifecycle event includes the required fields defined in section 36.1 and that the `sequence_number` is monotonically incremented. |
+| `P2-SF-008` | Verify that `child.lifecycle.accepted` is emitted before `child.lifecycle.activated` and that `child.lifecycle.activated` is emitted before `child.lifecycle.initialized`. |
+| `P2-SF-009` | Verify that `child.lifecycle.completed` includes a valid `completion_status` and `result_summary` populated by the child's live actor. |
+| `P2-SF-010` | Verify that `child.lifecycle.failed` is emitted with a valid `failure_code`, `failure_message`, and `snapshot_at_failure` when the child exits with an error. |
+
+> **Non-normative note.**
+The lifecycle ordering tests `P2-SF-006` through `P2-SF-008` validate the
+state machine transitions defined by the eight lifecycle event types.
+Test `P2-SF-010` exercises the failure path that is distinct from the
+cancellation and termination paths.
+These tests ensure that the child's live actor produces valid lifecycle
+events under both success and failure conditions.
+
+#### Monitor subscription flow
+
+| Test ID | Description |
+|---------|-------------|
+| `P2-SF-011` | Create a monitor subscription for a child's lifecycle events and verify that the subscriber receives a `child.lifecycle.observed` signal for every matching event. |
+| `P2-SF-012` | Create a monitor subscription with `event_types: all` and verify that the subscriber receives signals for all eight event types. |
+| `P2-SF-013` | Create a monitor subscription with a specific `event_types` subset and verify that the subscriber does NOT receive signals for events outside the subset. |
+| `P2-SF-014` | Create a monitor subscription with `target_child: null` and verify that the subscriber receives signals for all children of the subscriber's tenant. |
+| `P2-SF-015` | Delete a child and verify that the monitor subscription is automatically closed with a `subscription.closed` evidence record. |
+| `P2-SF-016` | Delete the subscriber agent and verify that all active subscriptions for that subscriber are automatically closed. |
+| `P2-SF-017` | Verify that a subscriber without the `observe.child.lifecycle` capability is rejected with the diagnostic `child.lifecycle.unauthorized`. |
+
+> **Non-normative note.**
+Tests `P2-SF-011` through `P2-SF-017` exercise the full monitor subscription
+lifecycle defined in section 36.2.
+The grant-based access control test `P2-SF-017` validates the security
+invariant that observation rights do not imply modification rights,
+consistent with the capability model defined in
+[Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md).
+
+#### Cancellation flow
+
+| Test ID | Description |
+|---------|-------------|
+| `P2-SF-018` | Issue a cancellation with `propagation_direction: top-down` and verify that the child acknowledges within the `deadline` and transitions to `cancelled` status. |
+| `P2-SF-019` | Issue a cancellation with `propagation_direction: bottom-up` initiated by the child and verify that the parent acknowledges and the child transitions to `cancelled` status. |
+| `P2-SF-020` | Issue a cancellation with `propagation_direction: bidirectional` for a subtree and verify that all children in the subtree acknowledge. |
+| `P2-SF-021` | Issue a cancellation with `grant_revocation_scope: all` and verify that all child grants are revoked. |
+| `P2-SF-022` | Issue a cancellation with `grant_revocation_scope: derived-only` and verify that only derived grants are revoked. |
+| `P2-SF-023` | Issue a cancellation with `grant_revocation_scope: none` and verify that no grants are revoked. |
+| `P2-SF-024` | Issue a cancellation with each of the eight reason codes and verify that the correct `child.lifecycle.cancelled` event is emitted. |
+
+> **Non-normative note.**
+Tests `P2-SF-018` through `P2-SF-024` exercise the full cancellation flow
+defined in section 36.1.
+The grant revocation scope tests `P2-SF-021` through `P2-SF-023` validate
+the differential revocation behavior that reflects the principle of
+least privilege as discussed in the grant revocation section.
+
+#### Restart policy flow
+
+| Test ID | Description |
+|---------|-------------|
+| `P2-SF-025` | Verify that a `never` policy child is terminated after its first non-graceful termination and is NEVER restarted by the host. |
+| `P2-SF-026` | Verify that a `bounded-retry` policy child is restarted the correct number of times with the correct exponential backoff schedule. |
+| `P2-SF-027` | Verify that a `bounded-retry` policy child with a non-restartable failure code is NOT restarted and transitions directly to terminal status. |
+| `P2-SF-028` | Verify that a `restart-on-infrastructure-failure` policy child is restarted for infrastructure failure reasons but NOT restarted for application-level failure reasons. |
+| `P2-SF-029` | Verify that an `operator-approved` policy child transitions to `suspended-pending-operator-approval` status and is restarted only after an explicit operator directive. |
+| `P2-SF-030` | Verify that an `operator-approved` policy child with a valid operator restart directive is restarted and that the `restart_nonce` prevents replay. |
+| `P2-SF-031` | Verify that a `bounded-retry` policy child that exhausts its restart budget transitions to `terminated-restart-exhausted` status and emits a `child.lifecycle.failed` event with reason code `restart-exhausted`. |
+
+> **Non-normative note.**
+Tests `P2-SF-025` through `P2-SF-031` exercise the full restart policy
+behavior defined in section 36.2.
+The nonce replay prevention test `P2-SF-030` validates the security
+invariant that prevents replay attacks on operator-approved restart
+directives.
+The restart exhaustion test `P2-SF-031` validates the terminal condition
+for `bounded-retry` children.
+
+### Failure handling tests
+
+> **Normative definition.**
+Failure handling tests verify that the host correctly rejects invalid inputs
+with stable diagnostics and without leaving unauthorized or partial state.
+Each test scenario below describes the invalid input, the expected diagnostic,
+and the state invariants that MUST hold after the failure.
+
+#### Malformed input tests
+
+| Test ID | Description | Expected diagnostic |
+|---------|-------------|---------------------|
+| `P2-FH-001` | Child-create directive with missing `artifact` field. | `child.create.malformed` |
+| `P2-FH-002` | Child-create directive with `artifact` field that is not a valid digest. | `child.create.malformed` |
+| `P2-FH-003` | Child-create directive with `initial_state` that is not valid JSON. | `child.create.malformed` |
+| `P2-FH-004` | Cancellation directive with missing `cancellation_id` field. | `child.cancellation.unavailable` |
+| `P2-FH-005` | Monitor subscription with `event_types` containing an unknown event type. | `child.lifecycle.unauthorized` |
+
+> **Normative definition.**
+Each malformed input test MUST verify that the host: (1) rejects the
+directive with the specified diagnostic, (2) does NOT create a partial
+registry entry or journal record, and (3) does NOT leave any live actor
+instance in an indeterminate state.
+
+> **Non-normative note.**
+The malformed input tests validate the schema validation layer that guards
+the atomic commit protocol.
+Without these tests, a malformed directive could cause inconsistent state
+or leave partial state in the durable journal, violating the atomicity
+guarantees defined in
+[Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md).
+
+#### Incompatible input tests
+
+| Test ID | Description | Expected diagnostic |
+|---------|-------------|---------------------|
+| `P2-FH-006` | Child-create directive with `lifecycle_policy` that does not name a defined policy. | `child.create.incompatible` |
+| `P2-FH-007` | Child-create directive with `manifest` digest that does not correspond to `artifact` digest. | `child.create.manifest-artifact-mismatch` |
+| `P2-FH-008` | Cancellation directive with `reason` code not in the cancellation reason taxonomy. | `child.cancellation.unauthorized` |
+
+> **Normative definition.**
+Each incompatible input test MUST verify that the host rejects the directive
+before entering the deterministic reducer and does NOT commit any state
+changes to the durable journal.
+
+> **Non-normative note.**
+The incompatible input tests validate the policy and schema conformance
+layer.
+Without these tests, a directive that is structurally valid but semantically
+incompatible could enter the reducer and produce unpredictable behavior.
+
+#### Stale input tests
+
+| Test ID | Description | Expected diagnostic |
+|---------|-------------|---------------------|
+| `P2-FH-009` | Child-create directive whose `owner` address resolves to a deleted or terminated agent. | `child.create.unauthorized` |
+| `P2-FH-010` | Cancellation directive whose `cancelling_principal` no longer has cancellation capability for the target child. | `child.cancellation.unauthorized` |
+| `P2-FH-011` | Restart directive whose `operator_address` no longer has operator approval capability. | `child.lifecycle.parent-loss.unauthorized` |
+
+> **Normative definition.**
+Each stale input test MUST verify that the host checks the current state
+of the durable registry (not a cached snapshot) before admitting the
+directive and rejects the directive if the principal is no longer valid.
+
+> **Non-normative note.**
+The stale input tests validate the principal resolution layer.
+Without these tests, a directive issued by a principal that was valid at
+the time the directive was composed but is no longer valid at the time
+of evaluation could be erroneously admitted, potentially bypassing
+security controls.
+
+#### Duplicate input tests
+
+| Test ID | Description | Expected diagnostic |
+|---------|-------------|---------------------|
+| `P2-FH-012` | Two child-create directives with the same `directive_id` submitted concurrently. | `child.create.duplicate-directive-id` for the second directive. |
+| `P2-FH-013` | Two monitor subscription requests for the same child and event set submitted concurrently. | `child.lifecycle.subscription.conflict` for the second request. |
+| `P2-FH-014` | Two cancellation directives for the same child submitted concurrently. | `child.cancellation.conflict` for the second directive. |
+
+> **Normative definition.**
+Each duplicate input test MUST verify that exactly one directive is admitted
+and the other is rejected with the specified diagnostic.
+The host MUST NOT admit both directives, even under high concurrency.
+
+> **Non-normative note.**
+The duplicate input tests validate the deduplication layer.
+Without these tests, concurrent duplicate directives could cause the host
+to create multiple live actor instances for the same child, leading to
+state corruption and resource leaks.
+
+#### Boundary-limit input tests
+
+| Test ID | Description | Expected behavior |
+|---------|-------------|-------------------|
+| `P2-FH-015` | Child-create directive with `initial_state` at the maximum payload size (64 KB). | Directive is admitted successfully if structurally valid. |
+| `P2-FH-016` | Child-create directive with `initial_state` exceeding the maximum payload size (64 KB). | Directive is rejected with `child.create.malformed`. |
+| `P2-FH-017` | Monitor subscription at the maximum active subscription limit (100 per subscriber). | Subscription is admitted successfully. |
+| `P2-FH-018` | Monitor subscription exceeding the maximum active subscription limit (101 per subscriber). | Subscription is rejected with `child.create.exhausted`. |
+| `P2-FH-019` | `bounded-retry` policy with `max_attempts` at the implementation-defined maximum. | Policy is applied correctly with the maximum number of restart attempts. |
+| `P2-FH-020` | Cancellation with `deadline` at the maximum allowed duration. | Cancellation is admitted and the deadline is enforced. |
+
+> **Normative definition.**
+Each boundary-limit input test MUST verify that the host correctly enforces
+the implementation limits defined in the "Implementation limits" table of
+this chapter without crashing, panicking, or producing undefined behavior.
+
+> **Non-normative note.**
+The boundary-limit input tests validate the capacity planning layer.
+Without these tests, an adversary could intentionally submit boundary-limit
+inputs to cause resource exhaustion, denial of service, or memory corruption.
+The limits defined in the implementation limits table are the minimum
+conformance requirements; implementations MAY enforce stricter limits.
+
+### Cancellation tests
+
+> **Normative definition.**
+Cancellation tests verify that the host correctly executes the cancellation
+flow including scope evaluation, propagation direction, acknowledgement
+handling, and hard-stop escalation.
+These tests exercise the interaction between the cancellation mechanism
+and the child's lifecycle state machine.
+
+#### Cancellation scope tests
+
+| Test ID | Description |
+|---------|-------------|
+| `P2-CT-001` | Issue a cancellation with `grant_revocation_scope: all` and verify that ALL grants associated with the child (both inherited and derived) are revoked. |
+| `P2-CT-002` | Issue a cancellation with `grant_revocation_scope: derived-only` and verify that only grants derived by the child during execution are revoked, while inherited grants remain available to the parent. |
+| `P2-CT-003` | Issue a cancellation with `grant_revocation_scope: none` and verify that NO grants are revoked. |
+| `P2-CT-004` | Verify that grant revocation is recorded in the evidence log with the correct `grant_revocation_scope`, `child_address`, and `cancellation_id`. |
+
+> **Non-normative note.**
+Tests `P2-CT-001` through `P2-CT-004` validate the differential grant
+revocation behavior defined in the grant revocation section.
+This behavior reflects the principle of least privilege and ensures that
+grant revocation is proportional to the lifecycle outcome.
+
+#### Cancellation propagation tests
+
+| Test ID | Description |
+|---------|-------------|
+| `P2-CT-005` | Issue a `top-down` cancellation from parent to child and verify that the child receives the `child.lifecycle.cancelled` event in its mailbox. |
+| `P2-CT-006` | Issue a `bottom-up` cancellation from child to parent and verify that the parent receives the acknowledgement signal. |
+| `P2-CT-007` | Issue a `bidirectional` cancellation for a subtree of children and verify that all children in the subtree receive the event and acknowledgements flow back to the cancelling principal. |
+| `P2-CT-008` | Verify that `propagation_direction` is recorded in the evidence log and can be correlated with the `cancellation_id`. |
+
+> **Non-normative note.**
+Tests `P2-CT-005` through `P2-CT-008` validate the propagation direction
+model defined in section 36.1.
+The bidirectional cancellation test `P2-CT-007` exercises the subtree
+cancellation semantics that are critical for system-level operations.
+
+#### Cancellation acknowledgement tests
+
+| Test ID | Description |
+|---------|-------------|
+| `P2-CT-009` | Issue a cancellation with a reasonable `deadline` and verify that the child acknowledges within the deadline and the cancellation completes gracefully. |
+| `P2-CT-010` | Issue a cancellation with a `deadline` and verify that the child does NOT acknowledge within the deadline and the host escalates to termination with reason `cancellation-timeout`. |
+| `P2-CT-011` | Verify that the escalation from cancellation to termination is recorded in the evidence log with the original `cancellation_id`. |
+| `P2-CT-012` | Issue a cancellation with an immediate-escalation reason code (`infrastructure-failure`, `restart-exhausted`, or `system-shutdown`) and verify that the child is terminated without waiting for acknowledgement. |
+
+> **Non-normative note.**
+Tests `P2-CT-009` through `P2-CT-012` validate the acknowledgement flow
+and the escalation mechanism.
+The timeout test `P2-CT-010` is particularly important because it validates
+that the host does not hang indefinitely waiting for an unresponsive child.
+The immediate-escalation test `P2-CT-012` validates that the host correctly
+distinguishes between cancellation reasons that require acknowledgement
+and those that do not.
+
+#### Hard-stop tests
+
+| Test ID | Description |
+|---------|-------------|
+| `P2-CT-013` | Issue a hard stop (via escalation from cancellation timeout) and verify that the child's live actor is immediately stopped without processing additional signals. |
+| `P2-CT-014` | Verify that the child's snapshot is captured at the moment of hard stop and recorded as `snapshot_at_termination`. |
+| `P2-CT-015` | Verify that the hard stop completes within the bounded time documented in the conformance profile. |
+| `P2-CT-016` | Verify that the `child.lifecycle.terminated` event is emitted with reason `hard-stop` and that no further lifecycle events are emitted for the child after hard stop. |
+
+> **Non-normative note.**
+Tests `P2-CT-013` through `P2-CT-016` validate the hard-stop behavior
+defined in section 36.1.
+The bounded-time test `P2-CT-015` is critical because a hard stop that
+takes too long defeats the purpose of hard stop as an immediate,
+unconditional stop mechanism.
+The snapshot capture test `P2-CT-014` validates the observability
+guarantee that operators can inspect the child's state at the moment
+of hard stop for forensic analysis.
+
+### Restart policy tests
+
+> **Normative definition.**
+Restart policy tests verify that the host correctly enforces all four
+restart policies under both normal and failure conditions.
+These tests exercise the interaction between the restart policy and the
+child's lifecycle state machine, including the backoff schedule, failure
+code evaluation, and operator approval flow.
+
+#### Never policy tests
+
+| Test ID | Description |
+|---------|-------------|
+| `P2-RT-001` | Create a child with `lifecycle_policy: never` and verify that after a non-graceful termination, the child is NOT restarted. |
+| `P2-RT-002` | Create a child with `lifecycle_policy: never` and verify that the host does NOT restart the child even when the termination reason is a transient infrastructure failure. |
+| `P2-RT-003` | Verify that a `never` policy child transitions to terminal status immediately after its first non-graceful termination. |
+
+> **Non-normative note.**
+The `never` policy tests validate the most restrictive restart policy.
+Test `P2-RT-002` is particularly important because it validates that the
+host does NOT restart a `never` policy child even under conditions where
+other policies would retry.
+This confirms the immutability of the restart policy selection at child
+creation time.
+
+#### Bounded-retry policy tests
+
+| Test ID | Description |
+|---------|-------------|
+| `P2-RT-004` | Create a child with `lifecycle_policy: bounded-retry`, `max_attempts: 3`, and verify that the child is restarted exactly 3 times before transitioning to `terminated-restart-exhausted` status. |
+| `P2-RT-005` | Verify that the backoff delay between restart attempts follows the exponential backoff formula `delay(n) = min(initial_delay * (backoff_multiplier ** n), max_delay)`. |
+| `P2-RT-006` | Create a child with `lifecycle_policy: bounded-retry` and a failure code in `restartable_failure_codes` and verify that the child IS restarted. |
+| `P2-RT-007` | Create a child with `lifecycle_policy: bounded-retry` and a failure code in `non_restartable_failure_codes` and verify that the child is NOT restarted and transitions directly to terminal status. |
+| `P2-RT-008` | Create a child with `lifecycle_policy: bounded-retry` and a failure code in neither list and verify that the host treats it as non-restartable and transitions the child to terminal status. |
+| `P2-RT-009` | Verify that the `child.lifecycle.retrying` heartbeat event is emitted during the backoff delay period and that no other lifecycle events are emitted. |
+| `P2-RT-010` | Create a child with `lifecycle_policy: bounded-retry` and verify that the restart policy state (attempt count, next backoff delay, remaining budget) is correctly tracked and recorded in evidence. |
+
+> **Non-normative note.**
+The `bounded-retry` policy tests are the most complex restart policy tests
+because they exercise the backoff schedule, failure code evaluation, and
+restart budget tracking.
+Test `P2-RT-005` validates the exponential backoff computation, which is
+critical for preventing retry storms and unbounded waiting.
+Test `P2-RT-008` validates the default behavior for unknown failure codes,
+which should be conservative (no restart) to prevent unexpected retries.
+
+#### Infrastructure-failure policy tests
+
+| Test ID | Description |
+|---------|-------------|
+| `P2-RT-011` | Create a child with `lifecycle_policy: restart-on-infrastructure-failure` and verify that the child IS restarted when the termination reason is `infrastructure-failure`. |
+| `P2-RT-012` | Create a child with `lifecycle_policy: restart-on-infrastructure-failure` and verify that the child IS restarted when the termination reason is `engine-instance-crash`. |
+| `P2-RT-013` | Create a child with `lifecycle_policy: restart-on-infrastructure-failure` and verify that the child IS NOT restarted when the termination reason is `policy-violation`. |
+| `P2-RT-014` | Create a child with `lifecycle_policy: restart-on-infrastructure-failure` and verify that the child IS NOT restarted when the termination reason is `operator-requested`. |
+| `P2-RT-015` | Verify that the restart on infrastructure failure is a single restart (not a bounded retry) and that the child transitions to terminal status after the single restart if it fails again. |
+
+> **Non-normative note.**
+The `restart-on-infrastructure-failure` policy tests validate the middle
+ground between `never` and `bounded-retry`.
+Test `P2-RT-015` is particularly important because it validates that the
+policy performs at most one restart (not a bounded retry), which is the
+key differentiator from `bounded-retry`.
+
+#### Operator-approved policy tests
+
+| Test ID | Description |
+|---------|-------------|
+| `P2-RT-016` | Create a child with `lifecycle_policy: operator-approved` and verify that after a non-graceful termination, the child transitions to `suspended-pending-operator-approval` status and is NOT restarted. |
+| `P2-RT-017` | Verify that the operator receives a `child.lifecycle.pending-operator-approval` event in their mailbox after the child transitions to suspended status. |
+| `P2-RT-018` | Issue a valid operator restart directive for a `operator-approved` policy child and verify that the child is restarted. |
+| `P2-RT-019` | Issue an operator restart directive with a previously-used `restart_nonce` and verify that the directive is rejected with `child.cancellation.conflict`. |
+| `P2-RT-020` | Verify that the periodic reminder events are emitted at the interval documented in the conformance profile while the child is in `suspended-pending-operator-approval` status. |
+| `P2-RT-021` | Verify that an operator termination directive for a `operator-approved` policy child transitions the child to terminal status without restart. |
+
+> **Non-normative note.**
+The `operator-approved` policy tests validate the human-in-the-loop
+restart flow.
+Test `P2-RT-019` validates the nonce-based replay prevention, which is
+critical for preventing replay attacks on operator approval directives.
+Test `P2-RT-020` validates the operator notification mechanism, which
+must be reliable to ensure that operators are aware of children requiring
+approval.
+
+### Cross-milestone compatibility tests
+
+> **Normative definition.**
+Cross-milestone compatibility tests verify that the Phase 2 contracts do
+not introduce regressions in earlier milestones.
+These tests run the integration fixtures from earlier milestones with the
+Phase 2 contracts active and verify that all previously-passing scenarios
+continue to pass.
+
+> **Non-normative note.**
+Cross-milestone compatibility testing is essential because the Phase 2
+contracts interact with many earlier milestones (see the cross-reference
+summary in section 36.1).
+Without these tests, a Phase 2 change that appears correct in isolation
+could break the behavior of earlier milestones, leading to inconsistent
+or unpredictable system behavior.
+
+#### Affected earlier milestone fixtures
+
+The following earlier milestone fixtures are affected by the Phase 2
+contracts and MUST be re-run as part of cross-milestone compatibility
+testing.
+
+| Milestone | Fixture scope | Expected behavior |
+|-----------|--------------|-------------------|
+| Milestone 6 Phase 1 | Signal envelopes, causality routing, and delivery | All fixtures continue to pass; child lifecycle events are correctly routed through the signal envelope mechanism. |
+| Milestone 6 Phase 1 | Actions, instructions, validation, plans, and results | All fixtures continue to pass; child-create directives are correctly validated through the actions validation flow. |
+| Milestone 6 Phase 1 | State operations, patches, revisions, and conflicts | All fixtures continue to pass; child initial state is correctly managed through the state operations mechanism. |
+| Milestone 6 Phase 1 | Directives, strategies, continuations, and terminal states | All fixtures continue to pass; child lifecycle terminal states are consistent with the directive terminal states. |
+| Milestone 6 Phase 1 | Deterministic reducer semantics and milestone acceptance | All fixtures continue to pass; child's first turn is correctly processed by the deterministic reducer. |
+| Milestone 6 Phase 1 | Extism invocation boundary instances and output validation | All fixtures continue to pass; hard stop correctly terminates Extism instances. |
+| Milestone 6 Phase 1 | Mailboxes, ordering, bounds, fairness, and turn leases | All fixtures continue to pass; child lifecycle events are correctly delivered through mailboxes. |
+| Milestone 6 Phase 1 | Agent registry, activation, cancellation, and completion | All fixtures continue to pass; child registry entries are consistent with the agent registry contract. |
+| Milestone 6 Phase 1 | Sensors, schedules, timers, and external signal ingress | All fixtures continue to pass; operator notifications are correctly delivered through the sensor mechanism. |
+| Milestone 6 Phase 1 | Single-agent host flow and milestone acceptance | All fixtures continue to pass; child lifecycle is consistent with the single-agent host flow. |
+| Milestone 6 Phase 1 | Revisioned snapshots, journals, history, and storage contracts | All fixtures continue to pass; child snapshots are correctly captured and journaled. |
+| Milestone 6 Phase 1 | Atomic state journal and directive-outbox commits | All fixtures continue to pass; child-create atomic commits are consistent with the journal protocol. |
+| Milestone 6 Phase 1 | Effect handlers, attempts, idempotency, and result signals | All fixtures continue to pass; child lifecycle events are correctly processed as effect handlers. |
+| Milestone 6 Phase 1 | Retry, timer, recovery, replay, hibernate, and migration | All fixtures continue to pass; child restart policy does not conflict with the retry mechanism. |
+| Milestone 6 Phase 1 | Crash injection, durable effects, and milestone acceptance | All fixtures continue to pass; child lifecycle events are durable across crashes. |
+| Milestone 5 | Threat model, principals, trust classes, and grant vocabulary | All fixtures continue to pass; child grants are consistent with the threat model. |
+| Milestone 5 | Capability policy, attenuation, limits, and enforcement | All fixtures continue to pass; child grant attenuation is consistent with the capability policy. |
+| Milestone 5 | Framework plugin manifests, composition, and lifecycle hooks | All fixtures continue to pass; child live actors are consistent with the framework plugin model. |
+| Milestone 5 | Synchronous host functions, WASI restrictions, and tenant isolation | All fixtures continue to pass; child live actors are subject to the same WASI restrictions. |
+| Milestone 5 | Provenance signing, audit, security, and milestone acceptance | All fixtures continue to pass; child lifecycle evidence is correctly signed and audited. |
+| Milestone 5 | Agent identity, addressing, ownership, and dependency relations | All fixtures continue to pass; child addresses and relationships are consistent with the identity model. |
+
+> **Normative definition.**
+A cross-milestone compatibility test passes if and only if: (1) every
+fixture listed in the table above continues to produce the same expected
+output as before the Phase 2 contracts were active, and (2) no new
+regressions are introduced.
+If any fixture fails, the Phase 2 implementation MUST be revised and the
+affected milestone MUST be re-validated according to the cross-milestone
+revision protocol defined in
+[Specification Authority](../SPECIFICATION-AUTHORITY.md).
+
+> **Non-normative note.**
+The table above lists 21 fixture scopes from 6 milestones that are affected
+by the Phase 2 contracts.
+This is consistent with the cross-reference summary in section 36.1, which
+identifies 10 direct integration points with earlier chapters.
+The broader fixture scope accounts for indirect effects through shared
+subsystems (such as the agent registry, mailboxes, and durable journal).
+
+### Integration test evidence requirements
+
+> **Normative definition.**
+Integration test evidence is the durable, auditable record that the Phase 2
+integration tests were executed and the results.
+Evidence is the primary input for promotion from `status: draft` to
+`status: normative`.
+
+> **Normative definition.**
+The following evidence items MUST be recorded for each test scenario
+defined in sections 36.4.1 through 36.4.5:
+
+| Evidence item | Content | Format |
+|---------------|---------|--------|
+| `test_id` | The test identifier (e.g., `P2-SF-001`). | String. |
+| `test_objective` | The test objective this scenario addresses. | String. |
+| `setup` | The test setup description (input data, preconditions). | Structured text. |
+| `expected_outcome` | The expected observable behavior. | Structured text. |
+| `actual_outcome` | The actual observable behavior. | Structured text. |
+| `result` | `pass`, `fail`, or `blocked`. | Enum. |
+| `evidence_digest` | A deterministic hash of the evidence record. | Hash digest. |
+| `timestamp` | The ISO 8601 timestamp of test execution. | ISO 8601 string. |
+| `regression` | For cross-milestone tests, whether the test previously passed. | Boolean. |
+| `approved_variability` | For cross-milestone tests, any approved variability from the baseline. | Structured text. |
+
+> **Non-normative note.**
+The evidence format above is consistent with the evidence record format
+defined in
+[Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md).
+The `evidence_digest` field enables downstream systems to verify that the
+evidence record has not been tampered with after creation.
+The `approved_variability` field enables operators to document and
+retroactively approve intentional deviations from the baseline, which
+is important for cross-milestone compatibility testing where some
+variations are acceptable (such as implementation-defined bounded times).
+
+> **Normative definition.**
+A run of all Phase 2 integration tests passes if and only if:
+
+1. Every test scenario defined in sections 36.4.1 through 36.4.5 produces
+   a `result` of `pass`.
+2. Every cross-milestone compatibility test defined in section 36.4.6
+   produces a `result` of `pass` and no new regressions are introduced.
+3. Every evidence record is complete (all required fields are present
+   and non-null) and has a valid `evidence_digest`.
+4. All evidence records are signed according to the provenance and audit
+   mechanism defined in
+   [Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md).
+
+> **Normative definition.**
+Promotion from `status: draft` to `status: normative` requires:
+
+1. A passing run of all Phase 2 integration tests as defined above.
+2. A passing run of all cross-milestone compatibility tests as defined
+   above.
+3. All evidence records for the passing run, signed and stored in the
+   durable evidence log.
+4. A written report summarizing the test run, including any approved
+   variability, regressions, or deviations from the baseline.
+
+> **Non-normative note.**
+The evidence requirements above ensure that promotion to `status: normative`
+is based on reproducible, auditable evidence rather than subjective
+assessment.
+The signed evidence records provide a tamper-evident trail that
+downstream consumers (such as the provenance and audit layer) can
+verify independently.
+The written report provides context and narrative that structured
+evidence records cannot capture, such as explanations of approved
+variability or deviations from the baseline.
+
+### Cross-reference summary
+
+> **Normative definition.**
+The integration tests defined in this section integrate with the following
+existing chapters:
+
+1. **Test evidence and provenance**: All test evidence is recorded in the
+   format defined in
+   [Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md).
+2. **Durable state**: Test preconditions and postconditions may interact
+   with the durable state journal as defined in
+   [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md)
+   and
+   [Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md).
+3. **Cross-milestone revision**: If cross-milestone compatibility tests
+   fail, the affected milestones must be revised according to the protocol
+   defined in
+   [Specification Authority](../SPECIFICATION-AUTHORITY.md).
+4. **Conformance vocabulary**: Test result classification (pass/fail/blocked)
+   follows the behavior classes defined in
+   [Conformance Vocabulary](../CONFORMANCE-VOCABULARY.md).
+
+> **Non-normative note.**
+The four integration points above demonstrate that Phase 2 integration
+testing is not an isolated activity but is deeply woven into the
+specification authority, conformance, and evidence layers.
+Every test evidence record is a first-class artifact in the archive,
+subject to the same provenance and audit guarantees as other durable
+knowledge documents.
