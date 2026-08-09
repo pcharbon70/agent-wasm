@@ -60,6 +60,7 @@ themselves.
 - [Crash Injection Durable Effects And Milestone Acceptance](29-crash-injection-durable-effects-and-milestone-acceptance.md) — Phase 5 of Milestone 4; proves state/effect invariants at every commit, dispatch, external-success, acknowledgement, and result-ingress boundary.
 - [Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md) — Phase 1 of Milestone 5; defines adversaries, protected assets, authenticated identities, trust zones, and the vocabulary used by every authorization decision.
 - [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md) — Phase 2 of Milestone 5; establishes host-owned policy decisions that bind every invocation and effect to minimum authority and resource budgets.
+- [Framework Plugin Manifests Composition And Lifecycle Hooks](32-framework-plugin-manifests-composition-and-lifecycle-hooks.md) — Phase 3 of Milestone 5; defines the declarative manifest contract, deterministic composition ordering, and trust-tier separation between framework plugins and individual Extism guest modules.
 
 ## Maintaining this index
 

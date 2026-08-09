@@ -117,6 +117,11 @@ TurnId = Defined in
 SessionId = string
 
 InvocationId = string
+
+UnixTimestamp = Defined in
+  [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md).
+
+Version = string
 ```
 
 > **Normative definition.**
