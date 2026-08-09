@@ -222,15 +222,15 @@ Provenance references MUST be bounded. They MUST NOT expose:
 
 ## Key design decisions
 
-1. **Workflow types**: Six workflow types cover the main agentic patterns (direct response, structured response, model-to-tool, retrieval-grounded, code execution, multi-agent delegation).
+1. **Workflow types**: Six workflow types cover the main agentic patterns (direct response, structured response, model-to-tool, retrieval-grounded, code execution, multi-agent delegation). Custom workflow types are deferred (medium priority) — the six types are sufficient for now.
 
-2. **Approval outcomes**: Approval outcomes include pending, approved, denied, expired, and quota exhaustion.
+2. **Approval outcomes**: Approval outcomes include pending, approved, denied, expired, and quota exhaustion. Approval requests support conditional approval (deferred).
 
-3. **Secret revocation**: Secret leases can be revoked, invalidating the principal's access.
+3. **Secret revocation**: Secret leases can be revoked, invalidating the principal's access. Revocation is a hard stop — no grace periods.
 
-4. **Model stream cancellation**: Model streams can be cancelled by the agent or host.
+4. **Model stream cancellation**: Model streams can be cancelled by the agent or host. Cancellation is immediate — no partial results returned.
 
-5. **Provenance references**: Every answer includes provenance references that link to the original evidence.
+5. **Provenance references**: Every answer includes provenance references that link to the original evidence. References are bounded and do not expose secrets. Automatic cleanup is rejected — provenance is audit evidence, not garbage.
 
 6. **Bounded evidence**: Provenance references are bounded and do not expose secrets.
 
@@ -238,48 +238,47 @@ Provenance references MUST be bounded. They MUST NOT expose:
 
 8. **Milestone acceptance**: Milestone 7 acceptance requires evidence that workflows are durable, bounded, attributable, interruptible, and controlled by host policy.
 
-9. **Safety boundaries**: Host policy enforces safety boundaries (quotas, approvals, secret access) on all workflows.
+9. **Safety boundaries**: Host policy enforces safety boundaries (quotas, approvals, secret access) on all workflows. Configuration is per-tenant with per-agent override support (sandbox/power agent patterns). Per-workflow configuration is not supported.
 
-10. **Residual model-quality limitations**: The spec documents known limitations in model quality (e.g., hallucination, inconsistency) that cannot be fully eliminated by the framework.
+10. **Residual model-quality limitations**: The spec documents known limitations in model quality (e.g., hallucination, inconsistency) as host-reported operational data, not normative thresholds. Quantified metrics are exposed in operator dashboards for informed decision-making.
 
 ## Open questions
 
-1. Should workflow types be extensible (allow custom workflow types)?
+1. **Workflow types extensible**: Deferred (Medium). Six types cover main patterns. Custom types may be added later if tenant requirements demand it.
 
-2. Should approval requests support conditional approval (e.g., "approve if X")?
+2. **Conditional approval**: Not addressed. Could be valuable for complex workflows (e.g., "approve if cost < $X and risk < medium").
 
-3. Should quota exhaustion support burst allowances (temporary overages)?
+3. **Burst allowances**: Rejected. Quota exhaustion is a hard stop. Tenants should use the approval workflow for resource increases.
 
-4. Should secret lease revocation support grace periods (allow in-progress operations to complete)?
+4. **Revocation grace periods**: Rejected. Secret lease revocation is immediate — no grace periods.
 
-5. Should model stream cancellation support partial results (return what was received before cancellation)?
+5. **Model stream partial results**: Not addressed. Model stream cancellation returns what was received (if any) without explicit opt-in.
 
-6. Should provenance references support hierarchical scoping (e.g., tenant, agent, workflow)?
+6. **Provenance hierarchical scoping**: Deferred. Could enable tenant/agent/workflow-level provenance hierarchies.
 
-7. Should provenance references support deduplication (e.g., if the same model response is referenced multiple times)?
+7. **Provenance deduplication**: Deferred. Useful for reducing storage when the same model response is referenced multiple times.
 
-8. Should workflow types support sub-workflows (e.g., a multi-agent delegation workflow contains child workflow instances)?
+8. **Sub-workflows**: Deferred. Multi-agent delegation could include child workflow instances, but six top-level types are sufficient for now.
 
-9. Should milestone acceptance criteria include performance benchmarks (e.g., response time, cost)?
+9. **Performance benchmarks**: Deferred (Medium). Useful for CI/CD and regression testing.
 
-10. Should safety boundaries be configurable per tenant, per agent, or per workflow?
+10. **Safety boundaries configurability**: Decided. Per-tenant with per-agent override. Per-workflow not supported.
 
-11. Should residual model-quality limitations be quantified (e.g., "model hallucination rate < 5%")?
+11. **Residual limitation quantification**: Decided. Host-reported operational data only. Not normative thresholds.
 
-12. Should provenance references support automatic cleanup (e.g., when the answer is deleted)?
+12. **Provenance automatic cleanup**: Rejected. Provenance is audit evidence, not garbage. Implement tiered storage (hot vs. cold) with retention policies instead.
 
 ## Cross-references
 
 ### Earlier chapters
 
-- [41-provider-neutral-model-requests-responses-streaming-and-usage-contract-and-data-model.md](../41-provider-neutral-model-requests-responses-streaming-and-usage-contract-and-data-model.md)
-- [42-tool-catalogs-retrieval-code-execution-and-connectors-contract-and-data-model.md](../42-tool-catalogs-retrieval-code-execution-and-connectors-contract-and-data-model.md)
-- [43-direct-fsm-tool-loop-and-planning-strategies-contract-and-data-model.md](../43-direct-fsm-tool-loop-and-planning-strategies-contract-and-data-model.md)
-- [44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md](../44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md)
+- [41-provider-neutral-model-requests-responses-streaming-and-usage-contract-and-data-model.md](../60-specification/41-provider-neutral-model-requests-responses-streaming-and-usage-contract-and-data-model.md)
+- [42-tool-catalogs-retrieval-code-execution-and-connectors-contract-and-data-model.md](../60-specification/42-tool-catalogs-retrieval-code-execution-and-connectors-contract-and-data-model.md)
+- [43-direct-fsm-tool-loop-and-planning-strategies-contract-and-data-model.md](../60-specification/43-direct-fsm-tool-loop-and-planning-strategies-contract-and-data-model.md)
+- [44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md](../60-specification/44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md)
 
 ### Related chapters (Phase 5)
 
-- [45-agentic-workflows-provenance-safety-and-milestone-acceptance-contract-and-data-model.md](../45-agentic-workflows-provenance-safety-and-milestone-acceptance-contract-and-data-model.md)
-- [45-agentic-workflows-provenance-safety-and-milestone-acceptance-behavior-and-integration.md](../45-agentic-workflows-provenance-safety-and-milestone-acceptance-behavior-and-integration.md)
-- [45-agentic-workflows-provenance-safety-and-milestone-acceptance-failure-evidence-and-operational-notes.md](../45-agentic-workflows-provenance-safety-and-milestone-acceptance-failure-evidence-and-operational-notes.md)
-- [45-agentic-workflows-provenance-safety-and-milestone-acceptance-phase-5-integration-tests.md](../45-agentic-workflows-provenance-safety-and-milestone-acceptance-phase-5-integration-tests.md)
+- [45-agentic-workflows-provenance-safety-and-milestone-acceptance-contract-and-data-model.md](../60-specification/45-agentic-workflows-provenance-safety-and-milestone-acceptance-contract-and-data-model.md)
+- [45-agentic-workflows-provenance-safety-and-milestone-acceptance-behavior-and-integration.md](../60-specification/45-agentic-workflows-provenance-safety-and-milestone-acceptance-behavior-and-integration.md)
+- [45-agentic-workflows-provenance-safety-and-milestone-acceptance-failure-evidence-and-operational-notes.md](../60-specification/45-agentic-workflows-provenance-safety-and-milestone-acceptance-failure-evidence-and-operational-notes.md)

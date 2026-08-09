@@ -210,63 +210,62 @@ boundaries, cost evidence, and residual model-quality limitations.
 
 ## Key design decisions
 
-1. **Hostile output validation**: Validation at four points (state, model context, downstream tool, user-facing) ensures safety at every admission boundary.
+1. **Hostile output validation**: Validation at four points (state, model context, downstream tool, user-facing) ensures safety at every admission boundary. Custom validation rules are supported via a declarative pipeline (regex patterns, schema extensions, policy scripts), not arbitrary code. ML-based detection is advisory only — ML-flagged content goes to a review queue, not auto-block.
 
-2. **Budget enforcement**: Five budget constraints (iterations, tools, time, cost, tokens) prevent resource exhaustion.
+2. **Budget enforcement**: Five budget constraints (iterations: 100, tools: 50, time: 300s, cost: $0.10, tokens: 10k) prevent resource exhaustion. Budgets are configured per-tenant with per-agent override support. Budget exhaustion is a hard stop — no grace periods.
 
-3. **Deterministic resume**: Snapshots and result signals enable workflows to resume deterministically after failure or interruption.
+3. **Deterministic resume**: Snapshots and result signals enable workflows to resume deterministically after failure or interruption. Partial results are supported only with explicit workflow author opt-in (`partial_results_allowed: true/false`).
 
-4. **Workflow corpus coverage**: All six workflow types are fully covered by the spec and tests.
+4. **Workflow corpus coverage**: All six workflow types are fully covered by the spec and tests. Benchmark workflows are deferred (Medium priority).
 
-5. **Provenance coverage**: All seven reference types are fully covered, enabling audit and debugging.
+5. **Provenance coverage**: All seven reference types are fully covered, enabling audit and debugging. Quantified coverage is an operational metric, not a spec requirement.
 
-6. **Safety boundaries**: Five safety boundaries (quotas, approvals, secrets, hostile output, budgets) enforce host policy.
+6. **Safety boundaries**: Five safety boundaries (quotas, approvals, secrets, hostile output, budgets) enforce host policy. Configuration is per-tenant with per-agent override. Per-workflow configuration is not supported.
 
 7. **Cost evidence**: Cost metrics are tracked per workflow, per tenant, and per agent for observability.
 
-8. **Residual limitations**: Known model-quality limitations are documented with mitigations.
+8. **Residual limitations**: Known model-quality limitations are documented with mitigations. Quantified metrics are host-reported operational data, not normative thresholds.
 
 9. **Bounded evidence**: All evidence is bounded and does not expose secrets.
 
-10. **Tenant isolation**: All resources are scoped to tenant boundaries.
+10. **Tenant isolation**: All resources are scoped to tenant boundaries. External storage checkpointing is deferred (Low priority) for long-running workflows.
 
 ## Open questions
 
-1. Should workflow budgets be configurable per tenant, per agent, or per workflow?
+1. **Budget configurability**: Decided. Per-tenant with per-agent override. Per-workflow not supported.
 
-2. Should hostile output validation support custom validation rules?
+2. **Custom validation rules**: Decided. Yes, via a declarative validation pipeline (regex, schema extensions, policy scripts). Not arbitrary code.
 
-3. Should deterministic resume support partial results (return what was completed before failure)?
+3. **Partial results on resume**: Decided. Yes, but only with explicit workflow author opt-in (`partial_results_allowed: true/false`).
 
-4. Should the workflow corpus include benchmark workflows (e.g., standard test cases)?
+4. **Benchmark workflows**: Deferred (Medium). Useful for CI/CD and regression testing.
 
-5. Should provenance coverage be quantified (e.g., "95% of answers have full provenance")?
+5. **Quantified provenance coverage**: Rejected. Provenance coverage is an operational metric, not a spec requirement. Mandating thresholds creates perverse incentives.
 
-6. Should safety boundaries be configurable per workflow type?
+6. **Per-workflow-type safety**: Rejected. Configure per tenant, not per workflow type. Workflow types are internal implementation categories.
 
-7. Should cost evidence include projections (e.g., estimated cost for upcoming workflows)?
+7. **Cost projections**: Deferred. Could be valuable for forecasting, but not a spec requirement.
 
-8. Should residual model-quality limitations include quantitative metrics (e.g., "hallucination rate < 5%")?
+8. **Residual limitation quantification**: Decided. Host-reported operational data only. Not normative thresholds.
 
-9. Should workflows support checkpointing to external storage (e.g., S3)?
+9. **External storage checkpointing**: Deferred (Low). Useful for long-running workflows (multi-minute/hour-scale), but most workflows complete in seconds to minutes.
 
-10. Should hostile output detection use ML-based approaches (e.g., toxicity classifiers)?
+10. **ML-based hostile detection**: Decided. Advisory only — ML-flagged content goes to a review queue. Rule-based detection is deterministic and auditable. ML classifiers are probabilistic and can false-positive/negative.
 
-11. Should budget exhaustion support grace periods (allow in-progress operations to complete)?
+11. **Budget grace periods**: Rejected. Budget exhaustion is a hard stop for safety. Use approval workflow for resource increases.
 
-12. Should provenance references support automatic cleanup (e.g., when the answer is deleted)?
+12. **Provenance automatic cleanup**: Rejected. Provenance is audit evidence, not garbage. Implement tiered storage (hot vs. cold) with retention policies instead.
 
 ## Cross-references
 
 ### Earlier chapters
 
-- [41-provider-neutral-model-requests-responses-streaming-and-usage-contract-and-data-model.md](../41-provider-neutral-model-requests-responses-streaming-and-usage-contract-and-data-model.md)
-- [42-tool-catalogs-retrieval-code-execution-and-connectors-contract-and-data-model.md](../42-tool-catalogs-retrieval-code-execution-and-connectors-contract-and-data-model.md)
-- [43-direct-fsm-tool-loop-and-planning-strategies-contract-and-data-model.md](../43-direct-fsm-tool-loop-and-planning-strategies-contract-and-data-model.md)
-- [44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md](../44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md)
+- [41-provider-neutral-model-requests-responses-streaming-and-usage-contract-and-data-model.md](../60-specification/41-provider-neutral-model-requests-responses-streaming-and-usage-contract-and-data-model.md)
+- [42-tool-catalogs-retrieval-code-execution-and-connectors-contract-and-data-model.md](../60-specification/42-tool-catalogs-retrieval-code-execution-and-connectors-contract-and-data-model.md)
+- [43-direct-fsm-tool-loop-and-planning-strategies-contract-and-data-model.md](../60-specification/43-direct-fsm-tool-loop-and-planning-strategies-contract-and-data-model.md)
+- [44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md](../60-specification/44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md)
 
 ### Related chapters (Phase 5)
 
-- [45-agentic-workflows-provenance-safety-and-milestone-acceptance-contract-and-data-model.md](../45-agentic-workflows-provenance-safety-and-milestone-acceptance-contract-and-data-model.md)
-- [45-agentic-workflows-provenance-safety-and-milestone-acceptance-failure-evidence-and-operational-notes.md](../45-agentic-workflows-provenance-safety-and-milestone-acceptance-failure-evidence-and-operational-notes.md)
-- [45-agentic-workflows-provenance-safety-and-milestone-acceptance-phase-5-integration-tests.md](../45-agentic-workflows-provenance-safety-and-milestone-acceptance-phase-5-integration-tests.md)
+- [45-agentic-workflows-provenance-safety-and-milestone-acceptance-contract-and-data-model.md](../60-specification/45-agentic-workflows-provenance-safety-and-milestone-acceptance-contract-and-data-model.md)
+- [45-agentic-workflows-provenance-safety-and-milestone-acceptance-failure-evidence-and-operational-notes.md](../60-specification/45-agentic-workflows-provenance-safety-and-milestone-acceptance-failure-evidence-and-operational-notes.md)

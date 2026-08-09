@@ -98,8 +98,7 @@ Related chapters:
 [Threads Checkpoints Memory Approvals Quotas And Secret Leases Failure Evidence And Operational Notes](44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-failure-evidence-and-operational-notes.md),
 [Threads Checkpoints Memory Approvals Quotas And Secret Leases Phase 4 Integration Tests](44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-phase-4-integration-tests.md),
 [Agentic Workflows Provenance Safety And Milestone Acceptance Behavior And Integration](45-agentic-workflows-provenance-safety-and-milestone-acceptance-behavior-and-integration.md),
-[Agentic Workflows Provenance Safety And Milestone Acceptance Failure Evidence And Operational Notes](45-agentic-workflows-provenance-safety-and-milestone-acceptance-failure-evidence-and-operational-notes.md),
-[Agentic Workflows Provenance Safety And Milestone Acceptance Phase 5 Integration Tests](45-agentic-workflows-provenance-safety-and-milestone-acceptance-phase-5-integration-tests.md).
+[Agentic Workflows Provenance Safety And Milestone Acceptance Failure Evidence And Operational Notes](45-agentic-workflows-provenance-safety-and-milestone-acceptance-failure-evidence-and-operational-notes.md).
 
 ## 45.1 Contract And Data Model
 
@@ -334,7 +333,7 @@ Provenance references MUST be bounded. They MUST NOT expose:
 
 ### 45.1.3 Safety boundary configurability
 
-- **Permission**: The host MAY configure safety boundaries per tenant, per agent, or per workflow.
-- **Recommendation**: The host SHOULD support tenant-level configuration by default.
+- **Permission**: The host MAY configure safety boundaries per tenant, with per-agent override support for sandbox/power agent patterns.
+- **Recommendation**: The host SHOULD support tenant-level configuration by default. Per-agent override lets tenants run agents with tighter limits (e.g., a sandbox agent at 50% of tenant budget). Per-workflow configuration is not supported — workflow types are internal implementation categories, not security boundaries.
 - **Permitted presentation**: The host MAY present the configured safety boundaries to the operator.
 - **Limit**: Safety boundaries MUST be enforced at all times.

@@ -97,8 +97,7 @@ Related chapters:
 [Threads Checkpoints Memory Approvals Quotas And Secret Leases Failure Evidence And Operational Notes](44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-failure-evidence-and-operational-notes.md),
 [Threads Checkpoints Memory Approvals Quotas And Secret Leases Phase 4 Integration Tests](44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-phase-4-integration-tests.md),
 [Agentic Workflows Provenance Safety And Milestone Acceptance Contract And Data Model](45-agentic-workflows-provenance-safety-and-milestone-acceptance-contract-and-data-model.md),
-[Agentic Workflows Provenance Safety And Milestone Acceptance Behavior And Integration](45-agentic-workflows-provenance-safety-and-milestone-acceptance-behavior-and-integration.md),
-[Agentic Workflows Provenance Safety And Milestone Acceptance Phase 5 Integration Tests](45-agentic-workflows-provenance-safety-and-milestone-acceptance-phase-5-integration-tests.md).
+[Agentic Workflows Provenance Safety And Milestone Acceptance Behavior And Integration](45-agentic-workflows-provenance-safety-and-milestone-acceptance-behavior-and-integration.md).
 
 ## 45.3 Failure Evidence And Operational Notes
 
@@ -282,20 +281,20 @@ The following implementation-defined choices MUST be documented by the host:
 ### Deferred work
 
 > **Normative definition.**
-The following work is deferred and MUST be tracked with priority and description:
+The following work is deferred and MUST be tracked with priority and description. Items marked as "rejected" are not deferred — they were explicitly decided against based on the design rationale.
 
-| Item | Description | Priority |
-|------|-------------|----------|
-| Custom workflow types | Support custom workflow types beyond the six defined. | Medium |
-| Custom validation rules | Support custom validation rules for hostile output. | Medium |
-| Partial results on resume | Support partial results on deterministic resume. | Low |
-| Quantified residual limitations | Quantify residual model-quality limitations (e.g., hallucination rate). | Low |
-| ML-based hostile output detection | Use ML-based approaches for hostile output detection (e.g., toxicity classifiers). | Medium |
-| External storage checkpointing | Support checkpointing to external storage (e.g., S3). | Low |
-| Budget grace periods | Support budget grace periods (allow in-progress operations to complete). | Low |
-| Provenance reference cleanup | Support automatic cleanup of provenance references when answers are deleted. | Low |
-| Benchmark workflows | Include benchmark workflows (e.g., standard test cases) in the workflow corpus. | Medium |
-| Quantified provenance coverage | Quantify provenance coverage (e.g., "95% of answers have full provenance"). | Low |
+| Item | Description | Status | Rationale |
+|------|-------------|--------|-----------|
+| Custom workflow types | Support custom workflow types beyond the six defined (direct-model-response, structured-response, model-to-tool-continuation, retrieval-grounded-answer, code-execution, multi-agent-delegation). | Deferred (Medium) | Workflow types are internal implementation categories, not security boundaries. Six types cover the main agentic patterns. |
+| Custom validation rules | Support a host-configurable declarative validation pipeline beyond built-in rules (schema, length, content filters). Rules should be expressed declaratively (regex patterns, schema extensions, policy scripts). | Deferred (Medium) | Built-in rules cover common cases. Custom rules require tenant-specific requirements (e.g., HIPAA, PII redaction). |
+| Partial results on resume | Support partial results on deterministic resume, gated by workflow author opt-in (`partial_results_allowed: true/false`). | Deferred (Low) | Opt-in mechanism needed to avoid surfacing incomplete/misleading data. Financial workflows should not return partial results. |
+| Quantified residual limitations | Quantify residual model-quality limitations (e.g., hallucination rate) and expose in operator dashboards as host-reported data. | Deferred (Low) | Quantified metrics are operational data, not normative thresholds. Framework cannot enforce model quality. |
+| ML-based hostile output detection | Use ML-based approaches (e.g., toxicity classifiers) as advisory signals only. ML-flagged content should go to a review queue, not auto-block. | Deferred (Medium) | ML classifiers are probabilistic — false positives/negatives. Rule-based detection is deterministic and auditable. ML should be advisory, not enforcement. |
+| External storage checkpointing | Support checkpointing to external storage (e.g., S3, GCS) for long-running workflows (multi-minute/hour-scale). | Deferred (Low) | Most workflows complete in seconds to minutes. External storage adds complexity (network calls, costs, consistency). Add as optional host feature, gated by config flag. |
+| Budget grace periods | Support budget grace periods (allow in-progress operations to complete after exhaustion). | Rejected | Budget exhaustion is a hard stop for safety. Grace periods let tenants exceed quotas, defeating quota enforcement. Use approval workflow for resource increases. |
+| Provenance reference cleanup | Support automatic cleanup of provenance references when answers are deleted. | Rejected | Provenance is audit evidence, not garbage. Deleting provenance breaks the audit chain. Implement tiered storage (hot vs. cold) with retention policies instead. |
+| Benchmark workflows | Include benchmark workflows (e.g., standard test cases) in the workflow corpus for regression testing and performance measurement. | Deferred (Medium) | Useful for CI/CD and performance baselines. |
+| Quantified provenance coverage | Quantify provenance coverage (e.g., "95% of answers have full provenance"). | Rejected | Provenance coverage is an operational metric, not a spec requirement. Mandating thresholds creates perverse incentives (skip provenance for edge cases to hit numbers). |
 
 ### Results that would invalidate earlier milestone assumptions
 
@@ -322,7 +321,7 @@ milestone maintainer.
 
 ### 45.3.3 Workflow budget configurability
 
-- **Permission**: The host MAY configure workflow budgets per tenant, per agent, or per workflow.
+- **Permission**: The host MAY configure workflow budgets per tenant, with per-agent override support. Tenants are the natural billing and trust boundary — they own their agents and should control spend. Per-agent override lets a tenant run a "sandbox" agent with tighter limits while a "power" agent gets the full amount. Per-workflow configuration is not supported. Budget exhaustion is a hard stop for safety — grace periods would let a tenant exceed their quota, defeating the purpose of quota enforcement. If a tenant needs more resources, they should request a quota increase through the approval workflow.
 - **Recommendation**: The host SHOULD support tenant-level configuration by default.
 - **Permitted presentation**: The host MAY present the configured budgets to the operator.
-- **Limit**: Budgets MUST be enforced at all times.
+- **Limit**: Budgets MUST be enforced at all times. Budget exhaustion is a hard stop, not a soft target.

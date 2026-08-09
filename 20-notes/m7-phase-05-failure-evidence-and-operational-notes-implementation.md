@@ -173,30 +173,36 @@ would invalidate an earlier milestone assumption.
 
 **Implementation-defined choices:**
 
-| Choice | Default | Documentation requirement |
-|--------|---------|---------------------------|
-| Workflow budget defaults | As stated in Section 45.2 | MUST be documented in host configuration. |
-| Hostile output validation rules | Built-in rules only | MUST be documented in host configuration. |
-| Deterministic resume behavior | Resume from last snapshot | MUST be documented in host configuration. |
-| Provenance reference deduplication | Enabled | MUST be documented in host configuration. |
-| Safety boundary configurability | Tenant-level | MUST be documented in host configuration. |
-| Cost tracking granularity | Per workflow, per tenant, per agent | MUST be documented in host configuration. |
-| Residual limitation reporting | Empirical data only | MUST be documented in host configuration. |
+| Choice | Default | Documentation requirement | Status |
+|--------|---------|---------------------------|--------|
+| Workflow budget defaults | As stated in Section 45.2 (100 iterations, 50 tools, 300s time, $0.10 cost, 10k tokens) | MUST be documented in host configuration. | Decided |
+| Hostile output validation rules | Built-in rules + declarative pipeline (regex, schema extensions, policy scripts) | MUST be documented in host configuration. | Decided |
+| Deterministic resume behavior | Resume from last snapshot, partial results with opt-in | MUST be documented in host configuration. | Decided |
+| Provenance reference deduplication | Enabled | MUST be documented in host configuration. | Deferred |
+| Safety boundary configurability | Tenant-level with per-agent override | MUST be documented in host configuration. | Decided |
+| Cost tracking granularity | Per workflow, per tenant, per agent | MUST be documented in host configuration. | Decided |
+| Residual limitation reporting | Empirical data only (host-reported operational data) | MUST be documented in host configuration. | Decided |
 
 **Deferred work:**
 
-| Item | Description | Priority |
-|------|-------------|----------|
-| Custom workflow types | Support custom workflow types beyond the six defined. | Medium |
-| Custom validation rules | Support custom validation rules for hostile output. | Medium |
-| Partial results on resume | Support partial results on deterministic resume. | Low |
-| Quantified residual limitations | Quantify residual model-quality limitations (e.g., hallucination rate). | Low |
-| ML-based hostile output detection | Use ML-based approaches for hostile output detection (e.g., toxicity classifiers). | Medium |
-| External storage checkpointing | Support checkpointing to external storage (e.g., S3). | Low |
-| Budget grace periods | Support budget grace periods (allow in-progress operations to complete). | Low |
-| Provenance reference cleanup | Support automatic cleanup of provenance references when answers are deleted. | Low |
-| Benchmark workflows | Include benchmark workflows (e.g., standard test cases) in the workflow corpus. | Medium |
-| Quantified provenance coverage | Quantify provenance coverage (e.g., "95% of answers have full provenance"). | Low |
+| Item | Description | Priority | Status | Rationale |
+|------|-------------|----------|--------|-----------|
+| Custom workflow types | Support custom workflow types beyond the six defined. | Medium | Deferred | Six types cover main agentic patterns. |
+| Custom validation rules | Support custom validation rules for hostile output (declarative pipeline). | Medium | Deferred | Built-in rules cover common cases. Custom rules for tenant-specific requirements (HIPAA, PII). |
+| Partial results on resume | Support partial results on deterministic resume (opt-in). | Low | Deferred | Opt-in mechanism needed to avoid surfacing incomplete data. |
+| Quantified residual limitations | Quantify residual model-quality limitations (host-reported data). | Low | Deferred | Operational metrics, not normative thresholds. |
+| ML-based hostile output detection | Use ML-based approaches as advisory only (review queue). | Medium | Deferred | ML classifiers are probabilistic. Rule-based detection is deterministic. |
+| External storage checkpointing | Support checkpointing to external storage (e.g., S3). | Low | Deferred | Most workflows complete in seconds to minutes. |
+| Benchmark workflows | Include benchmark workflows in the workflow corpus. | Medium | Deferred | Useful for CI/CD and regression testing. |
+
+**Rejected work:**
+
+| Item | Description | Rationale |
+|------|-------------|-----------|
+| Budget grace periods | Support budget grace periods (allow in-progress operations to complete). | Budget exhaustion is a hard stop for safety. Use approval workflow for resource increases. |
+| Provenance reference cleanup | Support automatic cleanup of provenance references when answers are deleted. | Provenance is audit evidence, not garbage. Implement tiered storage instead. |
+| Quantified provenance coverage | Quantify provenance coverage (e.g., "95% of answers have full provenance"). | Provenance coverage is an operational metric, not a spec requirement. Mandating thresholds creates perverse incentives. |
+| Per-workflow-type safety configuration | Configure safety boundaries per workflow type. | Workflow types are internal implementation categories, not security boundaries. Configure per tenant. |
 
 **Results that would invalidate earlier milestone assumptions:**
 
@@ -210,9 +216,9 @@ would invalidate an earlier milestone assumption.
 
 2. **Evidence emission**: Every significant event emits bounded evidence for observability and debugging.
 
-3. **Implementation-defined choices**: Implementation-defined choices are documented in host configuration.
+3. **Implementation-defined choices**: Implementation-defined choices are documented in host configuration. Budgets are tenant-level with per-agent override. Residual limitations are host-reported operational data.
 
-4. **Deferred work**: Deferred work is tracked with priority and description.
+4. **Deferred work**: Deferred work is tracked with priority and description. Items explicitly rejected (budget grace periods, provenance cleanup, quantified coverage, per-workflow-type safety) are documented with rationale.
 
 5. **Milestone assumption validation**: Results that invalidate earlier milestone assumptions are tracked and documented.
 
@@ -228,41 +234,40 @@ would invalidate an earlier milestone assumption.
 
 ## Open questions
 
-1. Should workflow budgets be configurable per tenant, per agent, or per workflow?
+1. **Budget configurability**: Decided. Per-tenant with per-agent override. Per-workflow not supported.
 
-2. Should hostile output validation support custom validation rules?
+2. **Custom validation rules**: Decided. Yes, via a declarative validation pipeline (regex, schema extensions, policy scripts). Not arbitrary code.
 
-3. Should deterministic resume support partial results (return what was completed before failure)?
+3. **Partial results on resume**: Decided. Yes, but only with explicit workflow author opt-in (`partial_results_allowed: true/false`).
 
-4. Should the workflow corpus include benchmark workflows (e.g., standard test cases)?
+4. **Benchmark workflows**: Deferred (Medium). Useful for CI/CD and regression testing.
 
-5. Should provenance coverage be quantified (e.g., "95% of answers have full provenance")?
+5. **Quantified provenance coverage**: Rejected. Provenance coverage is an operational metric, not a spec requirement. Mandating thresholds creates perverse incentives.
 
-6. Should safety boundaries be configurable per workflow type?
+6. **Per-workflow-type safety**: Rejected. Configure per tenant, not per workflow type. Workflow types are internal implementation categories.
 
-7. Should cost evidence include projections (e.g., estimated cost for upcoming workflows)?
+7. **Cost projections**: Deferred. Could be valuable for forecasting, but not a spec requirement.
 
-8. Should residual model-quality limitations include quantitative metrics (e.g., "hallucination rate < 5%")?
+8. **Residual limitation quantification**: Decided. Host-reported operational data only. Not normative thresholds.
 
-9. Should workflows support checkpointing to external storage (e.g., S3)?
+9. **External storage checkpointing**: Deferred (Low). Useful for long-running workflows (multi-minute/hour-scale), but most workflows complete in seconds to minutes.
 
-10. Should hostile output detection use ML-based approaches (e.g., toxicity classifiers)?
+10. **ML-based hostile detection**: Decided. Advisory only — ML-flagged content goes to a review queue. Rule-based detection is deterministic and auditable. ML classifiers are probabilistic and can false-positive/negative.
 
-11. Should budget exhaustion support grace periods (allow in-progress operations to complete)?
+11. **Budget grace periods**: Rejected. Budget exhaustion is a hard stop for safety. Use approval workflow for resource increases.
 
-12. Should provenance references support automatic cleanup (e.g., when the answer is deleted)?
+12. **Provenance automatic cleanup**: Rejected. Provenance is audit evidence, not garbage. Implement tiered storage (hot vs. cold) with retention policies instead.
 
 ## Cross-references
 
 ### Earlier chapters
 
-- [10-signals-causality-routing-and-delivery.md](../10-signals-causality-routing-and-delivery.md)
-- [14-deterministic-reducer-semantics-and-milestone-acceptance.md](../14-deterministic-reducer-semantics-and-milestone-acceptance.md)
-- [29-crash-injection-durable-effects-and-milestone-acceptance.md](../29-crash-injection-durable-effects-and-milestone-acceptance.md)
-- [34-provenance-signing-audit-security-and-milestone-acceptance.md](../34-provenance-signing-audit-security-and-milestone-acceptance.md)
+- [10-signals-causality-routing-and-delivery.md](../60-specification/10-signals-causality-routing-and-delivery.md)
+- [14-deterministic-reducer-semantics-and-milestone-acceptance.md](../60-specification/14-deterministic-reducer-semantics-and-milestone-acceptance.md)
+- [29-crash-injection-durable-effects-and-milestone-acceptance.md](../60-specification/29-crash-injection-durable-effects-and-milestone-acceptance.md)
+- [34-provenance-signing-audit-security-and-milestone-acceptance.md](../60-specification/34-provenance-signing-audit-security-and-milestone-acceptance.md)
 
 ### Related chapters (Phase 5)
 
-- [45-agentic-workflows-provenance-safety-and-milestone-acceptance-contract-and-data-model.md](../45-agentic-workflows-provenance-safety-and-milestone-acceptance-contract-and-data-model.md)
-- [45-agentic-workflows-provenance-safety-and-milestone-acceptance-behavior-and-integration.md](../45-agentic-workflows-provenance-safety-and-milestone-acceptance-behavior-and-integration.md)
-- [45-agentic-workflows-provenance-safety-and-milestone-acceptance-phase-5-integration-tests.md](../45-agentic-workflows-provenance-safety-and-milestone-acceptance-phase-5-integration-tests.md)
+- [45-agentic-workflows-provenance-safety-and-milestone-acceptance-contract-and-data-model.md](../60-specification/45-agentic-workflows-provenance-safety-and-milestone-acceptance-contract-and-data-model.md)
+- [45-agentic-workflows-provenance-safety-and-milestone-acceptance-behavior-and-integration.md](../60-specification/45-agentic-workflows-provenance-safety-and-milestone-acceptance-behavior-and-integration.md)

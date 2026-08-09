@@ -111,6 +111,26 @@ open workbenches in inquiries, and session evidence in the journal.
   — documents Section 4.4 implementation: successful flow tests, failure
   handling tests, timeout and cancellation tests, and cross-milestone
   compatibility tests.
+- [Phase 5 Contract And Data Model Implementation](m7-phase-05-contract-and-data-model-implementation.md)
+  — documents Section 5.1 implementation from Phase 5 plan: workflow types
+  (direct-model-response, structured-response, model-to-tool-continuation,
+  retrieval-grounded-answer, code-execution, multi-agent-delegation), approval
+  outcomes (approval-required, denied, expired), quota exhaustion, revoked
+  secret, cancelled model stream, and provenance references (model, tool,
+  retrieval, state-revision, directive, attempt, policy).
+- [Phase 5 Behavior And Integration Implementation](m7-phase-05-behavior-and-integration-implementation.md)
+  — documents Section 5.2 implementation: hostile output validation, loop
+  termination under budgets, deterministic resume from snapshots, and the
+  Milestone 7 workflow corpus with provenance coverage, safety boundaries,
+  cost evidence, and residual model-quality limitations.
+- [Phase 5 Failure Evidence And Operational Notes Implementation](m7-phase-05-failure-evidence-and-operational-notes-implementation.md)
+  — documents Section 5.3 implementation: failure outcomes, bounded
+  diagnostics, evidence emission, implementation-defined choices, deferred
+  work, and results that would invalidate earlier milestone assumptions.
+- [Phase 5 Integration Tests Implementation](m7-phase-05-integration-tests-implementation.md)
+  — documents Section 5.4 implementation: successful flow tests, failure
+  handling tests, timeout and cancellation tests, and cross-milestone
+  compatibility tests.
 
 ## Maintaining this index
 

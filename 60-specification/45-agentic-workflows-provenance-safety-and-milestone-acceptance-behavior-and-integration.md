@@ -96,8 +96,7 @@ Related chapters:
 [Threads Checkpoints Memory Approvals Quotas And Secret Leases Failure Evidence And Operational Notes](44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-failure-evidence-and-operational-notes.md),
 [Threads Checkpoints Memory Approvals Quotas And Secret Leases Phase 4 Integration Tests](44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-phase-4-integration-tests.md),
 [Agentic Workflows Provenance Safety And Milestone Acceptance Contract And Data Model](45-agentic-workflows-provenance-safety-and-milestone-acceptance-contract-and-data-model.md),
-[Agentic Workflows Provenance Safety And Milestone Acceptance Failure Evidence And Operational Notes](45-agentic-workflows-provenance-safety-and-milestone-acceptance-failure-evidence-and-operational-notes.md),
-[Agentic Workflows Provenance Safety And Milestone Acceptance Phase 5 Integration Tests](45-agentic-workflows-provenance-safety-and-milestone-acceptance-phase-5-integration-tests.md).
+[Agentic Workflows Provenance Safety And Milestone Acceptance Failure Evidence And Operational Notes](45-agentic-workflows-provenance-safety-and-milestone-acceptance-failure-evidence-and-operational-notes.md).
 
 ## 45.2 Behavior And Integration
 
@@ -278,28 +277,28 @@ Residual model-quality limitations include the following:
 
 ### 45.2.1 Budget configurability
 
-- **Permission**: The host MAY configure workflow budgets per tenant, per agent, or per workflow.
+- **Permission**: The host MAY configure workflow budgets per tenant, with per-agent override support. Tenants are the natural billing and trust boundary — they own their agents and should control spend. Per-agent override lets a tenant run a "sandbox" agent with tighter limits while a "power" agent gets the full amount. Per-workflow configuration is not supported.
 - **Recommendation**: The host SHOULD support tenant-level configuration by default.
 - **Permitted presentation**: The host MAY present the configured budgets to the operator.
 - **Limit**: Budgets MUST be enforced at all times.
 
 ### 45.2.2 Hostile output custom rules
 
-- **Permission**: The host MAY support custom validation rules for hostile output.
-- **Recommendation**: The host SHOULD document any custom validation rules.
+- **Permission**: The host MAY support a host-configurable declarative validation pipeline beyond built-in rules (schema, length, content filters). Different tenants have different requirements — a healthcare tenant needs HIPAA-sensitive filtering, a fintech tenant needs PII/redaction rules. Custom rules should be expressed declaratively (regex patterns, schema extensions, policy scripts) rather than arbitrary code, so the host can audit and sandbox them.
+- **Recommendation**: The host SHOULD document any custom validation rules and ensure they compose with built-in filters in a defined order.
 - **Permitted presentation**: The host MAY present custom validation rules to the operator.
-- **Limit**: Custom rules MUST not bypass built-in safety boundaries.
+- **Limit**: Custom rules MUST not bypass built-in safety boundaries. Earlier rules take precedence over later ones.
 
 ### 45.2.3 Deterministic resume partial results
 
-- **Permission**: The host MAY support partial results on deterministic resume.
-- **Recommendation**: The host SHOULD return partial results when available.
+- **Permission**: The host MAY support partial results on deterministic resume, but only when explicitly opted in by the workflow author via a workflow-level field (`partial_results_allowed: true/false`). Some workflows (e.g., multi-step research) are fine with partial results — "here's what we found so far." Others (e.g., financial transactions) are not — partial execution is meaningless. The opt-in mechanism lets the workflow author declare intent. The resume behavior itself is deterministic — the same snapshot always produces the same continuation.
+- **Recommendation**: The host SHOULD return partial results when the workflow author has opted in and partial results are available.
 - **Permitted presentation**: The host MAY present partial results to the user.
-- **Limit**: Partial results MUST be clearly marked as incomplete.
+- **Limit**: Partial results MUST be clearly marked as incomplete. Without explicit opt-in, the host MUST NOT return partial results automatically.
 
 ### 45.2.4 Residual limitation quantification
 
-- **Permission**: The host MAY quantify residual model-quality limitations (e.g., hallucination rate).
-- **Recommendation**: The host SHOULD report quantified limitations in operator dashboards.
+- **Permission**: The host MAY quantify residual model-quality limitations (e.g., hallucination rate) and expose them in operator dashboards and audit logs. Quantified metrics are operational data, not normative thresholds — the framework cannot enforce model quality, which depends on the model, not the framework. Saying "hallucination rate < 5%" in a spec implies the framework can enforce it, which it cannot. Thresholds belong in tenant-level policy, not the framework spec.
+- **Recommendation**: The host SHOULD report quantified limitations in operator dashboards so operators can make informed decisions (e.g., "model A has 2% hallucination rate, model B has 8% — choose based on your use case").
 - **Permitted presentation**: The host MAY present quantified limitations to the operator.
-- **Limit**: Quantified limitations MUST be based on empirical data.
+- **Limit**: Quantified limitations MUST be based on empirical data and MUST NOT be used as normative compliance thresholds. The spec requires completeness of the provenance reference structure; quantified reporting is a host implementation concern.
