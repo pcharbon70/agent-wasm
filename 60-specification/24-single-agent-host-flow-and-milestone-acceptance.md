@@ -47,7 +47,7 @@ Related chapters:
 [Sensors Schedules Timers And External Signal Ingress](23-sensors-schedules-timers-and-external-signal-ingress.md),
 [Deterministic Reducer Semantics And Milestone Acceptance](14-deterministic-reducer-semantics-and-milestone-acceptance.md).
 
-## 3.1 Contract And Data Model
+## 5.1 Contract And Data Model
 
 ### Reference host flow
 
@@ -101,7 +101,7 @@ The host MUST support the following representative flows:
 > **Normative definition.**
 Each representative flow MUST be verified by the Phase 5 integration tests.
 
-## 3.2 Behavior And Integration
+## 5.2 Behavior And Integration
 
 ### Failure scenarios
 
@@ -168,7 +168,7 @@ The following durability gaps are intentionally deferred to Milestone 4:
 These durability gaps mean that a host restart will lose all state.
 Milestone 4 will address these gaps.
 
-## 3.3 Failure Evidence And Operational Notes
+## 5.3 Failure Evidence And Operational Notes
 
 ### Failure modes
 
@@ -248,7 +248,7 @@ conformance obligation for current implementations:
 
 4. **Milestone 4 planning**: Future milestones will build on Milestone 3 contracts and may introduce additional phases and chapters.
 
-## 3.4 Phase 5 Integration Tests
+## 5.4 Phase 5 Integration Tests
 
 ### Canonical successful flow
 

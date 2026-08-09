@@ -283,15 +283,20 @@ CancellationState {
 | `cancellation_state` | CancellationState | Yes | Durable cancellation state |
 
 > **Normative definition.**
-The `DurableState` MUST be persisted to durable storage on every state
-transition.
-The host MUST NOT lose `DurableState` across host restarts.
+The `DurableState` concept MUST be maintained.
+The concrete persistence mechanism for `DurableState` is deferred to Milestone 4.
+During Milestone 3, `DurableState` is held in memory only.
+
+> **Non-normative note.**
+Milestone 4 will add durable storage for `DurableState`, registry records,
+mailbox entries, sensor state, schedule state, and timer state.
+Until then, a host restart will lose all state.
 
 > **Normative definition.**
 The live actor (Extism instance) is a disposable projection of the registry
 record.
 The host MUST NOT persist the live actor itself; only the registry record
-and `DurableState` are durable.
+and `DurableState` are durable concepts.
 
 ## 3.2 Behavior And Integration
 

@@ -46,7 +46,7 @@ Related chapters:
 [Agent Manifests Artifacts Schemas And Registries](03-agent-manifests-artifacts-schemas-and-registries.md),
 [Deterministic Reducer Semantics And Milestone Acceptance](14-deterministic-reducer-semantics-and-milestone-acceptance.md).
 
-## 3.1 Contract And Data Model
+## 1.1 Contract And Data Model
 
 ### Host invocation input
 

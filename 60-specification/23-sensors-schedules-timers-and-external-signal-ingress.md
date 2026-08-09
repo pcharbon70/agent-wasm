@@ -47,7 +47,7 @@ Related chapters:
 [Agent Registry Activation Cancellation And Completion](22-agent-registry-activation-cancellation-and-completion.md),
 [Deterministic Reducer Semantics And Milestone Acceptance](14-deterministic-reducer-semantics-and-milestone-acceptance.md).
 
-## 3.1 Contract And Data Model
+## 4.1 Contract And Data Model
 
 ### Sensor descriptor
 
@@ -232,7 +232,7 @@ The `due_time` field is an absolute timestamp.
 The host MUST fire the timer at or after the `due_time`.
 The host MUST NOT fire the timer before the `due_time`.
 
-## 3.2 Behavior And Integration
+## 4.2 Behavior And Integration
 
 ### Signal admission boundary
 
@@ -362,7 +362,7 @@ OutcomeKind {
 | `Disabled` | Sensor disabled | Sensor is disabled | `signal.ingress.disabled` |
 | `FailedSource` | Source failed | Source failed to emit signal | `signal.ingress.failed_source` |
 
-## 3.3 Failure Evidence And Operational Notes
+## 4.3 Failure Evidence And Operational Notes
 
 ### Failure modes
 
@@ -437,7 +437,7 @@ conformance obligation for current implementations:
 
 4. **Milestone 4 planning**: Future milestones will build on Milestone 3 contracts and may introduce additional phases and chapters.
 
-## 3.4 Phase 4 Integration Tests
+## 4.4 Phase 4 Integration Tests
 
 ### Canonical successful flow
 

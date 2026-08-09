@@ -46,7 +46,7 @@ Related chapters:
 [Extism Invocation Boundary Instances And Output Validation](20-extism-invocation-boundary-instances-and-output-validation.md),
 [Deterministic Reducer Semantics And Milestone Acceptance](14-deterministic-reducer-semantics-and-milestone-acceptance.md).
 
-## 3.1 Contract And Data Model
+## 2.1 Contract And Data Model
 
 ### Mailbox entries
 
@@ -169,7 +169,7 @@ overload policy defined in section 3.2.
 The host MUST provide configuration for the mailbox bounds.
 The bounds MUST be documented in the conformance profile.
 
-## 3.2 Behavior And Integration
+## 2.2 Behavior And Integration
 
 ### Overload behavior
 
@@ -275,7 +275,7 @@ The host MUST handle each failure outcome as follows:
 
 5. **Host shutdown**: The host MUST release the lease and mark the turn as failed. The next turn request for the agent MUST acquire a new lease.
 
-## 3.3 Failure Evidence And Operational Notes
+## 2.3 Failure Evidence And Operational Notes
 
 ### Failure modes
 
@@ -353,7 +353,7 @@ conformance obligation for current implementations:
 
 4. **Milestone 4 planning**: Future milestones will build on Milestone 3 contracts and may introduce additional phases and chapters.
 
-## 3.4 Phase 2 Integration Tests
+## 2.4 Phase 2 Integration Tests
 
 ### Canonical successful flow
 
