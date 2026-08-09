@@ -51,6 +51,7 @@ themselves.
 - [Extism Invocation Boundary Instances And Output Validation](20-extism-invocation-boundary-instances-and-output-validation.md) — Phase 1 of Milestone 3; establishes the host boundary that resolves artifacts, creates constrained instances, invokes exports, and treats all guest output as untrusted until validated.
 - [Mailboxes Ordering Bounds Fairness And Turn Leases](21-mailboxes-ordering-bounds-fairness-and-turn-leases.md) — Phase 2 of Milestone 3; provides one-at-a-time committed turns per agent while bounding queued work and making overload behavior explicit.
 - [Agent Registry Activation Cancellation And Completion](22-agent-registry-activation-cancellation-and-completion.md) — Phase 3 of Milestone 3; manages logical agent identity and disposable live actors without persisting engine or process handles.
+- [Sensors Schedules Timers And External Signal Ingress](23-sensors-schedules-timers-and-external-signal-ingress.md) — Phase 4 of Milestone 3; converts external events and time into validated signals without granting event sources direct access to agent state.
 
 ## Maintaining this index
 
