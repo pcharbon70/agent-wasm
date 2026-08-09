@@ -235,7 +235,7 @@ AgentRegistryEntry {
   metadata: Map<String, Value>
 }
 
-AgentStatus = "active" | "inactive" | "pending" | "deleted"
+AgentStatus = "active" | "inactive" | "suspended" | "pending" | "deleted"
 
 ResolutionState {
   address: TenantQualifiedAgentAddress,
@@ -364,7 +364,7 @@ RelationshipRecord {
 
 RelationshipId = string (globally unique, stable for the relationship's lifetime)
 PrincipalId = string (identity of the principal that created the relationship)
-RelationshipStatus = "active" | "suspended" | "terminated"
+RelationshipStatus = "pending" | "active" | "suspended" | "terminated"
 ```
 
 > **Normative definition.**
@@ -789,12 +789,16 @@ The host MUST validate signal provenance fields at reception time:
    identity.
    If it is not, the signal MUST be rejected with the diagnostic
    `signal.provenance.originating-principal-invalid`.
-3. `delegation_chain` MUST form a valid chain: each delegation in the
+3. `causation_id`, if present, MUST reference an existing relationship
+   that is in the `active` or `pending` state.
+   If the relationship does not exist or is not active, the signal MUST
+   be rejected with the diagnostic `signal.provenance.causation-invalid`.
+4. `delegation_chain` MUST form a valid chain: each delegation in the
    chain MUST be an active `delegate` relationship, and the target of
    each delegation MUST match the source of the next.
    A broken chain MUST be rejected with the diagnostic
    `signal.provenance.delegation-chain-invalid`.
-4. `return_address`, if present, MUST resolve to a known agent address.
+5. `return_address`, if present, MUST resolve to a known agent address.
    If it does not, the signal MUST be rejected with the diagnostic
    `signal.provenance.return-address-unknown`.
 
@@ -2278,31 +2282,10 @@ diagnostic prefix and MUST NOT mutate any state.
 > but the fields listed above are the minimum that MUST be produced
 > to establish conformance with this specification.
 
-### Variability register
+## Variability register
 
 The following table enumerates every implementation-defined choice,
 MAY permission, permitted variation, and limit defined in this section.
-Each entry references the rule or definition it modifies and states the
-required documentation obligation.
-
-| ID | Rule / Definition reference | Variability | Required documentation | Default |
-|----|---------------------------|-------------|----------------------|---------|
-| V-6.1-01 | Canonical address representation (separator character) | The separator character used to concatenate `tenant_id` and `local_id` in the canonical string representation of `TenantQualifiedAgentAddress`. | Conformance profile. | `:` |
-| V-6.1-02 | `local_id` generation method | The method used to generate `local_id` values (UUID v4, cryptographic random, monotonic counter with obfuscation, or other). | Conformance profile. | UUID v4 |
-| V-6.1-03 | Pending relationship timeout | The bounded time after which a pending relationship is automatically terminated. | Conformance profile. | 60 seconds |
-| V-6.1-04 | Stricter cardinality limits | Host-local cardinality limits that are stricter than the defaults in the cardinality table. | Conformance profile. | None (use defaults) |
-| V-6.1-05 | Delegation scope schema | The schema used to describe delegation scope, duration, and limitations in `delegate` relationship metadata. | Conformance profile. | Implementation-defined |
-| V-6.1-06 | Archived relationship retention | The retention period for archived (deleted) relationship records. | Conformance profile. | Same as evidence retention |
-| V-6.1-07 | Cross-tenant relationship policy | The specific cross-tenant policies applied to relationship creation, visibility, and resolution. | Conformance profile; must reference
-[Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md)
-and
-[Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md). | Deny by default |
-| V-6.1-08 | Relationship snapshot consistency model | Whether resolution returns a strong-consistency snapshot or a eventually-consistent snapshot of relationship state. | Conformance profile. | Strong consistency |
-| V-6.1-09 | Resolution cache invalidation mechanism | The mechanism used to invalidate resolution cache entries on relationship state changes (immediate, event-driven, TTL-based, or hybrid). | Conformance profile. | Event-driven |
-| V-6.1-10 | Signal provenance validation strictness | Whether provenance validation at reception is hard-fail (reject signal) or soft-fail (log warning, allow signal). | Conformance profile. | Hard-fail |
-| V-6.2-01 | Address resolution combination mechanism | How the host combines the durable registry entry with the activation/placement projection to produce a `ResolutionState`, including handling of missing placement and stale references. | Conformance profile. | Registry-first with placement overlay |
-| V-6.2-02 | Maximum delegation chain length | The maximum number of elements permitted in the `delegation_chain` field before the signal is rejected. | Conformance profile. | 128 |
-| V-6.2-03 | Moved outcome delivery mechanism | How the host signals that an agent's placement has changed since the last resolution (informational diagnostic, explicit placement field, or separate notification). | Conformance profile. | Informational diagnostic on placement-request |
 Each entry references the rule or definition it modifies and states the
 required documentation obligation.
 
