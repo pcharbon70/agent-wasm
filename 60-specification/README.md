@@ -59,6 +59,7 @@ themselves.
 - [Retry Timer Recovery Replay Hibernate And Migration](28-retry-timer-recovery-replay-hibernate-and-migration.md) — Phase 4 of Milestone 4; makes delayed work, runtime deactivation, state reconstruction, and schema evolution explicit durable operations.
 - [Crash Injection Durable Effects And Milestone Acceptance](29-crash-injection-durable-effects-and-milestone-acceptance.md) — Phase 5 of Milestone 4; proves state/effect invariants at every commit, dispatch, external-success, acknowledgement, and result-ingress boundary.
 - [Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md) — Phase 1 of Milestone 5; defines adversaries, protected assets, authenticated identities, trust zones, and the vocabulary used by every authorization decision.
+- [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md) — Phase 2 of Milestone 5; establishes host-owned policy decisions that bind every invocation and effect to minimum authority and resource budgets.
 
 ## Maintaining this index
 
