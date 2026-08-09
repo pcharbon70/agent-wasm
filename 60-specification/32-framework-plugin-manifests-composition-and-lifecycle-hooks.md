@@ -984,3 +984,196 @@ the affected milestone MUST be revised and re-validated.
 | Conflict resolution priority | Implementation-defined | Document in conformance profile | Must resolve route priority conflicts explicitly |
 | Trust tier enforcement | Implementation-defined | Document in conformance profile | Must enforce all three trust tier rules |
 | Manifest version validation | Implementation-defined | Document in conformance profile | Must reject unsupported manifest versions |
+
+## 3.3 Failure Evidence And Operational Notes
+
+This section establishes the failure outcomes, bounded diagnostics, evidence
+requirements, implementation-defined choices, deferred work, and potential
+invalidation results for framework plugin manifests composition and
+lifecycle hooks.
+
+### Failure outcomes
+
+> **Normative definition.**
+The host MUST define the following failure outcomes for framework plugin
+manifests composition and lifecycle hooks. Each outcome represents a
+distinct failure mode that the host MUST detect, classify, and report
+without exposing secrets to unprivileged callers.
+
+1. **Malformed**: The manifest does not conform to the declared schema
+   or data model defined in [Contract And Data Model](#31-contract-and-data-model).
+2. **Incompatible**: The manifest references a manifest version, schema
+   format, or trust tier that the host does not support.
+3. **Conflicting**: A conflict check fails during composition as defined
+   in [Composition order and conflict checks](#composition-order-and-conflict-checks).
+4. **Unauthorized**: The caller lacks the trust class required for the
+   requested lifecycle operation as defined in
+   [Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md).
+5. **Exhausted**: The host cannot allocate resources for the plugin,
+   including state namespace exhaustion, route table overflow, or
+   capability grant exhaustion.
+6. **Unavailable**: A required dependency is unavailable, including
+   missing artifacts, unresolved grants, or pending operator approval.
+
+> **Normative definition.**
+Each failure outcome MUST be mapped to a specific error code, a bounded
+diagnostic message, and the phase boundary at which the failure was
+detected. The diagnostic MUST identify the phase contract, the conformance
+profile, and the failed boundary without exposing secrets, internal
+state, or information accessible only to privileged callers.
+
+> **Non-normative note.**
+These six failure outcomes cover the primary failure modes for framework
+plugin manifests composition and lifecycle hooks. Additional failure
+outcomes are defined in the failure semantics subsection of
+[Behavior And Integration](#32-behavior-and-integration), including
+missing dependency, version conflict, circular dependency, ambiguous
+route, orphaned state, and revoked publisher. Implementations SHOULD
+emit diagnostics for all twelve failure outcomes to provide operators
+with comprehensive failure visibility.
+
+### Bounded diagnostics and evidence
+
+> **Normative definition.**
+The host MUST emit bounded diagnostics for each failure outcome. Each
+diagnostic MUST contain:
+
+1. The failure outcome category (malformed, incompatible, conflicting,
+   unauthorized, exhausted, or unavailable).
+2. The specific error code from the error code table.
+3. The phase boundary at which the failure was detected.
+4. The affected plugin identifier, if applicable.
+5. A human-readable description of the failure.
+6. The evidence required to reproduce or investigate the failure.
+
+> **Normative definition.**
+The host MUST NOT include the following information in diagnostics:
+
+1. Internal implementation details, such as memory addresses, stack
+   traces, or intermediate computation results.
+2. Secrets, such as cryptographic keys, tokens, or passwords.
+3. Information about other plugins or operators that the caller does
+   not have permission to inspect.
+4. Internal state of the host runtime, such as resource allocation
+   tables or scheduler state.
+
+> **Non-normative note.**
+Bounded diagnostics prevent information leakage while still providing
+operators with enough information to diagnose and resolve failures.
+The evidence requirements ensure that operators can reproduce failures
+in a controlled environment for debugging.
+
+> **Normative definition.**
+The host MUST record evidence for each failure outcome in the plugin's
+lifecycle audit log. The evidence MUST include:
+
+1. The timestamp of the failure.
+2. The caller identity and trust class.
+3. The requested lifecycle operation.
+4. The failure outcome and error code.
+5. The affected plugin identifier.
+6. The phase boundary at which the failure was detected.
+7. The diagnostic message.
+
+> **Non-normative note.**
+The lifecycle audit log provides a complete record of all failure
+outcomes for forensic analysis, compliance auditing, and operational
+monitoring. Operators SHOULD monitor the lifecycle audit log for
+patterns that indicate systemic issues, such as repeated malformed
+manifests from a specific publisher.
+
+### Implementation-defined choices
+
+> **Normative implementation-defined choice.**
+The following choices are implementation-defined and MUST be documented
+in the conformance profile. These choices affect how the host detects
+and reports failure outcomes, but do not affect the normative failure
+semantics defined in this section.
+
+1. **Plugin registry backend**: The storage mechanism for plugin
+   manifests and artifacts (in-memory, database, filesystem, etc.).
+2. **Route pattern matching**: The exact algorithm used to match
+   signal and action patterns against routes.
+3. **State namespace isolation**: The mechanism used to isolate plugin
+   state namespaces (separate databases, table prefixes, in-memory
+   maps, etc.).
+4. **Review evidence storage**: The mechanism used to store review
+   evidence for `reviewed-preparation` artifacts.
+5. **Schedule resolution**: The mechanism used to convert schedule
+   declarations into signals (timer threads, event loops, etc.).
+6. **Lifecycle approval workflow**: The mechanism used to obtain
+   operator approval for lifecycle transitions.
+7. **Composition order tie-breaking**: The exact implementation of
+   the tie-breaking rules defined in
+   [Composition order](#composition-order).
+8. **Conflict resolution priority**: The exact priority resolution
+   when two routes match the same pattern with different priorities.
+9. **Diagnostic formatting**: The exact format of diagnostic messages
+   (JSON, YAML, plain text, etc.).
+10. **Audit log retention**: The retention policy for lifecycle audit
+    log entries (TTL, archival, deletion, etc.).
+
+> **Non-normative note.**
+These implementation-defined choices allow host implementations to
+optimize for their specific deployment environments while maintaining
+normative conformance. Operators SHOULD review the conformance profile
+to understand how the host implements these choices.
+
+### Deferred work
+
+> **Non-normative note.**
+The following work is deferred to later phases or host implementations.
+These items are not part of the Phase 3 scope and MUST NOT be considered
+normative obligations for Phase 3 conformance.
+
+1. **Dynamic plugin discovery**: Runtime discovery of new plugin
+   manifests without a host restart.
+2. **Plugin marketplace**: A centralized or federated registry for
+   plugin distribution.
+3. **Plugin analytics**: Usage telemetry for plugin composition and
+   lifecycle events.
+4. **Plugin hot-reload**: Live swapping of plugin versions without
+   downtime.
+5. **Plugin sandboxing improvements**: Additional isolation layers
+   beyond the Extism boundary for `privileged-host` artifacts.
+6. **Cross-plugin dependency management**: Explicit dependency
+   declarations between plugins and automatic resolution.
+7. **Plugin compatibility matrix**: Automated verification that
+   plugins are compatible before composition.
+
+> **Non-normative note.**
+Deferred work items are documented for awareness and to prevent scope
+creep. Host implementations MAY choose to implement any or all of these
+items as extensions beyond the Phase 3 scope.
+
+### Results that could invalidate earlier milestones
+
+> **Non-normative note.**
+The following results from Phase 3 MAY invalidate earlier milestone
+assumptions. If any of these results are observed during Phase 3
+integration tests, the affected earlier milestone MUST be revised and
+re-validated before Phase 3 can be promoted to `status: normative`.
+
+1. **Composition latency**: If manifest composition latency exceeds
+   the turn timeout defined in
+   [Single-Agent Host Flow And Milestone Acceptance](24-single-agent-host-flow-and-milestone-acceptance.md),
+   the timeout or composition batching strategy MUST be revised.
+2. **Route table capacity**: If the route table exceeds the capacity
+   planned in earlier milestones, the capacity plan MUST be revised.
+3. **State namespace exhaustion**: If namespace allocation exhausts
+   the planned capacity, the allocation strategy MUST be revised.
+4. **Privileged artifact surface**: If the surface area of privileged
+   artifacts is larger than planned, the trust model defined in
+   [Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md)
+   MUST be revised.
+5. **Lifecycle operation ordering**: If the lifecycle operation ordering
+   defined in [Lifecycle operations](#lifecycle-operations) proves
+   insufficient for the observed deployment patterns, the ordering
+   MUST be revised.
+
+> **Non-normative note.**
+If any result from Phase 3 invalidates an earlier milestone assumption,
+the affected milestone MUST be revised and re-validated. The revision
+process is governed by
+[Specification Authority](../SPECIFICATION-AUTHORITY.md) and
+[Conformance Vocabulary](../CONFORMANCE-VOCABULARY.md).
