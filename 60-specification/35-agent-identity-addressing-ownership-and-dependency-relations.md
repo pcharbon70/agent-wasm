@@ -1776,10 +1776,533 @@ transitions complete within bounded time; if consent workflows are
 inherently unbounded (e.g., awaiting human approval that may never come),
 the lifecycle model needs a new state or a different timeout strategy.
 
-## Variability register
+## 6.4 Phase 1 Integration Tests
+
+### Test objectives
+
+> **Normative definition.**
+> Phase 1 integration tests are the executable evidence bundle that
+> demonstrates the contracts, behavior, failure semantics, and integration
+> points defined in sections 6.1 through 6.3 operate correctly as a
+> coordinated system under the conditions specified by
+> [Milestone 6](../.spec/planning/agentic-system/milestone-06-multi-agent-coordination-and-topology/README.md).
+> Integration tests exercise observable contracts, not private
+> implementation structure, and must produce reproducible evidence for
+> later milestone and release gates.
+
+> **Normative definition.**
+> The test objectives for Phase 1 integration tests are:
+
+1. **Canonical flow**: Verify the complete successful path from agent
+   address registration through relationship creation, address resolution,
+   signal provenance propagation, and result delivery under normal
+   operating conditions.
+2. **Failure handling**: Verify that malformed, incompatible, stale,
+   duplicate, and boundary-limit inputs are rejected with stable
+   diagnostics that comply with the taxonomy defined in
+   section 6.3, and that no unauthorized or partial state persists after
+   a failure.
+3. **Address stability**: Verify that agent addresses remain stable
+   across agent moves (placement changes across engine instances,
+   workers, or nodes), engine instance restarts, and sleep cycles, and
+   that address resolution continues to return correct results without
+   requiring relationship recreation.
+4. **Relation enforcement**: Verify that relationship authority checks,
+   cardinality limits, and visibility rules are enforced as defined in
+   section 6.1, and that unauthorized or violating operations are
+   rejected with the diagnostics defined in sections 6.2 and 6.3.
+5. **Cross-milestone compatibility**: Verify that the fixtures defined
+   for Phase 1 do not regress behavior established by milestones 1
+   through 5, and that address and relationship operations remain
+   compatible with signal envelopes, agent registry, mailbox, and
+   provenance contracts defined in earlier milestones.
+
+> **Non-normative note.**
+> The five objectives map directly to the phase planning structure in
+> the Phase 1 planning document under
+> [Milestone 6](../.spec/planning/agentic-system/milestone-06-multi-agent-coordination-and-topology/phase-01-agent-identity-addressing-ownership-and-dependency-relations.md),
+> ensuring that the integration test suite is traceable from planning
+> through execution through promotion to normative status.
+
+### Successful flow tests
+
+> **Normative definition.**
+> Successful flow tests verify that the complete canonical path through
+> the agent identity, addressing, ownership, and dependency relations
+> system operates correctly end-to-end.
+> Each successful flow test MUST exercise one or more of the contracts
+> defined in section 6.1 and the behavior defined in section 6.2, and
+> MUST verify that the system produces the expected observable result
+> without error.
+
+#### Agent address registration
+
+> **Normative definition.**
+> The agent address registration successful flow test verifies:
+
+1. The host assigns a unique `local_id` to a newly created agent within
+   a tenant, producing a `TenantQualifiedAgentAddress` that is unique
+   within that tenant.
+2. The canonical string representation of the address is deterministic
+   and parseable according to the separator rule defined in
+   section 6.1.
+3. The `local_id` is opaque (not predictable from the tenant_id or
+   from other agents' local_ids in the same tenant).
+4. The agent registry entry is written through the durable state layer
+   defined in
+   [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md).
+5. The agent status in the registry entry is `active` (or the status
+   appropriate to the creation path, such as `pending` if the creation
+   does not immediately activate the agent).
+6. A subsequent address resolution for the registered address returns
+   a `ResolutionState` with `status` matching the registry entry and
+   a placement (if the agent is active) consistent with the host's
+   current scheduling.
+
+> **Non-normative note.**
+> Steps 4 through 6 verify the integration between the address registry
+> defined in this chapter and the durable state and agent registry
+> chapters that back it.
+> A failure at step 4 indicates a durable state integration defect; a
+> failure at step 6 indicates an address resolution integration defect.
+
+#### Relationship creation
+
+> **Normative definition.**
+> The relationship creation successful flow test verifies:
+
+1. A relationship of each defined type (`parent`, `child`, `owner`,
+   `member`, `dependency`, `observer`, `delegate`, `result-recipient`)
+   is created between two agents in the same tenant, following the
+   creation authority rules in section 6.1.
+2. For relationship types requiring consent (`parent`, `child`, `owner`),
+   the target agent's consent is required and verified before the
+   relationship is admitted to `Active` status.
+3. For `member` relationships, the invitation/approval evidence is
+   recorded and verified.
+4. For `dependency` relationships, the relationship transitions from
+   `Pending` to `Active` only after the target confirms willingness to
+   provide the dependency.
+5. The relationship record includes a stable `relationship_id` that
+   is globally unique.
+6. The relationship record is written through the durable state layer
+   and subject to the atomic commit protocol defined in
+   [Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md).
+7. A relationship query returns the created relationship consistent
+   with the visibility policy in section 6.1.
+
+> **Non-normative note.**
+> Each relationship type requires a separate test iteration because
+> the creation authority, consent, and lifecycle rules differ.
+> The test suite MUST cover all eight types to establish complete
+> coverage.
+
+#### Address resolution
+
+> **Normative definition.**
+> The address resolution successful flow test verifies:
+
+1. An address resolution query for a known, active agent returns a
+   `ResolutionState` with `status: "active"` and a placement reflecting
+   the agent's current runtime location.
+2. An address resolution query for a known, inactive agent returns a
+   `ResolutionState` with `status: "inactive"` and an absent `placement`.
+3. An address resolution query for a known, deleted agent returns a
+   `ResolutionState` with `status: "deleted"` and an absent `placement`.
+4. An address resolution query for an unknown agent returns a
+   `ResolutionState` with `status: "unknown"` and an absent `placement`.
+5. A signal delivered to an agent with a placement returns a successful
+   delivery receipt.
+6. A signal delivered to an agent without a placement is queued in
+   the agent's mailbox as defined in
+   [Mailboxes Ordering Bounds Fairness And Turn Leases](21-mailboxes-ordering-bounds-fairness-and-turn-leases.md).
+
+#### Signal provenance
+
+> **Normative definition.**
+> The signal provenance successful flow test verifies:
+
+1. A signal created by an agent includes `originating_agent` and
+   `originating_principal` fields set correctly.
+2. A signal relayed through intermediate agents preserves the original
+   `originating_agent` and `originating_principal` without modification.
+3. A signal sent through a `delegate` relationship includes the
+   correct `causation_id` and an updated `delegation_chain`.
+4. A signal with a non-empty `delegation_chain` has a chain that forms
+   a valid contiguous sequence of active `delegate` relationships.
+5. A signal with a `return_address` field set is delivered to that
+   address (not to the current sender's placement) when results are
+   produced.
+6. A signal with `return_address: null` does not receive results at
+   any address.
+7. All provenance fields are recorded in the signal evidence logs
+   defined in
+   [Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md).
+
+### Failure handling tests
+
+> **Normative definition.**
+> Failure handling tests verify that the system correctly rejects
+> invalid inputs with the diagnostics defined in section 6.3 and that
+> no unauthorized or partial state persists after a failure.
+> Each failure test targets one or more failure outcome categories from
+> the taxonomy in section 6.3.
+
+#### Malformed inputs
+
+> **Normative definition.**
+> Malformed input failure tests verify:
+
+1. An agent address with an empty `tenant_id` is rejected with the
+   diagnostic `agent.identity.malformed.address-empty-tenant`.
+2. An agent address with an empty `local_id` is rejected with the
+   diagnostic `agent.identity.malformed.address-empty-local-id`.
+3. A relationship creation request with an invalid `RelationshipType`
+   (a value not in the defined set) is rejected with the diagnostic
+   `relationship.record.invalid-type`.
+4. A self-relationship (source and target are the same agent address)
+   is rejected with the diagnostic `relationship.self-reference-invalid`.
+5. A signal with a malformed `delegation_chain` (e.g., a non-list type
+   or a list containing non-string elements) is rejected with the
+   diagnostic `signal.provenance.malformed-field`.
+6. A signal with an `originating_agent` that is not a valid
+   `TenantQualifiedAgentAddress` is rejected with the diagnostic
+   `signal.provenance.originating-agent-unknown`.
+
+All malformed failures MUST use the `agent.identity.malformed.*`
+diagnostic prefix and MUST NOT mutate any state.
+
+#### Incompatible inputs
+
+> **Normative definition.**
+> Incompatible input failure tests verify:
+
+1. A relationship creation request for a `parent` relationship where
+   the target agent already has a `parent` relationship (violating the
+   cardinality limit of 1) is rejected with the diagnostic
+   `agent.identity.incompatible` (or `agent.identity.exhausted.cardinality-parent-limit`,
+   depending on whether the limit is classified as incompatible or
+   exhausted; the implementation MUST document this classification in
+   the conformance profile).
+2. A relationship lifecycle transition that is not permitted by the
+   state machine in section 6.1 (e.g., transitioning from `Active` to
+   `Pending`) is rejected with the diagnostic
+   `relationship.lifecycle.incompatible-state-transition`.
+3. A signal with a `causation_id` that references a non-existent or
+   terminated relationship is rejected with the diagnostic
+   `signal.provenance.causation-invalid`.
+
+#### Stale inputs
+
+> **Normative definition.**
+> Stale input failure tests verify:
+
+1. A relationship operation (suspend, terminate) on a relationship
+   whose state has changed since the operation was initiated (e.g.,
+   the relationship was terminated by another party between the time
+   of the query and the time of the operation) is rejected with the
+   diagnostic `agent.identity.conflict.relationship-state-changed`.
+2. An address resolution request that arrives after the agent has been
+   deleted is handled correctly: the resolution returns `status: "deleted"`
+   and any in-flight delivery is rejected with the diagnostic
+   `agent.resolution.deleted`.
+
+#### Duplicate inputs
+
+> **Normative definition.**
+> Duplicate input failure tests verify:
+
+1. A second agent creation request with the same `local_id` within the
+   same tenant is rejected with the diagnostic
+   `agent.address.duplicate-local-id`.
+2. A relationship creation request that reuses the `relationship_id` of
+   an already-deleted relationship is rejected with the diagnostic
+   `relationship.id-reused-invalid`.
+
+#### Boundary-limit inputs
+
+> **Normative definition.**
+> Boundary-limit failure tests verify:
+
+1. A `delegation_chain` exceeding the implementation-defined maximum
+   length (minimum 128 elements as defined in section 6.2) is rejected
+   with the diagnostic `signal.provenance.delegation-chain-too-long`.
+2. A `correlation_id` that exceeds implementation-defined size limits
+   is rejected with the diagnostic `signal.provenance.correlation-id-too-long`.
+3. A relationship creation request that would violate cardinality limits
+   is rejected with the diagnostic `relationship.cardinality-exceeded`.
+
+> **Non-normative note.**
+> Boundary-limit tests are important because they exercise the edge
+> cases where the system transitions from "valid but constrained" to
+> "invalid and rejected."
+> These transitions are common sources of off-by-one errors and
+> boundary condition bugs.
+
+### Address stability tests
+
+> **Normative definition.**
+> Address stability tests verify that an agent's `TenantQualifiedAgentAddress`
+> remains stable across runtime events that change the agent's placement,
+> and that address resolution continues to return correct results
+> without requiring relationship recreation or modification.
+
+#### Agent moves
+
+> **Normative definition.**
+> The agent move stability test verifies:
+
+1. After an agent's live actors are migrated from one engine instance
+   (or worker, or physical node) to another, a new address resolution
+   for the agent's address returns the new placement.
+2. The agent's address (the `TenantQualifiedAgentAddress`) does NOT
+   change as a result of the migration.
+3. All existing relationship records continue to reference the agent's
+   unchanged address.
+4. No relationship recreation, modification, or notification is
+   triggered by the migration.
+5. A signal sent to the agent's address after migration is routed to
+   the new placement successfully.
+
+#### Engine instance restarts
+
+> **Normative definition.**
+> The engine instance restart stability test verifies:
+
+1. After an engine instance hosting an agent is restarted (simulating
+   a crash or planned restart), the agent's address is unchanged.
+2. After the agent is reactivated on the restarted engine instance,
+   address resolution returns the new placement.
+3. All existing relationship records are intact and reference the
+   unchanged agent address.
+4. Signals queued in the agent's mailbox during the restart are
+   delivered after reactivation, following the mailbox policies defined
+   in
+   [Mailboxes Ordering Bounds Fairness And Turn Leases](21-mailboxes-ordering-bounds-fairness-and-turn-leases.md).
+
+#### Sleep cycles
+
+> **Normative definition.**
+> The sleep cycle stability test verifies:
+
+1. After an agent transitions to an inactive or suspended state
+   (simulating a sleep cycle), the agent's address is unchanged.
+2. Address resolution for the sleeping agent returns `status: "inactive"`
+   (or `status: "suspended"`) with an absent `placement`.
+3. After the agent transitions back to active, address resolution
+   returns the new placement, and existing relationships are still
+   valid.
+4. Signals delivered to the sleeping agent are queued in the mailbox
+   (per the mailbox specification) and delivered when the agent wakes.
+
+> **Non-normative note.**
+> These three stability tests collectively verify the core design
+> property that agent addresses are independent of process identity,
+> socket identity, engine instance identity, worker identity, and
+> physical node identity (as defined in section 6.1).
+> A failure in any of these tests indicates that the address stability
+> invariant is violated, which would require revision of assumptions
+> in milestones 1 through 5 that depend on stable agent addresses as
+> foreign keys.
+
+### Relation enforcement tests
+
+> **Normative definition.**
+> Relation enforcement tests verify that the authority, cardinality,
+> and visibility rules defined in section 6.1 are enforced as specified,
+> and that violations are rejected with the correct diagnostics.
+
+#### Authority checks
+
+> **Normative definition.**
+> The authority check enforcement tests verify:
+
+1. A `parent` relationship creation without the target agent's consent
+   is rejected with the diagnostic `relationship.creation.unauthorized-consent`.
+2. A `child` relationship creation without the target agent's consent
+   is rejected with the diagnostic `relationship.creation.unauthorized-consent`.
+3. An `owner` relationship creation without the target agent's consent
+   is rejected with the diagnostic `relationship.creation.unauthorized-consent`.
+4. A `dependency` relationship creation where the target does not
+   confirm willingness to serve remains in `Pending` status and does
+   NOT become operative.
+5. An `observer` relationship is terminated unilaterally by the target
+   agent as requested, even without cause.
+6. A `delegate` relationship is terminated unilaterally by the source
+   (delegator) agent, and the target (delegate) complies immediately.
+7. A principal lacking the minimum trust tier for a relationship type
+   is rejected with the diagnostic `agent.identity.unauthorized.relationship-creation-trust-tier-too-low`.
+
+#### Cardinality limits
+
+> **Normative definition.**
+> The cardinality limit enforcement tests verify:
+
+1. An agent that already has a `parent` relationship cannot create a
+   second `parent` relationship; the request is rejected with the
+   diagnostic `relationship.cardinality-exceeded`.
+2. An agent that already has an `owner` relationship cannot create a
+   second `owner` relationship; the request is rejected with the
+   diagnostic `relationship.cardinality-exceeded`.
+3. An agent that already has a `result-recipient` relationship cannot
+   create a second `result-recipient` relationship; the request is
+   rejected with the diagnostic `relationship.cardinality-exceeded`.
+4. Hosts that impose stricter cardinality limits (per V-6.1-04) enforce
+   those limits instead of the defaults.
+
+> **Non-normative note.**
+> Cardinality enforcement is important because it prevents governance
+> ambiguity (multiple parents), benefit ambiguity (multiple owners),
+> and result delivery ambiguity (multiple result-recipient targets).
+> These ambiguities would undermine the authority model defined in
+> section 6.1.
+
+#### Visibility rules
+
+> **Normative definition.**
+> The visibility rule enforcement tests verify:
+
+1. The source agent of a relationship can observe all fields, including
+   metadata.
+2. The target agent of a relationship can observe all fields, including
+   metadata.
+3. A creating principal can observe all fields, including metadata.
+4. An operator can observe all fields, including metadata.
+5. Another agent in the same tenant can observe only type, source,
+   target, and status (no metadata).
+6. An agent in a different tenant cannot observe any fields of a
+   cross-tenant relationship, including its existence.
+7. A principal in one tenant but not the other can observe a
+   cross-tenant relationship's type, source, target, and status, but
+   NOT its metadata.
+8. A query that would return visibility-violating data is filtered or
+   returns an empty result, and the host does not leak information
+   about invisible relationships through timing or error-channel side
+   channels.
+
+> **Non-normative note.**
+> The side-channel prevention requirement (item 8) is a security
+> property derived from
+> [Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md).
+> Implementations MUST design their query interfaces to prevent timing
+> and error-channel information leakage about invisible relationships.
+
+### Cross-milestone compatibility tests
+
+> **Normative definition.**
+> Cross-milestone compatibility tests verify that Phase 1 integration
+> test fixtures do not regress behavior established by milestones 1
+> through 5, and that the contracts defined in this chapter remain
+> compatible with the contracts defined in those earlier milestones.
+
+#### Fixture execution
+
+> **Normative definition.**
+> The cross-milestone compatibility test procedure is:
+
+1. Identify all test fixtures defined in milestones 1 through 5 that
+   exercise agent identity, addressing, signal routing, or inter-agent
+   communication.
+2. Run those fixtures in the context of an implementation that includes
+   the contracts defined in this chapter (milestone 6 Phase 1).
+3. Record any regressions (previously passing fixtures that now fail)
+   or approved variability (previously passing fixtures that fail
+   under a documented implementation-defined choice from the
+   variability register in this chapter).
+4. Regressions MUST be resolved (by fixing the implementation or
+   revising the earlier milestone) before this chapter can be promoted
+   to `status: normative`.
+5. Approved variability MUST be documented in the conformance profile
+   and MUST not undermine the cross-tenant isolation or authority
+   assumptions of milestones 3 through 5.
+
+> **Non-normative note.**
+> Cross-milestone compatibility is the final gate before promotion to
+> normative status.
+> If the address stability or authority enforcement defined in this
+> chapter contradicts assumptions made in earlier milestones, the
+> earlier milestones must be revised before this chapter is promoted.
+> The "results that could invalidate earlier milestones" section in
+> 6.3 identifies the specific assumptions at risk.
+
+### Integration test evidence requirements
+
+> **Normative definition.**
+> Integration test evidence is the inspectable, reproducible record
+> produced by executing the Phase 1 integration tests.
+> Evidence establishes that the phase's contracts, behavior, and
+> failure semantics operate correctly as an integrated system.
+> Evidence is required for promotion from `status: draft` to
+> `status: candidate` and from `status: candidate` to `status: normative`.
+
+> **Normative definition.**
+> The minimum integration test evidence required for this chapter is:
+
+1. **Test execution log**: A record of each test case executed, the
+   pass/fail result, the timestamp, and the implementation under test.
+2. **Diagnostic capture**: For each failed test case, the full
+   diagnostic output including the diagnostic code, category, and
+   human-readable message.
+3. **State snapshots**: For each successful flow test, a snapshot of
+   the relevant state after the test (agent registry entries,
+   relationship records, signal evidence logs) demonstrating that the
+   expected state was produced.
+4. **Failure state verification**: For each failure handling test,
+   evidence that no unauthorized or partial state persists after the
+   failure (e.g., no relationship record created for a rejected
+   creation request, no address assigned for a rejected registration).
+5. **Address stability verification**: For each address stability
+   test, before-and-after snapshots of the agent's address and
+   relationships demonstrating that the address did not change and
+   relationships remained intact.
+6. **Relation enforcement verification**: For each relation enforcement
+   test, evidence that the violating operation was rejected with the
+   correct diagnostic and that no state was mutated by the rejected
+   operation.
+7. **Cross-milestone regression report**: A report documenting which
+   earlier milestone fixtures were re-run, their results, and whether
+   any regressions or approved variability were observed.
+
+> **Normative definition.**
+> Evidence records MUST be written through the durable state layer
+> defined in
+> [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md)
+> and MUST be subject to the same retention and redaction rules as
+> other evidence records in
+> [Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md).
+
+> **Non-normative note.**
+> The evidence requirements above are the minimum for promotion.
+> Implementations MAY produce additional evidence for operational
+> diagnostics, performance benchmarks, or compliance requirements,
+> but the fields listed above are the minimum that MUST be produced
+> to establish conformance with this specification.
+
+### Variability register
 
 The following table enumerates every implementation-defined choice,
 MAY permission, permitted variation, and limit defined in this section.
+Each entry references the rule or definition it modifies and states the
+required documentation obligation.
+
+| ID | Rule / Definition reference | Variability | Required documentation | Default |
+|----|---------------------------|-------------|----------------------|---------|
+| V-6.1-01 | Canonical address representation (separator character) | The separator character used to concatenate `tenant_id` and `local_id` in the canonical string representation of `TenantQualifiedAgentAddress`. | Conformance profile. | `:` |
+| V-6.1-02 | `local_id` generation method | The method used to generate `local_id` values (UUID v4, cryptographic random, monotonic counter with obfuscation, or other). | Conformance profile. | UUID v4 |
+| V-6.1-03 | Pending relationship timeout | The bounded time after which a pending relationship is automatically terminated. | Conformance profile. | 60 seconds |
+| V-6.1-04 | Stricter cardinality limits | Host-local cardinality limits that are stricter than the defaults in the cardinality table. | Conformance profile. | None (use defaults) |
+| V-6.1-05 | Delegation scope schema | The schema used to describe delegation scope, duration, and limitations in `delegate` relationship metadata. | Conformance profile. | Implementation-defined |
+| V-6.1-06 | Archived relationship retention | The retention period for archived (deleted) relationship records. | Conformance profile. | Same as evidence retention |
+| V-6.1-07 | Cross-tenant relationship policy | The specific cross-tenant policies applied to relationship creation, visibility, and resolution. | Conformance profile; must reference
+[Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md)
+and
+[Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md). | Deny by default |
+| V-6.1-08 | Relationship snapshot consistency model | Whether resolution returns a strong-consistency snapshot or a eventually-consistent snapshot of relationship state. | Conformance profile. | Strong consistency |
+| V-6.1-09 | Resolution cache invalidation mechanism | The mechanism used to invalidate resolution cache entries on relationship state changes (immediate, event-driven, TTL-based, or hybrid). | Conformance profile. | Event-driven |
+| V-6.1-10 | Signal provenance validation strictness | Whether provenance validation at reception is hard-fail (reject signal) or soft-fail (log warning, allow signal). | Conformance profile. | Hard-fail |
+| V-6.2-01 | Address resolution combination mechanism | How the host combines the durable registry entry with the activation/placement projection to produce a `ResolutionState`, including handling of missing placement and stale references. | Conformance profile. | Registry-first with placement overlay |
+| V-6.2-02 | Maximum delegation chain length | The maximum number of elements permitted in the `delegation_chain` field before the signal is rejected. | Conformance profile. | 128 |
+| V-6.2-03 | Moved outcome delivery mechanism | How the host signals that an agent's placement has changed since the last resolution (informational diagnostic, explicit placement field, or separate notification). | Conformance profile. | Informational diagnostic on placement-request |
 Each entry references the rule or definition it modifies and states the
 required documentation obligation.
 
