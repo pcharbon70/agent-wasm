@@ -596,6 +596,353 @@ The host defines the query interface for evidence records, the caching
 strategy for redacted views, and the cache invalidation protocol on
 policy changes.
 
+### Security exercises
+
+> **Normative definition.**
+Security exercises are controlled adversarial inputs that exercise the
+specific attack vectors listed in
+[5.2.1.1](../.spec/planning/agentic-system/milestone-05-capabilities-plugins-security-and-tenancy/phase-05-provenance-signing-audit-security-and-milestone-acceptance.md)
+of the Phase 5 planning document.
+Each security exercise simulates a deliberate attack and verifies that
+the artifact provenance admission, evidence recording, and evidence
+redaction systems detect and reject it.
+Security exercises are normative test scenarios; a conforming
+implementation MUST detect every attack vector defined below.
+
+| Exercise | Attack vector | Expected host response | Relevant checks |
+|----------|--------------|----------------------|-----------------|
+| **Malicious imports** | An artifact declares imports from modules that are not permitted by the host's capability policy. | Reject at admission with `artifact.dependency-unresolved` or `artifact.signature-invalid`. | Dependency resolution, signature validity. |
+| **Oversized output** | An artifact produces an invocation output that exceeds the output size limit defined in
+[Synchronous Host Functions WASI Restrictions And Tenant Isolation](33-synchronous-host-functions-wasi-restrictions-and-tenant-isolation.md). | Truncate or reject at invocation time; record `invocation.failed` with `failure_type: output-oversize`. | Invocation boundary, output validation (see
+[Extism Invocation Boundary Instances And Output Validation](20-extism-invocation-boundary-instances-and-output-validation.md)). |
+| **Invalid UTF-8** | An artifact produces an invocation output containing invalid UTF-8 byte sequences in a field declared as UTF-8. | Reject output at invocation time; record `invocation.failed` with `failure_type: invalid-utf8`. | Output validation, UTF-8 conformance. |
+| **Forged identity** | An attacker submits an artifact with a signature produced by a key that impersonates a trusted publisher. | Reject with `artifact.signature-invalid` or `artifact.publisher-untrusted`. | Signature validity, publisher identity. |
+| **Stale grant** | An artifact's publisher was revoked between the artifact's build and its admission attempt. | Reject with `artifact.revoked`. | Revocation check. |
+| **Route confusion** | An artifact exploits ambiguous routing between agent, tenant, and system invocation paths to obtain capabilities it should not receive. | Reject capability grant with `grant.denied` and record `tenant.isolation.violation`. | Grant policy, tenant isolation. |
+| **Output injection** | A malicious artifact attempts to inject tenant-specific data into another tenant's evidence records through a shared artifact. | Reject cross-tenant write; record `tenant.isolation.violation` and emit the security alert path. | Tenant isolation, evidence recording. |
+
+> **Normative definition.**
+The malicious imports exercise tests that the dependency resolution check
+catchs imports that violate the capability policy defined in
+[Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md).
+An import is considered malicious if it references a module, function,
+or memory region that the host's capability policy does not grant to
+the artifact's trust tier.
+The exact mechanism for declaring permitted imports (allowlist, denylist,
+or capability-attenuation policy) is implementation-defined.
+
+> **Non-normative note.**
+Malicious imports are the most common attack vector in WebAssembly
+ecosystems because the sandbox boundary alone does not prevent an
+artifact from declaring imports that the host is configured to expose.
+The defense is at the capability policy layer, not at the sandbox
+layer.
+
+> **Normative definition.**
+The oversized output exercise tests that the host enforces the output
+size limit defined in the conformance profile and in
+[Synchronous Host Functions WASI Restrictions And Tenant Isolation](33-synchronous-host-functions-wasi-restrictions-and-tenant-isolation.md).
+An artifact that produces output exceeding the limit MUST NOT be
+allowed to consume unbounded host resources.
+The host MUST either truncate the output to the limit and emit a
+diagnostic or reject the invocation entirely.
+The choice between truncation and rejection is an implementation-defined
+choice documented in the conformance profile.
+
+> **Normative definition.**
+The invalid UTF-8 exercise tests that the host validates UTF-8
+conformance for output fields declared as UTF-8 in the artifact's
+manifest or the host's capability policy.
+Invalid UTF-8 in a declared UTF-8 field is a specification violation
+by the artifact publisher, not a host defect.
+The host MUST record the violation in an `invocation.failed` evidence
+record and MUST NOT include the invalid bytes in any evidence record
+or diagnostic.
+
+> **Normative definition.**
+The forged identity exercise tests that the signature validity check
+and publisher identity check together prevent an attacker from
+impersonating a trusted publisher.
+An artifact with a signature that is cryptographically valid but signed
+by an untrusted key MUST fail the publisher identity check.
+An artifact with a signature that is not cryptographically valid MUST
+fail the signature validity check.
+The host MUST NOT accept an artifact based solely on the
+`publisher_hint` field, as defined in
+[Artifact admission verification](#artifact-admission-verification).
+
+> **Normative definition.**
+The stale grant exercise tests that the revocation check queries the
+active revocation lists at the moment of admission, not at the moment
+of build.
+An artifact whose publisher was revoked between build and admission
+MUST fail the revocation check regardless of whether the artifact
+itself was signed before revocation.
+The host MUST NOT cache revocation status; the check is performed
+fresh for every admission request.
+
+> **Non-normative note.**
+The stale grant exercise is the primary defense against supply chain
+attacks where an attacker compromises a publisher's signing key after
+the key has been registered in the trust store but before the
+compromise is detected and the key is revoked.
+
+> **Normative definition.**
+The route confusion exercise tests that the host correctly routes
+capability grant requests to the appropriate policy and that an
+artifact cannot exploit ambiguous routing to obtain capabilities it
+should not receive.
+A route confusion attack succeeds if an artifact can cause the host
+to evaluate its grant request against a more permissive policy than
+the one that applies to its actual trust tier, tenant scope, or agent
+pin.
+The host MUST evaluate grant requests against the correct policy
+deterministically and MUST NOT allow an artifact to influence which
+policy is evaluated.
+
+> **Non-normative note.**
+Route confusion is a subclass of privilege escalation attacks.
+The defense is at the policy evaluation layer, not at the sandbox
+layer.
+The exact mechanism for preventing route confusion (immutable policy
+binding, capability attestation, or equivalent) is implementation-defined.
+
+> **Normative definition.**
+The output injection exercise tests that the host isolates evidence
+records by tenant and rejects cross-tenant writes.
+An artifact that attempts to inject tenant-specific data into another
+tenant's evidence records MUST be detected and rejected with
+`tenant.isolation.violation` and the security alert path.
+The host MUST enforce tenant isolation at the evidence writing layer,
+not at the guest module layer, because the guest module has no
+authority to write evidence records directly.
+
+> **Non-normative note.**
+Output injection is the most difficult attack vector to defend against
+because it requires the host to enforce isolation between artifacts
+that are individually admitted and invoked correctly.
+The defense is in the evidence recording flow's tenant-scoped write
+semantics defined in
+[Evidence recording flow](#evidence-recording-flow).
+
+> **Non-normative note.**
+Each security exercise produces an evidence record of the same type
+that would be produced by a real attack of the corresponding kind.
+This ensures that the security alert path is tested in the same
+conditions as a real attack and that the operator receives the same
+notification for both test and real events.
+
+### Adversarial isolation exercises
+
+> **Normative definition.**
+Adversarial isolation exercises are controlled scenarios that exercise
+the specific resilience requirements listed in
+[5.2.1.2](../.spec/planning/agentic-system/milestone-05-capabilities-plugins-security-and-tenancy/phase-05-provenance-signing-audit-security-and-milestone-acceptance.md)
+of the Phase 5 planning document.
+Each adversarial isolation exercise simulates a deliberate attempt to
+breach the system's isolation guarantees and verifies that the system
+detects the breach and recovers to a safe state.
+Adversarial isolation exercises are normative test scenarios; a
+conforming implementation MUST pass every exercise defined below.
+
+| Exercise | Attack vector | Expected host response | Relevant invariants |
+|----------|--------------|----------------------|--------------------|
+| **Tenant residue** | A guest module invocation leaves state in another tenant's scope after completion. | Detect residue with `residue.detected`; quarantine the instance; require operator review. | Tenant isolation, instance mode. |
+| **Pool reset** | A compromised instance in a shared pool retains state after reset. | Detect residue post-reset with `residue.detected`; escalate to operator. | Instance pool, reset semantics. |
+| **Cancellation races** | An artifact exploits a race between invocation cancellation and state commit to leave partial state. | Detect partial state with `residue.detected`; roll back to pre-invocation state. | Cancellation, atomicity. |
+| **Capability revocation** | An artifact retains capabilities after its grant is revoked mid-invocation. | Detect retained capabilities; revoke them; record `tenant.isolation.violation`. | Capability policy, revocation. |
+| **Compromised plugin upgrade** | A malicious plugin upgrade replaces a trusted plugin in an agent's pin without re-admission. | Detect unverified upgrade; reject with `artifact.admission.failed`; require full re-admission. | Artifact admission, agent pin lifecycle. |
+| **Audit tampering** | An attacker modifies or deletes evidence records after writing. | Detect modification with `evidence.integrity-violation`; emit security alert; quarantine affected records. | Evidence integrity, audit log. |
+
+> **Normative definition.**
+The tenant residue exercise tests that the host's instance mode
+policies and tenant isolation invariants prevent a guest module from
+leaving state in another tenant's scope.
+Tenant residue is detected by comparing the host's view of each
+tenant's state before and after an invocation.
+If any state change is observed in a tenant's scope that is not
+attributable to that tenant's own invocation, the host MUST emit
+`residue.detected`.
+The exact mechanism for detecting tenant residue (state snapshots,
+capability auditing, or equivalent) is implementation-defined.
+
+> **Non-normative note.**
+Tenant residue is the most dangerous isolation failure because it
+enables cross-tenant data exfiltration without triggering the
+`tenant.isolation.violation` diagnostic, which is only emitted for
+detected violations, not for successful stealthy leaks.
+The residue detection mechanism is a defense-in-depth control that
+catches violations that the primary isolation layer misses.
+
+> **Normative definition.**
+The pool reset exercise tests that the host's instance pool reset
+semantics eliminate all state from a returned instance, including
+any state that the instance may have retained in host-managed memory,
+registers, or auxiliary data structures.
+If any state remains after reset, the host MUST emit `residue.detected`
+and MUST NOT return the instance to the pool for reuse.
+The instance MUST be quarantined for operator review.
+
+> **Non-normative note.**
+Pool reset is critical for instance pool reuse because the same
+instance may be used by multiple tenants over its lifecycle.
+If reset is incomplete, a subsequent tenant may observe residue from
+a previous tenant's invocation.
+
+> **Normative definition.**
+The cancellation races exercise tests that the host's cancellation
+semantics prevent an artifact from exploiting a race between
+invocation cancellation and state commit to leave partial state.
+A cancellation race attack succeeds if an artifact can cause the host
+to commit a partially-computed state change that is not rolled back
+on cancellation.
+The host MUST enforce atomicity for all state-changing operations,
+as defined in
+[Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md),
+and MUST roll back any partial state on cancellation.
+
+> **Non-normative note.**
+Cancellation races are timing-dependent and difficult to test
+deterministically.
+The defense is at the atomicity layer, not at the cancellation layer.
+If the atomic state journal is correctly implemented, cancellation
+races are impossible by construction.
+
+> **Normative definition.**
+The capability revocation exercise tests that the host enforces
+capability revocation immediately and completely.
+If a capability grant is revoked mid-invocation, the host MUST
+revoke the corresponding capabilities from the invoking instance
+immediately and MUST NOT allow the instance to continue using
+revoked capabilities.
+The host MUST record the revocation in a `grant.denied` evidence
+record and MUST emit `tenant.isolation.violation` if the instance
+attempts to use revoked capabilities after revocation.
+
+> **Non-normative note.**
+Capability revocation is a liveness property: the system must
+respond to revocation within a bounded time, not eventually.
+The exact bounded time is an implementation-defined choice documented
+in the conformance profile.
+
+> **Normative definition.**
+The compromised plugin upgrade exercise tests that the host does not
+allow a plugin to be upgraded in an agent's pin without going through
+the full artifact admission flow.
+A compromised plugin upgrade attack succeeds if a malicious actor
+can replace a trusted plugin in an agent's pin without re-admission,
+either through a direct file system replacement, a cache poisoning
+attack, or a lifecycle hook exploitation.
+The host MUST verify the plugin's admission status at the moment of
+use, not at the moment of installation, and MUST reject any plugin
+that has not been admitted since its last modification.
+
+> **Non-normative note.**
+The compromised plugin upgrade exercise is the primary defense against
+supply chain attacks that target the plugin lifecycle rather than the
+artifact admission layer.
+It ensures that the admission gate is not a one-time check but a
+continuous invariant enforced at every point of use.
+
+> **Normative definition.**
+The audit tampering exercise tests that the host's evidence integrity
+checks and audit log detect any modification or deletion of evidence
+records.
+An audit tampering attack succeeds if an attacker can modify or
+delete an evidence record without triggering `evidence.integrity-violation`
+or the security alert path.
+The host MUST enforce evidence immutability as defined in
+[Host-owned evidence recording](#host-owned-evidence-recording),
+and MUST detect any tampering attempt with the integrity check.
+
+> **Non-normative note.**
+Audit tampering is the most serious adversarial scenario because it
+undermines the entire audit system.
+If an attacker can modify evidence records, the operator has no way
+to distinguish between legitimate events and fabricated ones.
+The defense is evidence immutability, which is the primary invariant
+of the audit system.
+
+> **Non-normative note.**
+Each adversarial isolation exercise produces an evidence record of
+the same type that would be produced by a real attack of the
+corresponding kind.
+This ensures that the security alert path is tested in the same
+conditions as a real attack and that the operator receives the same
+notification for both test and real events.
+It also ensures that the detection and containment mechanisms work
+correctly for both test and real scenarios.
+
+### Threat-to-control matrix publication
+
+> **Normative definition.**
+The threat-to-control matrix is a structured publication that maps each
+threat identified in this phase to the control that mitigates it, the
+adversarial test result, any accepted residual risk, and the required
+operator response.
+The threat-to-control matrix is normative evidence for Milestone 5
+acceptance; it MUST be published as part of the phase completion
+evidence bundle.
+
+> **Normative definition.**
+The threat-to-control matrix contains one row for each threat-control
+pair.
+Each row contains the following fields:
+
+| Field | Required | Content |
+|-------|----------|---------|
+| `threat_id` | Yes | Stable identifier for the threat (e.g., `T-5-01`). |
+| `threat_description` | Yes | Human-readable description of the threat. |
+| `control_id` | Yes | Stable identifier for the control that mitigates the threat (e.g., `C-5-01`). |
+| `control_description` | Yes | Human-readable description of the control. |
+| `control_type` | Yes | The control type: `preventive`, `detective`, `corrective`, or `deterrent`. |
+| `adversarial_test_result` | Yes | The result of the corresponding security or adversarial isolation exercise: `passed`, `failed`, or `deferred`. |
+| `residual_risk` | Yes | The residual risk after the control is applied: `accepted`, `mitigated`, or `unmitigated`. |
+| `residual_risk_rationale` | Conditional | If `residual_risk` is `accepted` or `unmitigated`, a human-readable rationale explaining why the residual risk is acceptable or what additional work is required. |
+| `operator_response` | Yes | The required operator action if the control is triggered: `monitor`, `investigate`, `contain`, `remediate`, or `escalate`. |
+
+> **Normative definition.**
+The threat-to-control matrix MUST include rows for every threat
+identified in the security exercises and adversarial isolation
+exercises of this section, plus every threat identified in the
+[Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md).
+No threat identified in the threat model or in this phase's exercises
+MAY be omitted from the matrix.
+
+> **Non-normative note.**
+The threat-to-control matrix is the primary artifact that demonstrates
+that the phase has completed its security review.
+It provides the milestone acceptance reviewers with a single
+document that maps every threat to its mitigation, test result, and
+required operator response.
+Without the matrix, the reviewers have no structured evidence that
+the security review is complete.
+
+> **Normative definition.**
+A threat with `residual_risk: unmitigated` blocks milestone acceptance.
+A threat with `residual_risk: accepted` requires a documented rationale
+and operator approval before milestone acceptance.
+A threat with `residual_risk: mitigated` does not block milestone
+acceptance, provided the corresponding control passed its adversarial
+test.
+
+> **Normative implementation-defined choice.**
+The host defines the format and storage mechanism for the threat-to-control
+matrix.
+The matrix MUST be machine-readable (YAML, JSON, or equivalent) and
+MUST be includable in the phase's evidence bundle.
+The exact format is an implementation-defined choice documented in
+the conformance profile.
+
+> **Non-normative note.**
+The threat-to-control matrix is distinct from the bounded diagnostics
+defined in
+[5.3 Failure Evidence And Operational Notes](#53-failure-evidence-and-operational-notes).
+Bounded diagnostics are per-failure instances; the threat-to-control
+matrix is a strategic overview of all threats and their mitigations.
+The matrix references bounded diagnostics by `evidence_hash` where
+applicable.
+
 ## 5.3 Failure Evidence And Operational Notes
 
 ### Failure outcomes for artifact admission
