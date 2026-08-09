@@ -127,8 +127,8 @@ before admission:
    defined in
    [Agent Manifests Artifacts Schemas And Registries](03-agent-manifests-artifacts-schemas-and-registries.md).
 4. Each work item's manifest digest MUST correspond to the work item's
-   artifact digest; a manifest that does not declare the artifact MUST
-   be rejected with the diagnostic `fanout.plan.manifest-artifact-mismatch`.
+    artifact digest; a manifest that does not declare the artifact MUST
+    be rejected with the diagnostic `fanout.plan.incompatible-manifest-artifact`.
 5. The `concurrency_bound` MUST be a positive integer and MUST not
    exceed the implementation-defined maximum concurrency per plan.
 6. The `deadline` MUST be a future timestamp relative to the current
@@ -215,23 +215,27 @@ Child work items are bound to the parent fan-out plan through the
 following invariants:
 
 1. A child work item MUST be associated with exactly one parent fan-out
-   plan; a work item whose `plan_id` does not resolve to an active plan
-   MUST be rejected with the diagnostic `fanout.work-item.invalid-plan`.
-2. A child work item MUST not exceed the parent plan's `concurrency_bound`;
+    plan; a work item whose `plan_id` does not resolve to an active plan
+    MUST be rejected with the diagnostic `fanout.plan.incompatible-plan`.
+2. A child work item MUST NOT be created with a `work_item_id` that matches
+    an already-existing work item for the same plan; a duplicate work item
+    submission MUST be rejected with the diagnostic
+    `fanout.work-item.duplicate-work-item-id`.
+3. A child work item MUST not exceed the parent plan's `concurrency_bound`;
    the host MUST schedule child agents such that at most
    `concurrency_bound` child agents are executing concurrently for a given
    plan.
-3. A child work item MUST not outlive the parent fan-out plan's `deadline`;
+4. A child work item MUST not outlive the parent fan-out plan's `deadline`;
    if a child agent has not completed its work item by the deadline, the
    host MUST apply the plan's `cancellation_policy` to determine whether
    to cancel, wait, or allow partial results.
-4. A child work item's result MUST be aggregated according to the parent
+5. A child work item's result MUST be aggregated according to the parent
    plan's `aggregation_policy`; results that do not satisfy the
    `result_contract` MUST be rejected with the diagnostic
-   `fanout.result.contract-violation`.
+   `fanout.result.incompatible-contract`.
 
 > **Non-normative note.**
-The four invariants above ensure that child work items are governed by
+The five invariants above ensure that child work items are governed by
 the parent plan's constraints and that the plan's aggregation policy
 can be applied deterministically.
 The `concurrency_bound` invariant prevents resource exhaustion by
@@ -336,16 +340,6 @@ plan's `aggregation_policy`:
 - `ordered`: Results are aggregated in the order specified by the parent
   plan's `work_items` list, regardless of submission order.
 
-> **Non-normative note.**
-The five aggregation policies provide flexibility for different use cases.
-`all` is appropriate for tasks where the complete result set is required
-(such as distributed queries); `quorum` is appropriate for tasks where
-a majority is sufficient (such as distributed consensus); `first-success`
-is appropriate for tasks where any successful result is sufficient (such
-as load-balanced requests); `best-effort` is appropriate for tasks where
-quality varies (such as distributed sampling); `ordered` is appropriate
-for tasks where result order matters (such as distributed sorting).
-
 ### Partial completion and duplicate suppression
 
 > **Normative definition.**
@@ -357,9 +351,10 @@ The host MUST classify partial results according to the parent plan's
 - `all`: Partial results are collected and included in the aggregated
   result; the host MUST NOT discard partial results unless the plan's
   `cancellation_policy` is `cancel-all` and the plan is cancelled.
-- `quorum`: Partial results are included in the aggregated result only
-  if the `quorum_threshold` is met; otherwise, the host MUST wait for
-  additional results or apply the `deadline`.
+- `quorum`: Partial results are aggregated in the order they are received
+  until `quorum_threshold` successful results are received; subsequent
+  successful results are discarded; failed results are included only if
+  they are among the first `quorum_threshold` results by submission order.
 - `first-success`: Partial results are discarded; only successful results
   are aggregated.
 - `best-effort`: Partial results are included in the aggregated result

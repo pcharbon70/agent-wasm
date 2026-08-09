@@ -139,12 +139,13 @@ Failed results are not aggregated; if all results fail, the plan is
 considered failed.
 
 > **Normative definition.**
-The `best-effort` aggregation policy collects all child results and
-selects the best according to an implementation-defined quality metric.
-The host MUST aggregate all received results and select the best result
-according to the quality metric documented in the conformance profile.
-Subsequent results are discarded; failed results are excluded from
-selection.
+The `best-effort` aggregation policy uses a two-phase process.
+Phase one (collection): the host collects all child results until the
+plan's `deadline` expires.
+Phase two (selection): the host selects the best result according to an
+implementation-defined quality metric documented in the conformance profile;
+the selected result becomes the aggregated output and all other results
+are discarded; failed results are excluded from selection.
 
 > **Non-normative note.**
 The `best-effort` policy ensures that the best available result is

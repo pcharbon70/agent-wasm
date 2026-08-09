@@ -87,7 +87,7 @@ host behavior.
 | `fanout.plan.malformed-concurrency-bound` | Fan-out plan directive with non-positive `concurrency_bound`. | Reject directive; do NOT create partial plan state. |
 | `fanout.plan.malformed-deadline` | Fan-out plan directive with past or invalid `deadline`. | Reject directive; do NOT create partial plan state. |
 | `fanout.plan.malformed-aggregation-policy` | Fan-out plan directive with unknown `aggregation_policy`. | Reject directive; do NOT create partial plan state. |
-| `fanout.plan.malformed-quorum` | Fan-out plan directive with invalid `quorum_threshold`. | Reject directive; do NOT create partial plan state. |
+| `fanout.plan.malformed-quorum` | Fan-out plan directive with `aggregation_policy: quorum` but invalid `quorum_threshold` (e.g., zero, negative, or greater than the number of work items). | Reject directive; do NOT create partial plan state. |
 | `fanout.work-item.malformed` | Child work item with missing required fields. | Reject work item; do NOT create partial work item state. |
 | `fanout.work-item.malformed-artifact` | Child work item with invalid artifact digest. | Reject work item; do NOT create partial work item state. |
 | `fanout.work-item.malformed-manifest` | Child work item with invalid manifest digest. | Reject work item; do NOT create partial work item state. |
@@ -121,13 +121,12 @@ which is consistent with the validation rules defined in
 | Diagnostic | Cause | Host behavior |
 |------------|-------|---------------|
 | `fanout.plan.duplicate-plan-id` | Fan-out plan directive with `plan_id` that matches an already-admitted plan. | Reject directive; do NOT create partial plan state. |
-| `fanout.plan.conflict` | Two fan-out plan directives for the same delegating agent submitted concurrently. | Reject second directive; do NOT create partial plan state. |
-| `fanout.work-item.duplicate-work-item-id` | Child work item with `work_item_id` that matches an already-admitted work item. | Reject work item; do NOT create partial work item state. |
-| `fanout.work-item.conflict` | Two child work item directives for the same plan submitted concurrently. | Reject second work item; do NOT create partial work item state. |
+| `fanout.work-item.duplicate-work-item-id` | Two child work item directives with the same `work_item_id` submitted for the same plan. | Reject second directive; do NOT create partial work item state. |
 | `fanout.result.duplicate` | Child result with `result_id` that matches a previously-aggregated result. | Reject result; do NOT aggregate. |
 | `fanout.result.duplicate-content` | Child result with `work_item_id` and `result_data` hash that match a previously-aggregated result. | Reject result; do NOT aggregate. |
 | `fanout.result.conflict` | Child result with different `result_id` values, same `work_item_id`, but different `result_data` hashes. | Record both results; emit `fanout.result.conflict` event. |
 | `fanout.result.late` | Child result submitted after aggregation has completed. | Reject result; do NOT aggregate. |
+| `fanout.result.causal-attachment.immutable` | Attempt to modify causal attachment metadata after it has been recorded in the durable journal. | Reject modification; do NOT alter the original causal attachment record. |
 
 > **Non-normative note.**
 Conflicting outcomes are caused by concurrent or duplicate requests.

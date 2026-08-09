@@ -122,7 +122,7 @@ cancellation and termination paths.
 |---------|-------------|
 | `P3-SF-011` | Submit a child result for a child work item and verify that the result is accepted and aggregated according to the parent plan's `aggregation_policy`. |
 | `P3-SF-012` | Submit multiple child results for a child work item and verify that duplicate suppression is applied correctly. |
-| `P3-SF-013` | Submit a child result that does not satisfy the parent plan's `result_contract` and verify that the result is rejected with `fanout.result.contract-violation`. |
+| `P3-SF-013` | Submit a child result that does not satisfy the parent plan's `result_contract` and verify that the result is rejected with `fanout.result.incompatible-contract`. |
 | `P3-SF-014` | Verify that the aggregated result is correctly composed according to the parent plan's `aggregation_policy` and `result_contract`. |
 | `P3-SF-015` | Verify that the aggregated result is recorded in the durable journal and emitted as evidence. |
 
@@ -185,10 +185,12 @@ and the state invariants that MUST hold after the failure.
 | `P3-FH-003` | Fan-out plan directive with `concurrency_bound: 0`. | `fanout.plan.malformed-concurrency-bound` |
 | `P3-FH-004` | Fan-out plan directive with past `deadline`. | `fanout.plan.malformed-deadline` |
 | `P3-FH-005` | Fan-out plan directive with `aggregation_policy: invalid`. | `fanout.plan.malformed-aggregation-policy` |
-| `P3-FH-006` | Child work item with missing `work_item_id` field. | `fanout.work-item.malformed` |
-| `P3-FH-007` | Child work item with invalid artifact digest. | `fanout.work-item.malformed-artifact` |
-| `P3-FH-008` | Child result with missing `result_id` field. | `fanout.result.malformed` |
-| `P3-FH-009` | Child result with invalid `result_data`. | `fanout.result.malformed-data` |
+| `P3-FH-006` | Fan-out plan directive with `aggregation_policy: quorum` and `quorum_threshold: 0`. | `fanout.plan.malformed-quorum` |
+| `P3-FH-007` | Fan-out plan directive with `aggregation_policy: quorum` and `quorum_threshold` greater than the number of work items. | `fanout.plan.malformed-quorum` |
+| `P3-FH-008` | Child work item with missing `work_item_id` field. | `fanout.work-item.malformed` |
+| `P3-FH-009` | Child work item with invalid artifact digest. | `fanout.work-item.malformed-artifact` |
+| `P3-FH-010` | Child result with missing `result_id` field. | `fanout.result.malformed` |
+| `P3-FH-011` | Child result with invalid `result_data`. | `fanout.result.malformed-data` |
 
 > **Normative definition.**
 Each malformed input test MUST verify that the host: (1) rejects the
@@ -208,10 +210,10 @@ guarantees defined in
 
 | Test ID | Description | Expected diagnostic |
 |---------|-------------|---------------------|
-| `P3-FH-010` | Fan-out plan directive with `lifecycle_policy` that does not name a defined policy. | `fanout.plan.incompatible` |
-| `P3-FH-011` | Child work item with `manifest` digest that does not correspond to `artifact` digest. | `fanout.plan.incompatible-manifest-artifact` |
-| `P3-FH-012` | Child work item with `plan_id` that does not resolve to an active plan. | `fanout.plan.incompatible-plan` |
-| `P3-FH-013` | Child result that does not satisfy the parent plan's `result_contract`. | `fanout.result.incompatible-contract` |
+| `P3-FH-012` | Fan-out plan directive with `lifecycle_policy` that does not name a defined policy. | `fanout.plan.incompatible` |
+| `P3-FH-013` | Child work item with `manifest` digest that does not correspond to `artifact` digest. | `fanout.plan.incompatible-manifest-artifact` |
+| `P3-FH-014` | Child work item with `plan_id` that does not resolve to an active plan. | `fanout.plan.incompatible-plan` |
+| `P3-FH-015` | Child result that does not satisfy the parent plan's `result_contract`. | `fanout.result.incompatible-contract` |
 
 > **Non-normative note.**
 The incompatible input tests validate the semantic validation layer that
@@ -223,11 +225,11 @@ state or leave partial state in the durable journal.
 
 | Test ID | Description | Expected diagnostic |
 |---------|-------------|---------------------|
-| `P3-FH-014` | Two fan-out plan directives with the same `plan_id` submitted concurrently. | `fanout.plan.duplicate-plan-id` for the second directive. |
-| `P3-FH-015` | Two child work item directives for the same plan submitted concurrently. | `fanout.work-item.duplicate-work-item-id` for the second directive. |
-| `P3-FH-016` | Two child results with the same `result_id` submitted for the same work item. | `fanout.result.duplicate` for the second result. |
-| `P3-FH-017` | Two child results with different `result_id` values, same `work_item_id`, but different `result_data` hashes. | `fanout.result.conflict` event emitted. |
-| `P3-FH-018` | Child result submitted after aggregation has completed. | `fanout.result.late` for the late result. |
+| `P3-FH-016` | Two fan-out plan directives with the same `plan_id` submitted concurrently. | `fanout.plan.duplicate-plan-id` for the second directive. |
+| `P3-FH-017` | Two child work item directives for the same plan submitted concurrently. | `fanout.work-item.duplicate-work-item-id` for the second directive. |
+| `P3-FH-018` | Two child results with the same `result_id` submitted for the same work item. | `fanout.result.duplicate` for the second result. |
+| `P3-FH-019` | Two child results with different `result_id` values, same `work_item_id`, but different `result_data` hashes. | `fanout.result.conflict` event emitted. |
+| `P3-FH-020` | Child result submitted after aggregation has completed. | `fanout.result.late` for the late result. |
 
 > **Non-normative note.**
 The conflicting input tests validate the deduplication and conflict
@@ -239,9 +241,9 @@ state or leave partial state in the durable journal.
 
 | Test ID | Description | Expected diagnostic |
 |---------|-------------|---------------------|
-| `P3-FH-019` | Fan-out plan directive whose `delegating_agent` does not have the `fanout.plan.create` capability. | `fanout.plan.unauthorized` |
-| `P3-FH-020` | Child work item whose `delegating_agent` does not have the `fanout.work-item.create` capability. | `fanout.work-item.unauthorized` |
-| `P3-FH-021` | Child result whose child agent does not have the `fanout.result.submit` capability. | `fanout.result.unauthorized` |
+| `P3-FH-021` | Fan-out plan directive whose `delegating_agent` does not have the `fanout.plan.create` capability. | `fanout.plan.unauthorized` |
+| `P3-FH-022` | Child work item whose `delegating_agent` does not have the `fanout.work-item.create` capability. | `fanout.work-item.unauthorized` |
+| `P3-FH-023` | Child result whose child agent does not have the `fanout.result.submit` capability. | `fanout.result.unauthorized` |
 
 > **Non-normative note.**
 The unauthorized input tests validate the capability enforcement layer
@@ -253,9 +255,9 @@ policy and compromise system security.
 
 | Test ID | Description | Expected diagnostic |
 |---------|-------------|---------------------|
-| `P3-FH-022` | Fan-out plan directive that would exceed the implementation-defined maximum concurrency per plan. | `fanout.plan.exhausted-concurrency` |
-| `P3-FH-023` | Child work item that would exceed the parent plan's `concurrency_bound`. | `fanout.work-item.exhausted-concurrency` |
-| `P3-FH-024` | Child result that would exceed the implementation-defined maximum number of results per plan. | `fanout.plan.exhausted-results` |
+| `P3-FH-024` | Fan-out plan directive that would exceed the implementation-defined maximum concurrency per plan. | `fanout.plan.exhausted-concurrency` |
+| `P3-FH-025` | Child work item that would exceed the parent plan's `concurrency_bound`. | `fanout.work-item.exhausted-concurrency` |
+| `P3-FH-026` | Child result that would exceed the implementation-defined maximum number of results per plan. | `fanout.plan.exhausted-results` |
 
 > **Non-normative note.**
 The exhausted input tests validate the resource limit enforcement layer
@@ -267,9 +269,9 @@ and compromise system stability.
 
 | Test ID | Description | Expected diagnostic |
 |---------|-------------|---------------------|
-| `P3-FH-025` | Fan-out plan directive whose `delegating_agent` is not active in the durable registry. | `fanout.plan.unavailable` |
-| `P3-FH-026` | Child work item whose parent plan is not active in the durable registry. | `fanout.work-item.unavailable-plan` |
-| `P3-FH-027` | Child result whose parent plan is not active in the durable registry. | `fanout.result.unavailable-plan` |
+| `P3-FH-027` | Fan-out plan directive whose `delegating_agent` is not active in the durable registry. | `fanout.plan.unavailable` |
+| `P3-FH-028` | Child work item whose parent plan is not active in the durable registry. | `fanout.work-item.unavailable-plan` |
+| `P3-FH-029` | Child result whose parent plan is not active in the durable registry. | `fanout.result.unavailable-plan` |
 
 > **Non-normative note.**
 The unavailable input tests validate the agent registry lookup layer
