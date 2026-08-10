@@ -209,6 +209,19 @@ open workbenches in inquiries, and session evidence in the journal.
 - [M8-P1 Runtime Matrix](m8-p1-runtime-matrix.yaml)
   — initial runtime matrix configuration for Extism/Wasmtime and Extism/Wazero
   across supported host platforms and guest toolchains.
+- [M8-P2 Section 2.1 Contract And Data Model Implementation](m8-p2-contract-and-data-model-implementation.md)
+  — documents Section 2.1 implementation from Phase 2 plan: Core WebAssembly
+  suite specifications, WASI suite specifications, WABT and reference interpreter
+  specifications, and validation rules.
+- [M8-P2 Section 2.2 Behavior And Integration Implementation](m8-p2-behavior-and-integration-implementation.md)
+  — documents Section 2.2 implementation: XTP contracts, Host SDK integration
+  areas, defect promotion specifications, and integration points.
+- [M8-P2 Section 2.3 Failure Evidence And Operational Notes Implementation](m8-p2-failure-evidence-and-operational-notes-implementation.md)
+  — documents Section 2.3 implementation: failure outcomes, bounded diagnostics,
+  implementation-defined choices, and deferred work.
+- [M8-P2 Section 2.4 Phase 2 Integration Tests Implementation](m8-p2-integration-tests-implementation.md)
+  — documents Section 2.4 implementation: canonical flow, failure flow,
+  resilience flow, and regression flow tests.
 
 ## Maintaining this index
 
