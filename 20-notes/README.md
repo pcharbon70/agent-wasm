@@ -29,10 +29,14 @@ open workbenches in inquiries, and session evidence in the journal.
 
 ### Documents
 
+- [Elixir/OTP Port Finished-Product Packaging and Release Pipeline](elixir-otp-port-finished-product-packaging-and-release-pipeline.md)
+  — selects Elixir/OTP as the sole public product language and defines the
+  supervised private-worker protocol, Hex/Mix/OCI packaging model, executable
+  probe, release workflow, security boundary, and rollback gates.
 - [Agent WASM Host Implementation Language and Runtime Boundary](agent-wasm-host-implementation-language-and-runtime-boundary.md)
-  — compares Rust, Go, Elixir, and Elixir/Rustler, audits the current Hex path,
-  recommends an Elixir control plane with a process-isolated Rust execution
-  worker, and defines gates for a Rustler optimization or language reversal.
+  — preserves the Rust, Go, Elixir, and Elixir/Rustler comparison and Hex audit
+  that led to the selected Elixir/OTP control plane and process-isolated private
+  worker.
 - [Extism Plugin-System Architecture and Runtimes](extism-plugin-system-architecture-and-runtimes.md)
   — detailed synthesis of Extism's ABI, kernel, call lifecycle, state,
   manifest, capabilities, PDK/SDK split, runtime families, and Agent WASM

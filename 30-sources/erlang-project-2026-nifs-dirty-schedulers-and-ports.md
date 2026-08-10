@@ -24,10 +24,10 @@ aliases: []
 
 ## Reference
 
-Erlang/OTP Project. *erl_nif* and *System Documentation: Built-In
-Mechanisms*. OTP 29.0.5.
-[NIF API](https://www.erlang.org/doc/apps/erts/erl_nif.html) and
-[interoperability overview](https://www.erlang.org/doc/system/overview.html),
+Erlang/OTP Project. *erl_nif*, *Ports*, and *erlang:open_port/2*. OTP 29.0.5.
+[NIF API](https://www.erlang.org/doc/apps/erts/erl_nif.html),
+[Port tutorial](https://www.erlang.org/doc/system/c_port.html), and
+[`open_port/2` reference](https://www.erlang.org/doc/apps/erts/erlang.html#open_port/2),
 accessed 10 August 2026.
 
 ## Contribution
@@ -61,6 +61,12 @@ byte-oriented interface. The boundary has encoding and IPC costs, but a worker
 fault does not execute inside the BEAM. The official overview recommends an
 external Port when possible and a NIF when the overhead is unacceptable.
 
+`open_port/2` supports an explicit `spawn_executable` path without an ordinary
+shell or `PATH` search, separate argument values, one-, two-, or four-byte
+packet framing, binary messages, exit-status notification, and stdio transport.
+These options allow the Elixir process to own process lifetime and framing
+without constructing a shell command.
+
 ## Relevance
 
 This evidence is decisive for the Elixir/Rustler comparison. WebAssembly
@@ -81,5 +87,6 @@ is general guidance; a measured workload can justify a carefully designed NIF.
 ## Derived work
 
 - [Host implementation comparison](../20-notes/agent-wasm-host-implementation-language-and-runtime-boundary.md)
+- [Elixir/OTP Port packaging and release pipeline](../20-notes/elixir-otp-port-finished-product-packaging-and-release-pipeline.md)
 - [Host language inquiry](../40-inquiries/which-host-implementation-approach-should-agent-wasm-use.md)
 - [Host implementation map](../10-maps/agent-wasm-host-implementation-language.md)

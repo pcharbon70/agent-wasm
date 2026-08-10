@@ -21,6 +21,15 @@ aliases:
 
 # Agent WASM Host Implementation Language and Runtime Boundary
 
+## Decision update
+
+The product direction is now selected: Agent WASM is an Elixir/OTP product
+whose native Extism worker is a private supervised Port component. The
+[finished-product packaging and release pipeline](elixir-otp-port-finished-product-packaging-and-release-pipeline.md)
+turns that selection into a concrete Hex, Mix-release, and OCI design. This
+earlier document retains the comparison that led to the choice; its alternate
+language paths are not parallel public product platforms.
+
 ## Executive recommendation
 
 Use **Elixir/OTP for the authoritative host control plane and Rust for a small
@@ -599,8 +608,12 @@ acceptable failure domain for a production node.
 
 - [Host implementation language map](../10-maps/agent-wasm-host-implementation-language.md)
   — routes through the options, native boundary, and evidence program.
+- [Elixir/OTP Port Finished-Product Packaging and Release Pipeline](elixir-otp-port-finished-product-packaging-and-release-pipeline.md)
+  — records the selected product architecture and its executable release
+  pipeline.
 - [Which Host Implementation Approach Should Agent WASM Use?](../40-inquiries/which-host-implementation-approach-should-agent-wasm-use.md)
-  — tracks the recommendation until prototypes and fault tests can resolve it.
+  — records the resolved product-language choice and the remaining private
+  boundary qualification work.
 - [Jido Agent Architecture and a Wasm/Extism Construction](jido-agent-architecture-and-wasm-extism-construction.md)
   — supplies the host-owned actor and reducer model being implemented.
 - [Extism Plugin-System Architecture and Runtimes](extism-plugin-system-architecture-and-runtimes.md)
