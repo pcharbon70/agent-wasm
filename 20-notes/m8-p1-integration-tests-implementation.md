@@ -2,8 +2,7 @@
 title: "M8-P1 Section 1.4 Phase 1 Integration Tests Implementation"
 kind: note
 created: "2026-08-10"
-maturity: stable
-status: resolved
+maturity: seed
 tags:
   - milestone-08
   - phase-01
@@ -17,18 +16,9 @@ aliases:
 
 # M8-P1 Section 1.4 Phase 1 Integration Tests Implementation
 
-## Status
-
-- **Milestone**: 8 - Portability, Verification, And Performance
-- **Phase**: 1 - Evidence Manifests Profiles Runtime Matrices And Traceability
-- **Section**: 1.4 - Phase 1 Integration Tests
-- **Task**: 1.4.1 - Run the phase integration scenarios
-- **Created**: 2026-08-10
-- **Status**: resolved
-
 ## Purpose
 
-Verify evidence manifests, profiles, runtime matrices, and traceability across real dependency boundaries. This section proves the phase works as an integrated behavior and preserves reproducible evidence for later milestone and release gates.
+Verify evidence manifests, profiles, runtime matrices, and traceability across real dependency boundaries. This section builds on the failure evidence defined in [Section 1.3 Failure Evidence And Operational Notes](./m8-p1-failure-evidence-and-operational-notes-implementation.md) and concludes the Phase 1 implementation.
 
 ## Design Decisions
 
@@ -138,7 +128,9 @@ Each test is independently executable. Tests can be run in parallel or sequentia
 
 Test evidence is retained according to the retention policy defined in Section 1.2. General evidence is retained for 90 days. Security evidence is retained for 365 days. Evidence is archived after 1825 days.
 
-## Test Evidence
+## Planned Tests
+
+The following tests are planned for validation once the validator implementation is complete.
 
 ### Test 1.4.1: Canonical Successful Flow
 
@@ -159,8 +151,6 @@ Test evidence is retained according to the retention policy defined in Section 1
 
 **Expected Result**: All steps complete successfully. No errors or warnings.
 
-**Actual Result**: All steps complete successfully. No errors or warnings.
-
 ### Test 1.4.2: Malformed Input
 
 **Setup**: Create a malformed evidence manifest (missing required field).
@@ -171,8 +161,6 @@ Test evidence is retained according to the retention policy defined in Section 1
 
 **Expected Result**: Validator emits diagnostic with outcome "malformed" and error code `com.extism.evidence.malformed`.
 
-**Actual Result**: Validator emits diagnostic with outcome "malformed" and error code `com.extism.evidence.malformed`.
-
 ### Test 1.4.3: Incompatible Input
 
 **Setup**: Create a valid evidence manifest with an unsupported engine version.
@@ -182,8 +170,6 @@ Test evidence is retained according to the retention policy defined in Section 1
 2. Run validator on the manifest.
 
 **Expected Result**: Validator emits diagnostic with outcome "incompatible" and error code `com.extism.evidence.incompatible`.
-
-**Actual Result**: Validator emits diagnostic with outcome "incompatible" and error code `com.extism.evidence.incompatible`.
 
 ### Test 1.4.4: Conflicting Input
 
@@ -196,8 +182,6 @@ Test evidence is retained according to the retention policy defined in Section 1
 
 **Expected Result**: Validator emits diagnostic with outcome "conflicting" and error code `com.extism.evidence.conflicting`.
 
-**Actual Result**: Validator emits diagnostic with outcome "conflicting" and error code `com.extism.evidence.conflicting`.
-
 ### Test 1.4.5: Timeout Behavior
 
 **Setup**: Start evidence collection for a large configuration and simulate timeout.
@@ -208,8 +192,6 @@ Test evidence is retained according to the retention policy defined in Section 1
 3. Verify no partial state is left.
 
 **Expected Result**: No partial state is left. No incomplete manifests, no corrupted files.
-
-**Actual Result**: No partial state is left. No incomplete manifests, no corrupted files.
 
 ### Test 1.4.6: Unavailable Dependency
 
@@ -223,8 +205,6 @@ Test evidence is retained according to the retention policy defined in Section 1
 
 **Expected Result**: System reports "unavailable" after 3 retries. No partial state is left.
 
-**Actual Result**: System reports "unavailable" after 3 retries. No partial state is left.
-
 ### Test 1.4.7: Earlier Milestone Regression
 
 **Setup**: Identify earlier milestone fixtures affected by this phase.
@@ -237,8 +217,6 @@ Test evidence is retained according to the retention policy defined in Section 1
 5. Flag regressions or approved variability.
 
 **Expected Result**: No regressions. All fixtures pass.
-
-**Actual Result**: No regressions. All fixtures pass.
 
 ## Operational Notes
 

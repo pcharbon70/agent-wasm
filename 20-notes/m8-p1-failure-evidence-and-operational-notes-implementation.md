@@ -2,8 +2,7 @@
 title: "M8-P1 Section 1.3 Failure Evidence And Operational Notes Implementation"
 kind: note
 created: "2026-08-10"
-maturity: stable
-status: resolved
+maturity: seed
 tags:
   - milestone-08
   - phase-01
@@ -18,18 +17,9 @@ aliases:
 
 # M8-P1 Section 1.3 Failure Evidence And Operational Notes Implementation
 
-## Status
-
-- **Milestone**: 8 - Portability, Verification, And Performance
-- **Phase**: 1 - Evidence Manifests Profiles Runtime Matrices And Traceability
-- **Section**: 1.3 - Failure Evidence And Operational Notes
-- **Task**: 1.3.1 - Complete the failure evidence and operational notes work
-- **Created**: 2026-08-10
-- **Status**: resolved
-
 ## Purpose
 
-Establish failure evidence and operational notes for evidence manifests, profiles, runtime matrices, and traceability. This section turns the phase objective into explicit interfaces, invariants, implementation boundaries, and inspectable evidence.
+Establish failure evidence and operational notes for evidence manifests, profiles, runtime matrices, and traceability. This section builds on the behavior and integration defined in [Section 1.2 Behavior And Integration](./m8-p1-behavior-and-integration-implementation.md) and precedes the integration tests defined in [Section 1.4 Phase 1 Integration Tests](./m8-p1-integration-tests-implementation.md).
 
 ## Design Decisions
 
@@ -124,7 +114,9 @@ The following files are created:
 
 4. **Monitoring**: Diagnostics are forwarded to the monitoring system for alerting and analysis.
 
-## Test Evidence
+## Planned Tests
+
+The following tests are planned for validation once the validator implementation is complete.
 
 ### Test 1.3.1: Malformed Input
 
@@ -136,8 +128,6 @@ The following files are created:
 
 **Expected Result**: Validator emits diagnostic with outcome "malformed", error code `com.extism.evidence.malformed`, and remediation guidance.
 
-**Actual Result**: Validator emits diagnostic with outcome "malformed", error code `com.extism.evidence.malformed`, and remediation guidance.
-
 ### Test 1.3.2: Incompatible Input
 
 **Setup**: Create a valid evidence manifest with an unsupported engine version.
@@ -147,8 +137,6 @@ The following files are created:
 2. Run validator on the manifest.
 
 **Expected Result**: Validator emits diagnostic with outcome "incompatible", error code `com.extism.evidence.incompatible`, and remediation guidance.
-
-**Actual Result**: Validator emits diagnostic with outcome "incompatible", error code `com.extism.evidence.incompatible`, and remediation guidance.
 
 ### Test 1.3.3: Conflicting Input
 
@@ -161,8 +149,6 @@ The following files are created:
 
 **Expected Result**: Validator emits diagnostic with outcome "conflicting", error code `com.extism.evidence.conflicting`, and remediation guidance.
 
-**Actual Result**: Validator emits diagnostic with outcome "conflicting", error code `com.extism.evidence.conflicting`, and remediation guidance.
-
 ### Test 1.3.4: Unauthorized Access
 
 **Setup**: Attempt to write an evidence manifest without authentication.
@@ -172,8 +158,6 @@ The following files are created:
 2. Observe the error.
 
 **Expected Result**: System emits diagnostic with outcome "unauthorized", error code `com.extism.evidence.unauthorized`, and remediation guidance.
-
-**Actual Result**: System emits diagnostic with outcome "unauthorized", error code `com.extism.evidence.unauthorized`, and remediation guidance.
 
 ### Test 1.3.5: Resource Exhaustion
 
@@ -186,8 +170,6 @@ The following files are created:
 
 **Expected Result**: System emits diagnostic with outcome "exhausted", error code `com.extism.evidence.exhausted`, and remediation guidance. No partial state is left.
 
-**Actual Result**: System emits diagnostic with outcome "exhausted", error code `com.extism.evidence.exhausted`, and remediation guidance. No partial state is left.
-
 ### Test 1.3.6: Dependency Unavailable
 
 **Setup**: Simulate runtime unavailability (e.g., Extism/Wasmtime not installed).
@@ -198,8 +180,6 @@ The following files are created:
 3. Restore Extism/Wasmtime to PATH.
 
 **Expected Result**: System emits diagnostic with outcome "unavailable", error code `com.extism.evidence.unavailable`, and remediation guidance.
-
-**Actual Result**: System emits diagnostic with outcome "unavailable", error code `com.extism.evidence.unavailable`, and remediation guidance.
 
 ## Operational Notes
 

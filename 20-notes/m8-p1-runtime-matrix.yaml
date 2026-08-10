@@ -1,8 +1,8 @@
 ---
 title: "M8-P1 Runtime Matrix"
-kind: note
+kind: map
 created: "2026-08-10"
-maturity: stable
+maturity: seed
 tags:
   - milestone-08
   - phase-01
@@ -13,16 +13,9 @@ aliases:
 
 # M8-P1 Runtime Matrix
 
-## Status
-
-- **Milestone**: 8 - Portability, Verification, And Performance
-- **Phase**: 1 - Evidence Manifests Profiles Runtime Matrices And Traceability
-- **Created**: 2026-08-10
-- **Status**: stable
-
 ## Purpose
 
-Define the initial runtime matrix for Extism/Wasmtime and Extism/Wazero across supported host platforms and guest toolchains.
+Define the initial runtime matrix for Extism/Wasmtime and Extism/Wazero across supported host platforms and guest toolchains. This matrix is referenced by [Section 1.1 Contract And Data Model](./m8-p1-contract-and-data-model-implementation.md) and [Section 1.2 Behavior And Integration](./m8-p1-behavior-and-integration-implementation.md).
 
 ## Matrix Configuration
 

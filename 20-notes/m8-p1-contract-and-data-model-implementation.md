@@ -2,8 +2,7 @@
 title: "M8-P1 Section 1.1 Contract And Data Model Implementation"
 kind: note
 created: "2026-08-10"
-maturity: stable
-status: resolved
+maturity: seed
 tags:
   - milestone-08
   - phase-01
@@ -17,16 +16,9 @@ aliases:
 
 # M8-P1 Section 1.1 Contract And Data Model Implementation
 
-## Status
-
-- **Milestone**: 8 - Portability, Verification, And Performance
-- **Phase**: 1 - Evidence Manifests Profiles Runtime Matrices And Traceability
-- **Section**: 1.1 - Contract And Data Model
-- **Task**: 1.1.1 - Complete the contract and data model work
-- **Created**: 2026-08-10
-- **Status**: resolved
-
 ## Purpose
+
+This section establishes the contract and data model for evidence manifests, profiles, runtime matrices, and traceability. See [Section 1.2 Behavior And Integration](./m8-p1-behavior-and-integration-implementation.md) for the behavior and integration work that follows.
 
 Complete the contract and data model for evidence manifests, profiles, runtime matrices, and traceability. This section turns the phase objective into explicit interfaces, invariants, implementation boundaries, and inspectable evidence.
 
@@ -182,7 +174,21 @@ Disposition = "supported" | "experimental" | "excluded" | "skipped" |
 | **divergent** | The configuration produces different results across runtimes but all are correct. | Must document divergence and justification. |
 | **conforming** | The configuration passes all tests and produces identical results across runtimes. | All tests pass, no divergences. |
 
-**Decision**: Dispositions are hierarchical. "conforming" is the highest level, followed by "supported", then "experimental", then "expected-failure", then "quarantined", then "skipped", then "excluded", then "divergent". A configuration with a "divergent" disposition MUST document the divergence and justification.
+**Decision**: Dispositions are organized along two dimensions:
+
+1. **Correctness** - Whether all runtimes produce correct results:
+   - **conforming**: All runtimes produce identical correct results (highest correctness)
+   - **divergent**: All runtimes produce correct but different results
+   - **expected-failure**: Known failures documented with issue references
+   - **quarantined**: Failing and under investigation
+
+2. **Test Coverage** - Whether the configuration has been tested:
+   - **supported**: Fully tested and meets all normative requirements
+   - **experimental**: Under active development, may have known issues
+   - **skipped**: Skipped due to external dependencies or resource constraints
+   - **excluded**: Explicitly excluded from testing
+
+A configuration with a "divergent" disposition MUST document the divergence and justification. The two dimensions are combined to produce the final disposition (e.g., "conforming" implies both highest correctness and full test coverage).
 
 ### Subtask 1.1.1.3: Initial Matrix
 
@@ -228,7 +234,9 @@ The validator MUST check:
 4. All referenced artifacts and evidence files exist and are accessible.
 5. Dispositions are valid and properly assigned.
 
-## Test Evidence
+## Planned Tests
+
+The following tests are planned for validation once the validator implementation is complete.
 
 ### Test 1.1.1: Manifest Validation
 
@@ -242,8 +250,6 @@ The validator MUST check:
 
 **Expected Result**: Validator reports "conforming" status. Manifest digest matches computed value.
 
-**Actual Result**: Validator reports "conforming" status. Manifest digest matches computed value.
-
 ### Test 1.1.2: Missing Required Fields
 
 **Setup**: Create an evidence manifest with missing required fields.
@@ -253,8 +259,6 @@ The validator MUST check:
 2. Run validator on the manifest.
 
 **Expected Result**: Validator reports "missing-field" error for `compiler`.
-
-**Actual Result**: Validator reports "missing-field" error for `compiler`.
 
 ### Test 1.1.3: Invalid Disposition
 
@@ -266,8 +270,6 @@ The validator MUST check:
 
 **Expected Result**: Validator reports "invalid-disposition" error.
 
-**Actual Result**: Validator reports "invalid-disposition" error.
-
 ### Test 1.1.4: Divergent Disposition Without Documentation
 
 **Setup**: Create an evidence manifest with "divergent" disposition but no documentation.
@@ -277,8 +279,6 @@ The validator MUST check:
 2. Run validator on the manifest.
 
 **Expected Result**: Validator reports "missing-divergence-documentation" error.
-
-**Actual Result**: Validator reports "missing-divergence-documentation" error.
 
 ## Operational Notes
 

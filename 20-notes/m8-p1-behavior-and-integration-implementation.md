@@ -2,8 +2,7 @@
 title: "M8-P1 Section 1.2 Behavior And Integration Implementation"
 kind: note
 created: "2026-08-10"
-maturity: stable
-status: resolved
+maturity: seed
 tags:
   - milestone-08
   - phase-01
@@ -17,18 +16,9 @@ aliases:
 
 # M8-P1 Section 1.2 Behavior And Integration Implementation
 
-## Status
-
-- **Milestone**: 8 - Portability, Verification, And Performance
-- **Phase**: 1 - Evidence Manifests Profiles Runtime Matrices And Traceability
-- **Section**: 1.2 - Behavior And Integration
-- **Task**: 1.2.1 - Complete the behavior and integration work
-- **Created**: 2026-08-10
-- **Status**: resolved
-
 ## Purpose
 
-Establish behavior and integration for evidence manifests, profiles, runtime matrices, and traceability. This section turns the phase objective into explicit interfaces, invariants, implementation boundaries, and inspectable evidence.
+Establish behavior and integration for evidence manifests, profiles, runtime matrices, and traceability. This section builds on the contract and data model defined in [Section 1.1 Contract And Data Model](./m8-p1-contract-and-data-model-implementation.md) and precedes the failure evidence defined in [Section 1.3 Failure Evidence And Operational Notes](./m8-p1-failure-evidence-and-operational-notes-implementation.md).
 
 ## Design Decisions
 
@@ -184,7 +174,9 @@ The following files are created:
 
 4. **Release Process**: Evidence manifests are included in release artifacts. Release comparison is part of the release checklist.
 
-## Test Evidence
+## Planned Tests
+
+The following tests are planned for validation once the validator implementation is complete.
 
 ### Test 1.2.1: Test Case Mapping
 
@@ -197,8 +189,6 @@ The following files are created:
 
 **Expected Result**: All categories have at least one test case.
 
-**Actual Result**: All categories have at least one test case.
-
 ### Test 1.2.2: Aggregate Status Computation
 
 **Setup**: Create a runtime matrix with missing cells.
@@ -209,8 +199,6 @@ The following files are created:
 3. Compute aggregate status.
 
 **Expected Result**: Aggregate status reports missing cells with correct severity levels.
-
-**Actual Result**: Aggregate status reports missing cells with correct severity levels.
 
 ### Test 1.2.3: Evidence Retention
 
@@ -223,8 +211,6 @@ The following files are created:
 
 **Expected Result**: Evidence older than 90 days is archived. No evidence is deleted.
 
-**Actual Result**: Evidence older than 90 days is archived. No evidence is deleted.
-
 ### Test 1.2.4: Release Comparison
 
 **Setup**: Create evidence manifests for two releases with a divergence.
@@ -235,8 +221,6 @@ The following files are created:
 3. Run release comparison.
 
 **Expected Result**: Release comparison flags the divergent configuration. Approval is required before release.
-
-**Actual Result**: Release comparison flags the divergent configuration. Approval is required before release.
 
 ## Operational Notes
 
