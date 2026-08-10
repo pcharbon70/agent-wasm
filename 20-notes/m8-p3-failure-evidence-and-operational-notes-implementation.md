@@ -31,7 +31,8 @@ The following failure outcomes are defined for Extism Wasmtime and Extism Wazero
 | Outcome | Definition | Trigger Condition |
 |---------|------------|-------------------|
 | **malformed** | The input is invalid and cannot be processed. | Invalid WebAssembly binary, missing required exports, incompatible artifact format. |
-| **incompatible** | The input is valid but incompatible with the current configuration. | Unsupported engine version, missing required features, incompatible artifact version. |
+| **incompatible** | The input is valid but incompatible with the current configuration. | Unsupported engine version, missing required features. |
+| **stale** | The input is valid but has exceeded the retention period. | Artifact version older than retention period, divergence record older than review period. |
 | **conflicting** | The input conflicts with existing evidence or configuration. | Duplicate divergence record with different verdict, conflicting controlled variables. |
 | **unauthorized** | The input is valid but the actor lacks permission. | Missing authentication, insufficient privileges, unauthorized access to engine binaries. |
 | **exhausted** | The system is unable to process the input due to resource constraints. | Disk space full, memory limit exceeded, rate limit hit, timeout exceeded, gas limit exceeded. |
@@ -57,7 +58,7 @@ Diagnostic = {
   correlation_id: UUID
 }
 
-FailureOutcome = "malformed" | "incompatible" | "conflicting" | "unauthorized" | "exhausted" | "unavailable"
+FailureOutcome = "malformed" | "incompatible" | "stale" | "conflicting" | "unauthorized" | "exhausted" | "unavailable"
 
 ErrorCode = string
 
