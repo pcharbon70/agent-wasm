@@ -222,6 +222,19 @@ open workbenches in inquiries, and session evidence in the journal.
 - [M8-P2 Section 2.4 Phase 2 Integration Tests Implementation](m8-p2-integration-tests-implementation.md)
   — documents Section 2.4 implementation: canonical flow, failure flow,
   resilience flow, and regression flow tests.
+- [M8-P3 Section 3.1 Contract And Data Model Implementation](m8-p3-contract-and-data-model-implementation.md)
+  — documents Section 3.1 implementation from Phase 3 plan: TurnResult
+  equivalence specifications, controlled variables, execution scenarios, and
+  validation rules.
+- [M8-P3 Section 3.2 Behavior And Integration Implementation](m8-p3-behavior-and-integration-implementation.md)
+  — documents Section 3.2 implementation: behavior comparison, divergence
+  recording format, adjudication specifications, and integration points.
+- [M8-P3 Section 3.3 Failure Evidence And Operational Notes Implementation](m8-p3-failure-evidence-and-operational-notes-implementation.md)
+  — documents Section 3.3 implementation: failure outcomes, bounded diagnostics,
+  implementation-defined choices, and deferred work.
+- [M8-P3 Section 3.4 Phase 3 Integration Tests Implementation](m8-p3-integration-tests-implementation.md)
+  — documents Section 3.4 implementation: canonical flow, failure flow,
+  resilience flow, and regression flow tests.
 
 ## Maintaining this index
 
