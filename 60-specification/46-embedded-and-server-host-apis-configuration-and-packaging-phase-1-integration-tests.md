@@ -21,9 +21,9 @@ aliases:
 ## Status and authority
 
 This chapter is a draft specification produced by
-[Phase 1](../../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/phase-01-embedded-and-server-host-apis-configuration-and-packaging.md)
+[Phase 1](../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/phase-01-embedded-and-server-host-apis-configuration-and-packaging.md)
 of
-[Milestone 9](../../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/README.md)
+[Milestone 9](../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/README.md)
 --
 Production Platform And Developer Experience.
 It defines the integration tests that verify embedded and server host APIs,
@@ -36,9 +36,9 @@ Promotion to `status: normative` requires passing this test suite and
 a passing cross-milestone fixture run.
 
 Governing policies:
-[Specification Authority](../../SPECIFICATION-AUTHORITY.md)
+[Specification Authority](../SPECIFICATION-AUTHORITY.md)
 and
-[Conformance Vocabulary](../../CONFORMANCE-VOCABULARY.md).
+[Conformance Vocabulary](../CONFORMANCE-VOCABULARY.md).
 
 Related chapters:
 [Profile Vocabulary And Architectural Boundaries](01-profile-vocabulary-and-architectural-boundaries.md),
