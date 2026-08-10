@@ -35,6 +35,31 @@ obligations.
 Promotion to `status: normative` requires evidence from the Phase 4
 integration tests and a passing cross-milestone fixture run.
 
+### Milestone acceptance criteria
+
+> **Normative definition.**
+Phase 4 MILESTONE ACCEPTANCE requires:
+
+1. **Integration test pass**: 100% of Phase 4 integration tests MUST pass.
+2. **Cross-milestone fixture**: A passing cross-milestone fixture run that
+   exercises the synchronous host function surface, WASI restrictions,
+   and tenant isolation in conjunction with other milestone capabilities.
+3. **Tenant isolation**: All tenant isolation invariants MUST hold under
+   the adversarial scenarios defined in this chapter.
+4. **Residue detection**: All residue categories MUST be verified with
+   zero deviation across all invocation outcomes.
+5. **Evidence recording**: All integration test evidence MUST be recorded
+   as machine-readable YAML reports in the `50-journal/` directory.
+6. **Conformance profile**: The conformance profile MUST document all
+   implementation-defined choices listed in this chapter.
+
+> **Normative definition.**
+Phase 4 FAILS MILESTONE ACCEPTANCE if:
+- Any integration test fails, OR
+- Any tenant isolation invariant is violated, OR
+- Any residue category shows deviation, OR
+- The conformance profile is incomplete.
+
 Governing policies:
 [Specification Authority](../SPECIFICATION-AUTHORITY.md)
 and
@@ -722,6 +747,39 @@ This mechanism MUST include:
 3. A diff report that identifies any deviation from expected behavior.
 4. An audit log entry that records the diff report with the
    invocation's `invocation_id`.
+
+> **Normative definition.**
+Residue evidence MUST be retained for a minimum of 90 days for forensic
+analysis, aligned with common compliance requirements (SOC2, ISO 27001).
+Conformance profiles MAY specify longer retention periods for specific
+deployment models or regulatory requirements.
+
+### Migration artifact handling
+
+> **Normative definition.**
+Migration artifacts are a special class of `reviewed-preparation` artifacts
+that operate on agent state during plugin upgrades or framework migrations.
+Migration artifacts MUST satisfy the following additional requirements:
+
+1. **Reversibility**: Every migration MUST be reversible.
+   The migration artifact MUST declare a rollback procedure that restores
+   the pre-migration state if the migration fails or is cancelled.
+2. **Atomicity**: Migration MUST follow the atomic commit protocol defined
+   in [Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md).
+   Partial migrations MUST be rolled back.
+3. **Tenant isolation**: Migration artifacts MUST respect tenant isolation
+   boundaries.
+   A migration artifact MUST NOT access state from tenants other than the
+   one being migrated.
+4. **Audit trail**: All migration operations MUST be recorded in the
+   plugin lifecycle audit log with the event type `plugin.migration.started`,
+   `plugin.migration.completed`, and `plugin.migration.rolled-back`.
+
+> **Normative definition.**
+The host MUST reject migration artifacts that do not declare a rollback
+procedure or that violate tenant isolation boundaries.
+The host MUST emit the diagnostic `plugin.migration-invalid` when a
+migration artifact fails validation.
 
 > **Non-normative note.**
 The snapshot and diff mechanism is intentionally lightweight and

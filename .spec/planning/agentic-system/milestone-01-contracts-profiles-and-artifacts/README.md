@@ -2,7 +2,7 @@
 
 Establish the language-neutral vocabulary, compatibility rules, artifact model, and byte-level host–guest protocol on which every later runtime feature depends.
 
-Current status: planned; all phases and tasks are unchecked.
+Current status: phase 1-5 complete; milestone 1 complete.
 
 ## Purpose
 

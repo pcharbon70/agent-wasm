@@ -2,7 +2,7 @@
 
 Layer provider-neutral model access, tools, retrieval, reasoning strategies, memory projections, approvals, quotas, and secret leases above the stable agent runtime.
 
-Current status: planned; all phases and tasks are unchecked.
+Current status: phase 1-5 complete; milestone 7 complete.
 
 ## Purpose
 

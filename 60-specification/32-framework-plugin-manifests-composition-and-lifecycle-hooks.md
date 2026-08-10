@@ -35,6 +35,28 @@ obligations.
 Promotion to `status: normative` requires evidence from the Phase 3
 integration tests and a passing cross-milestone fixture run.
 
+### Milestone acceptance criteria
+
+> **Normative definition.**
+Phase 3 MILESTONE ACCEPTANCE requires:
+
+1. **Integration test pass**: 100% of Phase 3 integration tests MUST pass.
+2. **Cross-milestone fixture**: A passing cross-milestone fixture run that
+   exercises the plugin composition and lifecycle system in conjunction
+   with other milestone capabilities.
+3. **Conflict detection**: All composition conflicts MUST be detected
+   and rejected with the correct diagnostics.
+4. **Evidence recording**: All integration test evidence MUST be recorded
+   as machine-readable YAML reports in the `50-journal/` directory.
+5. **Conformance profile**: The conformance profile MUST document all
+   implementation-defined choices listed in this chapter.
+
+> **Normative definition.**
+Phase 3 FAILS MILESTONE ACCEPTANCE if:
+- Any integration test fails, OR
+- Any composition conflict is NOT detected, OR
+- The conformance profile is incomplete.
+
 Governing policies:
 [Specification Authority](../SPECIFICATION-AUTHORITY.md)
 and
@@ -101,6 +123,41 @@ The host MUST reject any manifest whose `manifest_version` is not
 recognised.
 The host MUST compare `manifest_version` as an exact string match,
 not as a numeric range.
+
+### 3.1.1 Plugin Dependencies
+
+> **Normative definition.**
+Plugins MUST declare explicit dependencies on other plugins through the
+`dependencies` field in the manifest.
+The `dependencies` field is a list of `PluginDependency` records.
+
+> **Normative conformance example.**
+
+```
+PluginDependency {
+  plugin_id: PluginId,
+  version_constraint: VersionConstraint,
+  optional: bool
+}
+
+VersionConstraint = string
+```
+
+> **Normative definition.**
+The host MUST detect circular dependencies at composition time and reject
+plugins with circular dependency graphs with the diagnostic
+`plugin.circular-dependency`.
+The host MUST validate dependency resolution before composition and fail
+composition if any dependency cannot be resolved with the diagnostic
+`plugin.dependency-unresolved`.
+
+> **Normative definition.**
+The `optional` field indicates whether the dependency is required for
+baseline conformance.
+Optional dependencies MAY be omitted at runtime, but the plugin MUST
+gracefully handle missing optional dependencies.
+Required dependencies (where `optional` is false or absent) MUST be
+satisfied for composition to succeed.
 
 > **Non-normative note.**
 The manifest version is independent of the plugin's semantic version.
@@ -475,6 +532,13 @@ explicit publisher-signed approval for every lifecycle transition.
 When `lifecycle_ownership` is `"shared"`, the host and publisher share
 authority according to the rules defined in
 [Single-Agent Host Flow And Milestone Acceptance](24-single-agent-host-flow-and-milestone-acceptance.md).
+
+> **Normative definition.**
+Lifecycle ownership IS FIXED at plugin declaration and CANNOT be transferred
+between host, publisher, or shared ownership after composition.
+Transfer of lifecycle ownership requires uninstall and reinstall with a new
+manifest declaring the desired ownership.
+This prevents confusion about responsibility for plugin lifecycle operations.
 
 > **Non-normative note.**
 Lifecycle ownership controls who can promote or demote a plugin in the
@@ -922,22 +986,44 @@ in the conformance profile:
 
 1. **Plugin registry backend**: The storage mechanism for plugin
    manifests and artifacts (in-memory, database, filesystem, etc.).
+   Baseline conformance is BACKEND-AGNOSTIC.
+   Conformance does NOT depend on backend type.
+   Implementations define backend-specific behavior (e.g., durability,
+   concurrency) as implementation-defined choices documented in the
+   conformance profile.
+
 2. **Route pattern matching**: The exact algorithm used to match
    signal and action patterns against routes.
+
 3. **State namespace isolation**: The mechanism used to isolate plugin
    state namespaces (separate databases, table prefixes, in-memory
    maps, etc.).
+
 4. **Review evidence storage**: The mechanism used to store review
    evidence for `reviewed-preparation` artifacts.
+
 5. **Schedule resolution**: The mechanism used to convert schedule
    declarations into signals (timer threads, event loops, etc.).
+
 6. **Lifecycle approval workflow**: The mechanism used to obtain
    operator approval for lifecycle transitions.
+
 7. **Composition order tie-breaking**: The exact implementation of
    the tie-breaking rules defined in
    [Composition order](#composition-order).
+
 8. **Conflict resolution priority**: The exact priority resolution
    when two routes match the same pattern with different priorities.
+
+### Deferred work promotion
+
+> **Normative definition.**
+Deferred work items CANNOT be implemented as extensions without formal
+specification change.
+Promotion of deferred work to normative status requires:
+1. A design document explaining the extension and its conformance implications.
+2. Review by the specification authority.
+3. A normative change to this chapter and the conformance profile.
 
 ## Deferred work
 

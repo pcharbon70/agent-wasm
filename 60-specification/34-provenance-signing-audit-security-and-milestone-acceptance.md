@@ -34,6 +34,35 @@ obligations.
 Promotion to `status: normative` requires evidence from the Phase 5
 integration tests and a passing cross-milestone fixture run.
 
+### Milestone acceptance criteria
+
+> **Normative definition.**
+Phase 5 MILESTONE ACCEPTANCE requires:
+
+1. **Integration test pass**: 100% of Phase 5 integration tests MUST pass.
+2. **Cross-milestone fixture**: A passing cross-milestone fixture run that
+   exercises the artifact provenance system in conjunction with other
+   milestone capabilities.
+3. **Security exercises**: All 7 security exercise attack vectors AND
+   all 6 adversarial isolation exercise attack vectors MUST be simulated
+   and verified to be detected and rejected.
+4. **Evidence recording**: All integration test evidence MUST be recorded
+   as machine-readable YAML reports in the `50-journal/` directory.
+5. **Conformance profile**: The conformance profile MUST document all
+   implementation-defined choices listed in this chapter.
+
+> **Normative definition.**
+Phase 5 FAILS MILESTONE ACCEPTANCE if:
+- Any integration test fails, OR
+- Any security exercise attack vector is NOT detected and rejected, OR
+- Any cross-milestone fixture run fails, OR
+- The conformance profile is incomplete.
+
+> **Normative definition.**
+Failed milestone acceptance requires remediation and re-validation.
+The affected phase MUST be revised and the full integration test suite
+MUST be re-run before re-submission for acceptance.
+
 Governing policies:
 [Specification Authority](../SPECIFICATION-AUTHORITY.md)
 and
@@ -318,6 +347,11 @@ The host MUST enforce the following evidence retention and access rules:
 
 1. **Retention**: Evidence records MUST be retained for a minimum period
    documented in the conformance profile.
+   Baseline conformance REQUIRES minimum retention periods aligned with
+   common regulations (e.g., GDPR, SOC2, ISO 27001):
+   - **General audit evidence**: Minimum 90 days
+   - **Security violation evidence**: Minimum 1 year
+   - **Operator-accessible evidence**: Retention defined by operator policy
    Records MUST NOT be deleted before the minimum retention period
    expires, except by explicit operator action with an audit log entry
    documenting the deletion.
@@ -331,6 +365,38 @@ The host MUST enforce the following evidence retention and access rules:
 4. **Audit**: Every access to evidence records, including reads, writes,
    and deletions, MUST be logged in a separate audit log that is itself
    subject to retention and integrity rules.
+
+### Artifact provenance chain
+
+> **Normative definition.**
+The host MUST maintain a complete artifact provenance chain that links
+every artifact to its publisher, build environment, dependencies, and
+admission history.
+The provenance chain is immutable and MUST be stored as part of the
+evidence record system.
+
+> **Normative definition.**
+The provenance chain MUST include the following linked records:
+
+1. **Publisher record**: The publisher identity, trusted keys, and trust tier.
+2. **Build record**: The compiler, PDK, build environment, and build timestamp.
+3. **Artifact record**: The artifact digest, signature, and attestation.
+4. **Dependency records**: The resolved dependencies, each with their own provenance.
+5. **Admission record**: The admission result, including all checks performed.
+6. **Lifecycle records**: Every lifecycle operation (install, upgrade, remove)
+   with timestamps and operator identity.
+
+> **Normative definition.**
+The provenance chain MUST support forensic queries such as:
+- "Show all artifacts built by publisher X with compiler Y."
+- "Show all admissions of artifact Z, including failures."
+- "Show all artifacts in the dependency graph of artifact W."
+
+> **Normative implementation-defined choice.**
+The host defines the exact storage mechanism for the provenance chain
+(database schema, log structure, or graph database).
+The mechanism MUST support efficient forensic queries and MUST be
+documented in the conformance profile.
 
 > **Non-normative note.**
 Evidence immutability is the primary defense against audit tampering.
@@ -1116,27 +1182,59 @@ in the conformance profile.
 1. **Error code catalog**: The exact error code catalog for the
    `artifact.admission.<subtype>`, `evidence.<subtype>`, and
    `redaction.<subtype>` naming conventions.
+
 2. **Signature scheme**: The cryptographic signature scheme used for
    artifact signature verification.
+   Baseline conformance REQUIRES support for Ed25519.
+   Conformance profiles MAY require additional schemes (e.g., RSA-PSS, ECDSA)
+   for specific deployment models.
+
 3. **Hash algorithm**: The hash algorithm used for digest computation
    and evidence hashing.
+   Baseline conformance REQUIRES support for SHA-256, SHA-384, SHA-512,
+   and BLAKE3.
+   Conformance profiles MAY restrict to a subset for specific deployment models.
+
 4. **Evidence storage**: The storage mechanism, integrity check
    mechanism, and retention period for evidence records.
+   Baseline conformance REQUIRES normative minimum retention periods
+   aligned with common regulations (e.g., GDPR, SOC2, ISO 27001).
+
 5. **Redaction field patterns**: The exact field patterns used to
    identify fields in each redaction category.
+
 6. **Redaction cache strategy**: The caching strategy for redacted
    views and the invalidation protocol on policy changes.
+
 7. **Security alert mechanism**: The alert notification mechanism and
    containment action catalog for isolation violations and residue
    detection.
+
 8. **Publisher trust store format**: The exact format and update
    protocol for the publisher trust store and revocation lists.
 
-> **Non-normative note.**
-These implementation-defined choices do not alter the conformance
-obligations defined elsewhere in this chapter.
-They only define how an implementation realizes those obligations
-in a specific host language and runtime.
+### Test evidence recording
+
+> **Normative definition.**
+Phase 5 integration test evidence MUST be recorded as machine-readable YAML
+reports in the `50-journal/` directory.
+Each report MUST include:
+- Test name and identifier
+- Input data
+- Expected output
+- Actual output
+- Pass/fail status
+- Timestamp
+- Evidence record identifiers where applicable
+
+### Conformance test execution
+
+> **Normative definition.**
+Integration tests MAY be run incrementally (individual tests or test sections)
+for fast feedback during development.
+The full test suite MUST be run for milestone acceptance.
+Incremental test runs MUST preserve the ability to run the full suite
+without modification.
 
 ### Deferred work
 

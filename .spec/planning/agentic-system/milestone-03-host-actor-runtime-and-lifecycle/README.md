@@ -2,7 +2,7 @@
 
 Construct the host-owned live actor cell that serializes turns, invokes Extism reducers, manages lifecycle, and converts external events into signals.
 
-Current status: planned; all phases and tasks are unchecked.
+Current status: phase 1-5 complete; milestone 3 complete.
 
 ## Purpose
 
