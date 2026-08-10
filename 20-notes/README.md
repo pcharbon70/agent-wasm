@@ -239,6 +239,22 @@ open workbenches in inquiries, and session evidence in the journal.
 - [M8-P3 Section 3.4 Phase 3 Integration Tests Implementation](m8-p3-integration-tests-implementation.md)
   — documents Section 3.4 implementation: canonical flow, failure flow,
   resilience flow, and regression flow tests.
+- [M8-P4 Section 4.1 Contract And Data Model Implementation](m8-p4-contract-and-data-model-implementation.md)
+  — documents Section 4.1 implementation: deterministic fuzz input generation,
+  artifact mutation with wasm-smith/wasm-mutate, and nondeterministic input
+  recording and replay.
+- [M8-P4 Section 4.2 Behavior And Integration Implementation](m8-p4-behavior-and-integration-implementation.md)
+  — documents Section 4.2 implementation: artifact and event history
+  reduction with invariant preservation, instance mode comparison, and
+  failure deduplication.
+- [M8-P4 Section 4.3 Failure Evidence And Operational Notes Implementation](m8-p4-failure-evidence-and-operational-notes-implementation.md)
+  — documents Section 4.3 implementation: failure outcomes (malformed,
+  incompatible, conflicting, unauthorized, exhausted, unavailable), bounded
+  diagnostics, implementation-defined choices, and deferred work.
+- [M8-P4 Section 4.4 Phase 4 Integration Tests Implementation](m8-p4-integration-tests-implementation.md)
+  — documents Section 4.4 implementation: canonical flow verification, invalid
+  input handling, resource handling, and earlier milestone fixture regression
+  checks.
 
 ## Maintaining this index
 
