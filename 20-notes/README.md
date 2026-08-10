@@ -193,6 +193,22 @@ open workbenches in inquiries, and session evidence in the journal.
   — documents Section 5.4 implementation: canonical flow verification, failure
   handling tests, timeout/cancellation/retry tests, and cross-milestone
   compatibility tests.
+- [M8-P1 Section 1.1 Contract And Data Model Implementation](m8-p1-contract-and-data-model-implementation.md)
+  — documents Section 1.1 implementation from Phase 1 plan: evidence manifest
+  field specifications, disposition definitions, initial runtime matrix, and
+  validation rules.
+- [M8-P1 Section 1.2 Behavior And Integration Implementation](m8-p1-behavior-and-integration-implementation.md)
+  — documents Section 1.2 implementation: test case mapping, aggregate status
+  visibility, evidence lifecycle, and release comparison.
+- [M8-P1 Section 1.3 Failure Evidence And Operational Notes Implementation](m8-p1-failure-evidence-and-operational-notes-implementation.md)
+  — documents Section 1.3 implementation: failure outcomes, bounded diagnostics,
+  implementation-defined choices, and deferred work.
+- [M8-P1 Section 1.4 Phase 1 Integration Tests Implementation](m8-p1-integration-tests-implementation.md)
+  — documents Section 1.4 implementation: canonical flow, failure flow,
+  resilience flow, and regression flow tests.
+- [M8-P1 Runtime Matrix](m8-p1-runtime-matrix.yaml)
+  — initial runtime matrix configuration for Extism/Wasmtime and Extism/Wazero
+  across supported host platforms and guest toolchains.
 
 ## Maintaining this index
 
