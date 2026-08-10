@@ -25,12 +25,15 @@ Only phase plans and milestone-wide assumptions for portability, verification, a
 3. [Phase 3 - Extism Wasmtime And Extism Wazero Semantic Equivalence](phase-03-extism-wasmtime-and-extism-wazero-semantic-equivalence.md)
 4. [Phase 4 - Property Fuzz Replay Reduction Pooling And Isolation](phase-04-property-fuzz-replay-reduction-pooling-and-isolation.md)
 5. [Phase 5 - Fault Security Performance Formal Model And Release Acceptance](phase-05-fault-security-performance-formal-model-and-release-acceptance.md)
+6. [Phase 6 - Cross-Platform Deployment Documentation And Community Handoff](phase-06-cross-platform-deployment-documentation-and-community-handoff.md)
 
 ## Planned Artifacts
 
 - Evidence manifest and support matrix
 - Cross-runtime conformance and regression corpus
 - Fault, isolation, security, performance, and formal-model release gates
+- Cross-platform deployment artifacts with integrity verification
+- Operational procedures and community handoff documentation
 
 ## Shared Conventions
 
@@ -49,7 +52,7 @@ Only phase plans and milestone-wide assumptions for portability, verification, a
 
 ## Exit Gate
 
-All five phase integration sections pass together, their evidence is retained,
+All six phase integration sections pass together, their evidence is retained,
 and no unresolved failure changes an earlier contract or trust assumption.
 
 ## Index
@@ -65,6 +68,7 @@ and no unresolved failure changes an earlier contract or trust assumption.
 - [Phase 3 - Extism Wasmtime And Extism Wazero Semantic Equivalence](phase-03-extism-wasmtime-and-extism-wazero-semantic-equivalence.md) — implements and verifies this ordered phase.
 - [Phase 4 - Property Fuzz Replay Reduction Pooling And Isolation](phase-04-property-fuzz-replay-reduction-pooling-and-isolation.md) — implements and verifies this ordered phase.
 - [Phase 5 - Fault Security Performance Formal Model And Release Acceptance](phase-05-fault-security-performance-formal-model-and-release-acceptance.md) — implements and verifies this ordered phase.
+- [Phase 6 - Cross-Platform Deployment Documentation And Community Handoff](phase-06-cross-platform-deployment-documentation-and-community-handoff.md) — implements and verifies this ordered phase.
 
 ## Maintaining This Index
 
