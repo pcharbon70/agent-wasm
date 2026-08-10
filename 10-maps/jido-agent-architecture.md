@@ -33,6 +33,9 @@ host–guest design.
 - [How Should Agent WASM Assure a Jido-Like Extism Runtime?](../40-inquiries/how-should-agent-wasm-assure-a-jido-like-extism-runtime.md)
   — defines the evidence model for cross-runtime reducer equivalence,
   state/outbox correctness, crash recovery, resource limits, and tenant erasure.
+- [Agent WASM Host Implementation Language](agent-wasm-host-implementation-language.md)
+  — evaluates which language and native boundary can implement this actor model
+  without conflating OTP process isolation with Wasm or NIF isolation.
 
 ## Trails
 
@@ -77,6 +80,9 @@ host–guest design.
 
 ### Wasm and Extism context
 
+- [Agent WASM Host Implementation Language and Runtime Boundary](../20-notes/agent-wasm-host-implementation-language-and-runtime-boundary.md)
+  — maps the Jido-like host responsibilities onto Rust, Go, Elixir, and a
+  narrow Rust execution kernel.
 - [Extism Plugin-System Architecture and Runtimes](../20-notes/extism-plugin-system-architecture-and-runtimes.md)
   — the bytes ABI, host functions, state, manifests, engines, and limitations
   beneath the proposed guest boundary.
@@ -104,6 +110,10 @@ subject to the inquiry.
 - What are the precise crash and delivery contracts for state plus effects?
 - When do WIT types and component-native async outweigh Extism's simpler and
   broader bootstrap toolchains?
+- Does an OTP control plane with a process-isolated Rust worker preserve enough
+  performance, or do measurements justify Rustler's BEAM-wide native risk?
 
 These remain tracked in the
-[construction inquiry](../40-inquiries/how-should-agent-wasm-construct-a-jido-like-framework.md).
+[construction inquiry](../40-inquiries/how-should-agent-wasm-construct-a-jido-like-framework.md)
+and the
+[host implementation inquiry](../40-inquiries/which-host-implementation-approach-should-agent-wasm-use.md).

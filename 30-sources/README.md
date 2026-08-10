@@ -64,6 +64,28 @@ what the source supports, how it reached its conclusions, and its limits.
 - [Jido Signals and Routing](agentjido-2026-jido-signals-and-routing.md) —
   records the CloudEvents-derived envelope, causal metadata, route precedence,
   dispatch adapters, and persistent subscription features.
+- [Elixir Processes, Mailboxes, and Supervision](elixir-project-2026-processes-and-supervision.md)
+  — documents lightweight isolated processes, non-blocking mailbox sends,
+  links, monitors, supervision, process bottlenecks, and the gap between a raw
+  mailbox and Agent WASM's explicit admission bounds.
+- [Erlang NIFs, Dirty Schedulers, and Ports](erlang-project-2026-nifs-dirty-schedulers-and-ports.md)
+  — establishes VM-wide NIF failure scope, lengthy-work scheduling rules,
+  cooperative cancellation constraints, and external Port isolation.
+- [Go Concurrency, Context, and C Interoperation](go-project-2026-concurrency-context-and-cgo.md)
+  — covers goroutines, channels, bounded workers, cooperative cancellation,
+  the cgo boundary, and built-in fuzzing.
+- [Rust Ownership and Concurrency](rust-project-2026-ownership-and-concurrency.md)
+  — records ownership, `Send`/`Sync`, safe concurrency, the unsafe boundary,
+  and the actor semantics that remain application responsibilities.
+- [Rustler Safe Rust NIF Bridge](rustler-project-2026-safe-rust-nifs.md) —
+  covers typed NIF wrappers, panic catching, dirty scheduling, native resources,
+  asynchronous thread replies, and the limits of safe-wrapper claims.
+- [Rustler Precompiled NIF Distribution](rustler-project-2026-precompiled-nif-distribution.md)
+  — documents checksummed native artifacts, target/NIF matrices, source-build
+  fallback, and remaining release and provenance obligations.
+- [Tokio Task Runtime and Blocking Work](tokio-project-2026-task-runtime.md) —
+  distinguishes async tasks from bounded blocking or CPU work and records why
+  task abort alone does not stop a running engine invocation.
 - [Wasm-R3](baek-et-al-2024-wasm-r3.md) — record-reduce-replay construction of
   realistic standalone cross-engine Wasm benchmarks.
 - [RR-Reduce](baek-et-al-2025-rr-reduce.md) — execution-aware minimization of
@@ -106,6 +128,9 @@ what the source supports, how it reached its conclusions, and its limits.
   host callbacks, reset, and cancellation.
 - [Extism Chicory SDK](extism-project-2026-chicory-sdk.md) — experimental
   pure-Java implementation over the JVM-native Chicory engine.
+- [Extism Elixir Host SDK](extism-project-2026-elixir-sdk.md) — source and API
+  audit of the official Rustler-based Elixir binding, its pinned versions,
+  string boundary, missing public capabilities, and normal-scheduler calls.
 - [Extism Go SDK](extism-project-2026-go-sdk.md) — independent pure-Go Extism
   implementation over Wazero with contexts, WASI, caches, and instances.
 - [Extism Host Function Namespaces](extism-project-2026-host-function-namespaces.md)
