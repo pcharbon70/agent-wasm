@@ -207,7 +207,7 @@ The following tests are planned for validation once the validator implementation
 
 ### Earlier Milestone Assumptions
 
-No earlier milestone assumptions are invalidated by this phase. The contract and data model build on the evidence manifests defined in [Phase 1 Section 1.1 Contract And Data Model](../phase-01-evidence-manifests-profiles-runtime-matrices-and-traceability/m8-p1-contract-and-data-model-implementation.md).
+No earlier milestone assumptions are invalidated by this phase. The contract and data model build on the evidence manifests defined in [Phase 1 Section 1.1 Contract And Data Model](./m8-p1-contract-and-data-model-implementation.md).
 
 ## Checklist
 
