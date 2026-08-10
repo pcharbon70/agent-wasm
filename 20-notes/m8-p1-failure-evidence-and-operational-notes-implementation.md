@@ -31,6 +31,7 @@ The following failure outcomes are defined for evidence manifests, profiles, run
 |---------|------------|-------------------|
 | **malformed** | The input is invalid and cannot be processed. | Invalid YAML, missing required fields, invalid types. |
 | **incompatible** | The input is valid but incompatible with the current configuration. | Unsupported engine version, missing required features. |
+| **stale** | The input is valid but has exceeded the retention period. | Artifact version older than retention period, divergence record older than review period. |
 | **conflicting** | The input conflicts with existing evidence or configuration. | Duplicate manifest with different content, disposition conflicts. |
 | **unauthorized** | The input is valid but the actor lacks permission. | Missing authentication, insufficient privileges. |
 | **exhausted** | The system is unable to process the input due to resource constraints. | Disk space full, memory limit exceeded, rate limit hit. |
@@ -56,7 +57,7 @@ Diagnostic = {
   correlation_id: UUID
 }
 
-FailureOutcome = "malformed" | "incompatible" | "conflicting" | "unauthorized" | "exhausted" | "unavailable"
+FailureOutcome = "malformed" | "incompatible" | "stale" | "conflicting" | "unauthorized" | "exhausted" | "unavailable"
 
 ErrorCode = string
 
