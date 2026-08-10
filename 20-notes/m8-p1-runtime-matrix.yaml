@@ -1,0 +1,92 @@
+---
+title: "M8-P1 Runtime Matrix"
+kind: note
+created: "2026-08-10"
+maturity: stable
+tags:
+  - milestone-08
+  - phase-01
+  - runtime-matrix
+aliases:
+  - "M8-P1 Runtime Matrix"
+---
+
+# M8-P1 Runtime Matrix
+
+## Status
+
+- **Milestone**: 8 - Portability, Verification, And Performance
+- **Phase**: 1 - Evidence Manifests Profiles Runtime Matrices And Traceability
+- **Created**: 2026-08-10
+- **Status**: stable
+
+## Purpose
+
+Define the initial runtime matrix for Extism/Wasmtime and Extism/Wazero across supported host platforms and guest toolchains.
+
+## Matrix Configuration
+
+```yaml
+matrix:
+  - engine: "Extism/Wasmtime"
+    version: "0.6.x"
+    os:
+      - name: "Linux"
+        architecture: ["x86_64", "aarch64"]
+        features: ["WASI", "memory", "gas"]
+        status: "supported"
+      - name: "macOS"
+        architecture: ["x86_64", "aarch64"]
+        features: ["WASI", "memory", "gas"]
+        status: "supported"
+      - name: "Windows"
+        architecture: ["x86_64"]
+        features: ["WASI", "memory", "gas"]
+        status: "experimental"
+
+  - engine: "Extism/Wazero"
+    version: "1.7.x"
+    os:
+      - name: "Linux"
+        architecture: ["x86_64", "aarch64"]
+        features: ["WASI", "memory"]
+        status: "supported"
+      - name: "macOS"
+        architecture: ["x86_64", "aarch64"]
+        features: ["WASI", "memory"]
+        status: "supported"
+      - name: "Windows"
+        architecture: ["x86_64"]
+        features: ["WASI", "memory"]
+        status: "experimental"
+```
+
+## Disposition Hierarchy
+
+The following hierarchy defines the disposition levels from highest to lowest:
+
+1. **conforming** - All tests pass, no divergences across runtimes
+2. **supported** - Fully tested and meets all normative requirements
+3. **experimental** - Under active development, may have known issues
+4. **expected-failure** - Known failures documented with issue references
+5. **quarantined** - Failing and under investigation
+6. **skipped** - Skipped due to external dependencies or resource constraints
+7. **excluded** - Explicitly excluded from testing
+8. **divergent** - Different results across runtimes but all correct
+
+## Maintenance
+
+- Update this matrix when new configurations are tested.
+- Update disposition statuses when test results change.
+- Commit alongside evidence manifests that reference this matrix.
+
+## Index
+
+### Documents
+
+- None yet.
+
+## Maintaining This Index
+
+Keep phase numbering contiguous, preserve dependency order, and update the
+master roadmap when milestone scope or exit criteria change.
