@@ -78,7 +78,6 @@ EffectHandlerRegistration {
 }
 
 HandlerId = string
-DirectiveKindName = "emit" | "timer" | "effect" | "child-lifecycle" | "approval" | "topology"
 TrustClass = Untrusted | Confined | Privileged
 HandlerCapability {
   effects: Set<EffectKind>,

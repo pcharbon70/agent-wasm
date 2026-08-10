@@ -343,6 +343,12 @@ The state_patch field is the structural update to agent state.
 It is a typed patch that the host validates and applies.
 
 > **Normative definition.**
+This is the wire format returned in `TurnResult`.
+The host internally converts this to the internal patch model defined in
+[State Operations Patches Revisions And Conflicts](12-state-operations-patches-revisions-and-conflicts.md)
+for atomic application with revision tracking and precondition enforcement.
+
+> **Normative definition.**
 
 ```
 StatePatch {
@@ -493,8 +499,6 @@ The following diagnostic codes are defined:
 | `protocol.encode` | `non_canonical` | Output not in canonical form. |
 | `protocol.timeout` | `turn_exceeded` | Turn deadline exceeded. |
 | `protocol.cancel` | `requested` | Cancellation requested. |
-
-## Canonical JSON encoding
 
 ## Canonical JSON encoding
 

@@ -2,7 +2,7 @@
 title: "Extism Invocation Boundary Instances And Output Validation"
 kind: specification
 created: "2026-08-08"
-status: draft
+status: normative
 spec_version: "0.1.0"
 tags:
   - milestone-03
@@ -338,46 +338,10 @@ InvocationResult {
 `StatePatch` is defined in
 [Turn Lifecycle Protocols And Canonical Encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md#state-patch).
 
-`Directive` is defined in
+`Directive`, `DirectiveKindName`, `CausalMetadata`, `CapabilityRef`, `RetryClass`, and `ResultContract` are defined in
 [Directives Strategies Continuations And Terminal States](13-directives-strategies-continuations-and-terminal-states.md#directive).
 The chapter 13 definition supersedes the simpler chapter 04 definition for
 this chapter.
-The chapter 13 `Directive` is:
-
-> **Normative definition.**
-
-```
-Directive {
-  id: string,
-  kind: DirectiveKindName,
-  payload: JsonObject?,
-  requested_capability: CapabilityRef,
-  causal_metadata: CausalMetadata,
-  completion_signal: string?,
-  retry_class: RetryClass?,
-  result_contract: ResultContract?
-}
-
-DirectiveKindName = "emit" | "timer" | "effect" | "child-lifecycle" | "approval" | "topology"
-
-CausalMetadata {
-  turn_id: string,
-  instruction_id: string?,
-  action_name: string,
-  timestamp: timestamp
-}
-
-CapabilityRef {
-  name: string,
-  version: string?
-}
-
-RetryClass {
-  max_attempts: int,
-  backoff_ms: int,
-  jitter_ms: int?
-}
-```
 
 > **Normative definition.**
 
@@ -529,17 +493,20 @@ without exposing secrets or implementation internal state.
 ### Implementation-defined choices
 
 > **Normative implementation-defined choice.**
-The following choices are implementation-defined and do not create
-conformance obligations.
+The following implementation-defined choices do not create conformance obligations.
 The Variability register below catalogs all such choices.
 
-1. **Cache eviction policy**: The host MAY choose the cache eviction policy. The policy MUST be documented in the conformance profile.
+> **Normative implementation-defined choice.**
+Cache eviction policy: The host MAY choose the cache eviction policy. The policy MUST be documented in the conformance profile. This implementation-defined choice is not a conformance obligation.
 
-2. **Host function registration**: The host MAY choose how to register and validate host functions. The mechanism is implementation-defined.
+> **Normative implementation-defined choice.**
+Host function registration: The host MAY choose how to register and validate host functions. The mechanism is implementation-defined. This implementation-defined choice is not a conformance obligation.
 
-3. **Cancellation polling**: The host MAY choose how frequently to check the cancellation token. The frequency MUST be documented in the conformance profile.
+> **Normative implementation-defined choice.**
+Cancellation polling: The host MAY choose how frequently to check the cancellation token. The frequency MUST be documented in the conformance profile. This implementation-defined choice is not a conformance obligation.
 
-4. **Quarantine retention**: The host MAY choose how long to retain quarantined instances. The retention period MUST be documented in the conformance profile.
+> **Normative implementation-defined choice.**
+Quarantine retention: The host MAY choose how long to retain quarantined instances. The retention period MUST be documented in the conformance profile. This implementation-defined choice is not a conformance obligation.
 
 ### Deferred work
 
@@ -735,10 +702,9 @@ Any approved variability MUST be documented in the Milestone 3 exit report.
 | Invocation order | Required | describe, initialize, reduce, migrate, fixed by this chapter |
 | Output validation | Required | 7-step validation pipeline, fixed by this chapter |
 | Instance disposal | Required | Dispose or quarantine, fixed by this chapter |
-| Cache eviction policy | Implementation-defined | Documented in conformance profile |
-| Host function registration | Implementation-defined | Documented in conformance profile |
-| Cancellation polling | Implementation-defined | Documented in conformance profile |
-| Quarantine retention | Implementation-defined | Documented in conformance profile |
+
+The remaining variability choices are documented in the
+section on host-defined selections.
 
 ## Rationale and evidence (non-normative)
 

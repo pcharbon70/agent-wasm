@@ -76,7 +76,7 @@ CausalMetadata {
   turn_id: string,
   instruction_id: string?,
   action_name: string,
-  timestamp: timestamp
+  timestamp: UnixTimestamp
 }
 
 CapabilityRef {

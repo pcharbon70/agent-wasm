@@ -169,7 +169,9 @@ external provider received the result), the host MUST:
    result using the idempotency key.
 2. **Return cached result**: If a result exists, return it without re-dispatching.
 3. **Cache result**: If no result exists, cache the result locally and mark
-   the attempt as `Completed` with `attempt.ambiguous_success_cached`.
+    the attempt as `Completed`. Record the ambiguous-success state in the
+    attempt metadata so that the dispatch layer can detect the condition on
+    subsequent processing.
 
 > **Normative definition.**
 The host MUST NOT re-dispatch an attempt that has already been successfully
@@ -203,10 +205,8 @@ recovered entity and its state.
 If any recovery step fails, the host MUST:
 
 1. Log the failure with the error code and diagnostic message.
-2. Mark the affected entity as `Failed` (e.g., `outbox.pending_ack_failed`,
-   `timer.recovery_failed`, etc.).
-3. Continue recovering other entities.
-4. Report all failures to the operator via bounded diagnostics.
+2. Mark the affected entity as `Failed` and continue recovering other entities.
+3. Report all failures to the operator via bounded diagnostics.
 
 ### Crash matrix
 

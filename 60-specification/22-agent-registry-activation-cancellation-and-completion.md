@@ -2,7 +2,7 @@
 title: "Agent Registry Activation Cancellation And Completion"
 kind: specification
 created: "2026-08-08"
-status: draft
+status: normative
 spec_version: "0.1.0"
 tags:
   - milestone-03
@@ -583,10 +583,8 @@ Any approved variability MUST be documented in the Milestone 3 exit report.
 | Activation policies | Required | eager, lazy, on-signal, disabled, fixed by this chapter |
 | Activation behavior | Required | 5 scenarios fixed by this chapter |
 | Disposable projections | Required | Must be disposable, fixed by this chapter |
-| Activation policy enforcement | Implementation-defined | Documented in conformance profile |
-| Durable state storage | Implementation-defined | Documented in conformance profile |
-| Disposable projection release | Implementation-defined | Documented in conformance profile |
-| Registry persistence | Implementation-defined | Documented in conformance profile |
+
+Other variability choices are documented in the section on host-defined selections.
 
 ## Rationale and evidence (non-normative)
 

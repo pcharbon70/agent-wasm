@@ -38,10 +38,10 @@ This chapter is normative by default within its stated scope.
 Material visibly marked non-normative does not create conformance
 obligations.
 Promotion to `status: normative` requires evidence from the Phase 3
-integration tests in
-Section 3.4
-and a passing cross-milestone fixture run recorded in
-Section 3.4.1.4.
+ integration tests in
+ Section Integration Test Expectations
+ and a passing cross-milestone fixture run recorded in
+ the cross-milestone fixture regression test case within that section.
 
 Governing policies:
 [Specification Authority](../SPECIFICATION-AUTHORITY.md)
@@ -489,7 +489,7 @@ Artifact and manifest validation proceeds in the following order:
 
 1. **Bytes integrity:** Verify module bytes decode as valid Wasm.
 2. **Digest verification:** Compute digest and compare to declared digest.
-3. **Signature verification:** Verify signatures if present (non-blocking).
+3. **Signature verification:** Verify signatures if present; missing signatures are acceptable, but failed verification is a rejection.
 4. **Feature profile:** Check required Wasm features against host support.
 5. **Manifest structure:** Validate manifest JSON schema and field types.
 6. **Manifest compatibility:** Check version fields against host supported range.
@@ -674,7 +674,7 @@ Any regression MUST be recorded with its approval status.
 | Clause | Type | Selection |
 | --- | --- | --- |
 | Artifact structure | Required | Wasm bytes + manifest + optional signatures |
-| Digest algorithm | SHOULD | SHA-256; stronger algorithms MAY be used |
+| Digest algorithm | Required | SHA-256; stronger algorithms MAY be used |
 | Media types | Required | Fixed by this chapter |
 | Build provenance | Required | Fields fixed by this chapter |
 | Signature verification | SHOULD NOT | Provenance only; not a security mechanism |

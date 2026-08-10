@@ -81,7 +81,7 @@ Every child-create directive MUST include the following fields:
 | Field | Content | Source |
 |-------|---------|--------|
 | `directive_id` | A deterministic request identity derived from parent address, artifact digest, manifest digest, initial state hash, owner address, lifecycle policy reference, grant scope hash, and a monotonic sequence number. | Directive construction. |
-| `artifact` | The WASM artifact digest and selection that the child's live actor will execute. | Agent Manifests Artifacts Schemas And Registries](30-threat-model-principals-trust-classes-and-grant-vocabulary.md). |
+| `artifact` | The WASM artifact digest and selection that the child's live actor will execute. | [Agent Manifests Artifacts Schemas And Registries](03-agent-manifests-artifacts-schemas-and-registries.md). |
 | `manifest` | The reviewed manifest record that declares the artifact's declared capabilities, input schema, output schema, and trust tier. | [Agent Manifests Artifacts Schemas And Registries](03-agent-manifests-artifacts-schemas-and-registries.md). |
 | `initial_state` | The serialized initial state document that becomes the child's first snapshot revision. | [State Operations Patches Revisions And Conflicts](12-state-operations-patches-revisions-and-conflicts.md). |
 | `owner` | The `TenantQualifiedAgentAddress` of the parent agent that created the child. | [Agent Identity Addressing Ownership And Dependency Relations](35-agent-identity-addressing-ownership-and-dependency-relations.md). |
@@ -1091,9 +1091,7 @@ conflict on a behavior question, the following precedence rules apply:
 5. Where both sections are applicable and agree, they are mutually
    reinforcing.
 
-## Variability and limits
-
-### Normative variability register
+## Variability register
 
 The following table enumerates every `MAY`, `SHOULD`, `SHOULD NOT`,
 implementation-defined choice, implementation limit, and permitted

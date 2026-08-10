@@ -94,8 +94,10 @@ RetryClassification = Transient | Permanent | OperatorIntervention
 RetryState = Pending | InProgress | Completed | Failed | Cancelled | Expired | TerminalFailed
 ```
 
-`AttemptId`, `TenantId`, and `AgentId` are defined in
+`AttemptId` is defined in
 [Effect Handlers Attempts Idempotency And Result Signals](27-effect-handlers-attempts-idempotency-and-result-signals.md).
+`TenantId` and `AgentId` are defined in
+[Mailboxes Ordering Bounds Fairness And Turn Leases](21-mailboxes-ordering-bounds-fairness-and-turn-leases.md).
 
 | Field | Type | Required | Purpose |
 |-------|------|----------|---------|
@@ -435,6 +437,7 @@ replay, hibernate, and migration:
 5. **Exhausted**: The system is out of resources (e.g., storage capacity, retry
    budget).
 6. **Unavailable**: The storage backend is unavailable.
+7. **Timeout**: A dispatch or operation exceeded its deadline.
 
 > **Normative definition.**
 Each failure outcome MUST be mapped to a specific error code and diagnostic
@@ -451,7 +454,6 @@ hibernate, and migration:
 | `retry.max_retries_exceeded` | Maximum retry attempts exceeded |
 | `retry.deadline_exceeded` | Retry deadline exceeded |
 | `retry.expired` | Retry expired |
-| `retry.timeout` | Retry dispatch timed out |
 | `timer.expired` | Timer expired |
 | `timer.duplicate` | Duplicate timer detected |
 | `timer.missed_fire` | Timer missed scheduled fire time |

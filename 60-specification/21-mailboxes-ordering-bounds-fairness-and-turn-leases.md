@@ -2,7 +2,7 @@
 title: "Mailboxes Ordering Bounds Fairness And Turn Leases"
 kind: specification
 created: "2026-08-08"
-status: draft
+status: normative
 spec_version: "0.1.0"
 tags:
   - milestone-03
@@ -540,11 +540,8 @@ Any approved variability MUST be documented in the Milestone 3 exit report.
 | Deterministic ordering | Required | Stable FIFO within priority class, fixed by this chapter |
 | Mailbox bounds | Required | Count, byte, age, per-source, per-tenant, fixed by this chapter |
 | Turn lease structure | Required | Fields fixed by this chapter |
-| Fairness policy | Implementation-defined | Documented in conformance profile |
-| Overload policy | Implementation-defined | Documented in conformance profile |
-| Lease renewal interval | Implementation-defined | Documented in conformance profile |
-| Dead-letter retention | Implementation-defined | Documented in conformance profile |
-| Delivery deadline | Implementation-defined | Documented in conformance profile |
+
+Other variability choices are documented in the section on host-defined selections.
 
 ## Rationale and evidence (non-normative)
 

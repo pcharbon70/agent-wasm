@@ -182,7 +182,7 @@ If any case fails, the reducer is non-conformant.
 The following negative cases verify failure handling:
 
 1. **Stale state**: Turn with state revision older than current MUST be rejected with `state.revision.stale`.
-2. **Ambiguous route**: Signal with no matching action or strategy transition MUST be rejected with `signal.routing.ambiguous`.
+2. **Ambiguous route**: Signal with no matching action or strategy transition MUST be rejected with `reducer.resolution.routing_ambiguous` (defined in [Turn Lifecycle Protocols And Canonical Encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md#diagnostics)).
 3. **Invalid patch**: Patch that fails validation MUST be rejected with appropriate diagnostic.
 4. **Unauthorized directive**: Directive requiring ungranted capability MUST be rejected with `directive.missing.missing_capability`.
 5. **Corrupt strategy snapshot**: Snapshot that fails validation MUST be rejected with `strategy.snapshot.corruption`.

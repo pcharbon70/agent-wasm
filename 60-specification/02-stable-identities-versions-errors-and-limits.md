@@ -32,10 +32,10 @@ This chapter is normative by default within its stated scope.
 Material visibly marked non-normative does not create conformance
 obligations.
 Promotion to `status: normative` requires evidence from the Phase 2
-integration tests in
-Section 2.4
-and a passing cross-milestone fixture run recorded in
-Section 2.4.1.4.
+ integration tests in
+ Section Integration Test Expectations
+ and a passing cross-milestone fixture run recorded in
+ the cross-milestone fixture regression test case within that section.
 
 Governing policies:
 [Specification Authority](../SPECIFICATION-AUTHORITY.md)
@@ -162,6 +162,25 @@ Identity comparison is lexical on the canonical text representation.
 Comparison MUST be case-sensitive and MUST treat all characters equally.
 Two identities are equal if and only if their canonical text representations
 are byte-for-byte identical.
+
+### Temporal identity
+
+> **Normative definition.**
+The following temporal types are used throughout this profile.
+
+| Type | Representation | Example |
+| --- | --- | --- |
+| Timestamp | ISO 8601 UTC | `2026-08-10T12:34:56Z` |
+| UnixTimestamp | ISO 8601 UTC | `2026-08-10T12:34:56Z` |
+
+All temporal fields use ISO 8601 UTC format. The host MUST store timestamps
+in UTC and MUST NOT include timezone offsets.
+
+> **Normative definition.**
+
+```
+UnixTimestamp = string
+```
 
 ## Versions
 
@@ -526,7 +545,7 @@ Any regression MUST be recorded with its approval status.
 | Error categories | Required | 11 categories fixed by this chapter. |
 | Limit categories | Required | 9 limits fixed by this chapter. |
 | Default limit values | Implementation-defined | Documented in conformance profile. |
-| Unknown field policy | SHOULD NOT | Reject by default; accept only with justification. |
+| Unknown field policy | Required | Reject for authoritative structures; MAY accept for backward compatibility with justification. |
 | Deprecation notification | SHOULD | Notify publishers of upcoming deprecations. |
 | Identity generation strategy | Implementation-defined | UUID v4, counter, or hybrid; collision handling documented. |
 | Trace retention policy | Implementation-defined | Retention duration and archival strategy documented. |

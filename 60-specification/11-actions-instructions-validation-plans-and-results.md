@@ -441,13 +441,8 @@ no regressions.
 
 Expected behavior:
 
-- All Phase 1 fixtures: PASS.
-- All Phase 2 fixtures: PASS.
-- All Phase 3 fixtures: PASS.
-- All Phase 4 fixtures: PASS.
-- All Phase 5 fixtures: PASS.
-- All Milestone 2 Phase 1 fixtures: PASS.
-- All Milestone 2 Phase 2 fixtures: PASS.
+- All Milestone 1 fixtures: PASS.
+- All earlier Milestone 2 fixtures: PASS.
 
 Any approved variability MUST be documented in the Milestone 2 exit report.
 

@@ -62,7 +62,7 @@ Related chapters:
 [Synchronous Host Functions WASI Restrictions And Tenant Isolation](33-synchronous-host-functions-wasi-restrictions-and-tenant-isolation.md),
 [Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md).
 
-## 6.1 Contract And Data Model
+## 35.1 Contract And Data Model
 
 ### Tenant-qualified agent addresses
 
@@ -900,7 +900,7 @@ The signal envelope is concerned with how signals move; the address/
 relationship layer is concerned with who is moving them and why.
 Both layers are necessary for a complete multi-agent coordination model.
 
-## 6.2 Behavior And Integration
+## 35.2 Behavior And Integration
 
 ### Address resolution and placement projections
 
@@ -950,7 +950,7 @@ Address resolution returns a `ResolutionState` that includes:
    projection, if any.
 3. A point-in-time snapshot of the agent's active relationships,
    consistent with the relationship visibility policy defined in
-   section 6.1.
+   section 35.1.
 4. A timestamp indicating when the resolution was computed.
 
 The resolution operation MUST NOT create, modify, or terminate the agent.
@@ -1001,7 +1001,7 @@ and delivered when the agent transitions to `"active"`.
 
 > **Normative definition.**
 Signal provenance propagation is the set of rules that govern how the
-provenance fields defined in section 6.1 are carried, preserved, and
+provenance fields defined in section 35.1 are carried, preserved, and
 validated as a signal traverses the multi-agent system from its
 originating agent to its final recipient.
 Propagation is governed by three invariants: origin preservation, chain
@@ -1178,7 +1178,7 @@ a relationship record whose source or target agent has been migrated
 to a different engine instance, worker, or node since the relationship
 was created.
 Because agent addresses are independent of placement (as defined in
-section 6.1), the relationship record itself does NOT change when an
+section 35.1), the relationship record itself does NOT change when an
 agent migrates.
 The moved outcome is NOT an error: the relationship remains valid and
 operative.
@@ -1223,7 +1223,7 @@ and MUST NOT return any data about the cross-tenant relationship,
 including its existence, type, source, target, or status.
 If the requesting principal is a member of one but not the other
 tenant, the host MAY return a restricted view (type, source, target,
-status only, as defined in the visibility policy in section 6.1).
+status only, as defined in the visibility policy in section 35.1).
 
 > **Non-normative note.**
 The cross-tenant outcome enforces the tenant isolation boundary defined
@@ -1266,7 +1266,7 @@ principal, and the required trust tier or consent condition.
 
 > **Non-normative note.**
 The unauthorized outcome is the primary enforcement mechanism for the
-relationship creation authority model defined in section 6.1.
+relationship creation authority model defined in section 35.1.
 Without this outcome, principals could create or modify relationships
 without proper authority, undermining the trust and governance model.
 
@@ -1340,7 +1340,7 @@ delivery semantics, fault tolerance, and retry behavior; this section
 only governs how the provenance fields within those signals are
 populated and validated.
 
-## 6.3 Failure Evidence And Operational Notes
+## 35.3 Failure Evidence And Operational Notes
 
 ### Failure outcome taxonomy
 
@@ -1394,7 +1394,7 @@ the conflict-resolution action taken (e.g., `agent.identity.conflict.address-ass
 > **Normative definition.**
 The **unauthorized** failure outcome occurs when a principal attempts an
 operation without the required creation authority, consent, or trust
-tier defined in section 6.1.
+tier defined in section 35.1.
 Unauthorized outcomes are the primary enforcement mechanism for the
 governance and authority model.
 The diagnostic prefix for unauthorized failures is `agent.identity.unauthorized`.
@@ -1479,7 +1479,7 @@ Every diagnostic emitted by this chapter's contracts MUST include:
    unauthorized, exhausted, unavailable).
 2. The diagnostic code from the category's prefix.
 3. The affected agent addresses or relationship IDs (if any), subject
-   to the visibility policy in section 6.1.
+   to the visibility policy in section 35.1.
 4. A human-readable message that describes the failure in domain terms.
 
 > **Normative definition.**
@@ -1489,7 +1489,7 @@ Bounded diagnostics MUST NOT include:
    regex patterns, hash functions, or comparison algorithms.
 2. Information about agents, relationships, or principals that the
    requesting principal has no visibility into under the policy in
-   section 6.1.
+   section 35.1.
 3. Timing information that could be used to infer the existence or
    state of resources the principal cannot observe (timing side
    channel prevention, as required by
@@ -1654,7 +1654,7 @@ The distributed consensus protocol for address resolution across
 multiple host instances is deferred.
 This chapter defines that multiple host instances connected to a shared
 backend MUST converge on the same resolution state within a bounded
-time (as stated in section 6.1), but the specific consensus protocol
+time (as stated in section 35.1), but the specific consensus protocol
 (paxos, raft, causal broadcast, or other) is not defined here.
 This is deferred because the consensus protocol depends on the
 deployment topology and failure model, which are implementation-defined
@@ -1664,7 +1664,7 @@ choices documented in the conformance profile.
 The relationship graph cycle-detection algorithm for non-governance
 types (`dependency`, `delegate`, `observer`) is not fully specified.
 This chapter defines that cycles in governance types (`parent`,
-`child`, `owner`) are rejected (see section 6.2), but does not define
+`child`, `owner`) are rejected (see section 35.2), but does not define
 the specific algorithm for detecting cycles in non-governance types
 beyond the signal-level delegation-chain cycle detection.
 This is deferred because the cycle-detection requirements for
@@ -1753,7 +1753,7 @@ information, the isolation guarantee is weakened.
 
 > **Non-normative note.**
 The bounded delegation chain assumption assumes that delegation chains
-are bounded in length (maximum 128 elements, as stated in section 6.2).
+are bounded in length (maximum 128 elements, as stated in section 35.2).
 If integration tests reveal that delegation chains longer than 128
 elements are required for legitimate operational patterns, or that
 the 128-element limit causes legitimate operations to fail, then the
@@ -1780,7 +1780,7 @@ transitions complete within bounded time; if consent workflows are
 inherently unbounded (e.g., awaiting human approval that may never come),
 the lifecycle model needs a new state or a different timeout strategy.
 
-## 6.4 Phase 1 Integration Tests
+## 35.4 Phase 1 Integration Tests
 
 ### Test objectives
 
@@ -1804,7 +1804,7 @@ the lifecycle model needs a new state or a different timeout strategy.
 2. **Failure handling**: Verify that malformed, incompatible, stale,
    duplicate, and boundary-limit inputs are rejected with stable
    diagnostics that comply with the taxonomy defined in
-   section 6.3, and that no unauthorized or partial state persists after
+   section 35.3, and that no unauthorized or partial state persists after
    a failure.
 3. **Address stability**: Verify that agent addresses remain stable
    across agent moves (placement changes across engine instances,
@@ -1813,7 +1813,7 @@ the lifecycle model needs a new state or a different timeout strategy.
    requiring relationship recreation.
 4. **Relation enforcement**: Verify that relationship authority checks,
    cardinality limits, and visibility rules are enforced as defined in
-   section 6.1, and that unauthorized or violating operations are
+   section 35.1, and that unauthorized or violating operations are
    rejected with the diagnostics defined in sections 6.2 and 6.3.
 5. **Cross-milestone compatibility**: Verify that the fixtures defined
    for Phase 1 do not regress behavior established by milestones 1
@@ -1835,7 +1835,7 @@ the lifecycle model needs a new state or a different timeout strategy.
 > the agent identity, addressing, ownership, and dependency relations
 > system operates correctly end-to-end.
 > Each successful flow test MUST exercise one or more of the contracts
-> defined in section 6.1 and the behavior defined in section 6.2, and
+> defined in section 35.1 and the behavior defined in section 35.2, and
 > MUST verify that the system produces the expected observable result
 > without error.
 
@@ -1849,7 +1849,7 @@ the lifecycle model needs a new state or a different timeout strategy.
    within that tenant.
 2. The canonical string representation of the address is deterministic
    and parseable according to the separator rule defined in
-   section 6.1.
+   section 35.1.
 3. The `local_id` is opaque (not predictable from the tenant_id or
    from other agents' local_ids in the same tenant).
 4. The agent registry entry is written through the durable state layer
@@ -1878,7 +1878,7 @@ the lifecycle model needs a new state or a different timeout strategy.
 1. A relationship of each defined type (`parent`, `child`, `owner`,
    `member`, `dependency`, `observer`, `delegate`, `result-recipient`)
    is created between two agents in the same tenant, following the
-   creation authority rules in section 6.1.
+   creation authority rules in section 35.1.
 2. For relationship types requiring consent (`parent`, `child`, `owner`),
    the target agent's consent is required and verified before the
    relationship is admitted to `Active` status.
@@ -1893,7 +1893,7 @@ the lifecycle model needs a new state or a different timeout strategy.
    and subject to the atomic commit protocol defined in
    [Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md).
 7. A relationship query returns the created relationship consistent
-   with the visibility policy in section 6.1.
+   with the visibility policy in section 35.1.
 
 > **Non-normative note.**
 > Each relationship type requires a separate test iteration because
@@ -1947,10 +1947,10 @@ the lifecycle model needs a new state or a different timeout strategy.
 
 > **Normative definition.**
 > Failure handling tests verify that the system correctly rejects
-> invalid inputs with the diagnostics defined in section 6.3 and that
+> invalid inputs with the diagnostics defined in section 35.3 and that
 > no unauthorized or partial state persists after a failure.
 > Each failure test targets one or more failure outcome categories from
-> the taxonomy in section 6.3.
+> the taxonomy in section 35.3.
 
 #### Malformed inputs
 
@@ -1989,7 +1989,7 @@ diagnostic prefix and MUST NOT mutate any state.
    exhausted; the implementation MUST document this classification in
    the conformance profile).
 2. A relationship lifecycle transition that is not permitted by the
-   state machine in section 6.1 (e.g., transitioning from `Active` to
+   state machine in section 35.1 (e.g., transitioning from `Active` to
    `Pending`) is rejected with the diagnostic
    `relationship.lifecycle.incompatible-state-transition`.
 3. A signal with a `causation_id` that references a non-existent or
@@ -2029,7 +2029,7 @@ diagnostic prefix and MUST NOT mutate any state.
 > Boundary-limit failure tests verify:
 
 1. A `delegation_chain` exceeding the implementation-defined maximum
-   length (minimum 128 elements as defined in section 6.2) is rejected
+   length (minimum 128 elements as defined in section 35.2) is rejected
    with the diagnostic `signal.provenance.delegation-chain-too-long`.
 2. A `correlation_id` that exceeds implementation-defined size limits
    is rejected with the diagnostic `signal.provenance.correlation-id-too-long`.
@@ -2103,7 +2103,7 @@ diagnostic prefix and MUST NOT mutate any state.
 > These three stability tests collectively verify the core design
 > property that agent addresses are independent of process identity,
 > socket identity, engine instance identity, worker identity, and
-> physical node identity (as defined in section 6.1).
+> physical node identity (as defined in section 35.1).
 > A failure in any of these tests indicates that the address stability
 > invariant is violated, which would require revision of assumptions
 > in milestones 1 through 5 that depend on stable agent addresses as
@@ -2113,7 +2113,7 @@ diagnostic prefix and MUST NOT mutate any state.
 
 > **Normative definition.**
 > Relation enforcement tests verify that the authority, cardinality,
-> and visibility rules defined in section 6.1 are enforced as specified,
+> and visibility rules defined in section 35.1 are enforced as specified,
 > and that violations are rejected with the correct diagnostics.
 
 #### Authority checks
@@ -2151,7 +2151,7 @@ diagnostic prefix and MUST NOT mutate any state.
 3. An agent that already has a `result-recipient` relationship cannot
    create a second `result-recipient` relationship; the request is
    rejected with the diagnostic `relationship.cardinality-exceeded`.
-4. Hosts that impose stricter cardinality limits (per V-6.1-04) enforce
+4. Hosts that impose stricter cardinality limits (per V-35.1-04) enforce
    those limits instead of the defaults.
 
 > **Non-normative note.**
@@ -2159,7 +2159,7 @@ diagnostic prefix and MUST NOT mutate any state.
 > ambiguity (multiple parents), benefit ambiguity (multiple owners),
 > and result delivery ambiguity (multiple result-recipient targets).
 > These ambiguities would undermine the authority model defined in
-> section 6.1.
+> section 35.1.
 
 #### Visibility rules
 
@@ -2291,19 +2291,19 @@ required documentation obligation.
 
 | ID | Rule / Definition reference | Variability | Required documentation | Default |
 |----|---------------------------|-------------|----------------------|---------|
-| V-6.1-01 | Canonical address representation (separator character) | The separator character used to concatenate `tenant_id` and `local_id` in the canonical string representation of `TenantQualifiedAgentAddress`. | Conformance profile. | `:` |
-| V-6.1-02 | `local_id` generation method | The method used to generate `local_id` values (UUID v4, cryptographic random, monotonic counter with obfuscation, or other). | Conformance profile. | UUID v4 |
-| V-6.1-03 | Pending relationship timeout | The bounded time after which a pending relationship is automatically terminated. | Conformance profile. | 60 seconds |
-| V-6.1-04 | Stricter cardinality limits | Host-local cardinality limits that are stricter than the defaults in the cardinality table. | Conformance profile. | None (use defaults) |
-| V-6.1-05 | Delegation scope schema | The schema used to describe delegation scope, duration, and limitations in `delegate` relationship metadata. | Conformance profile. | Implementation-defined |
-| V-6.1-06 | Archived relationship retention | The retention period for archived (deleted) relationship records. | Conformance profile. | Same as evidence retention |
-| V-6.1-07 | Cross-tenant relationship policy | The specific cross-tenant policies applied to relationship creation, visibility, and resolution. | Conformance profile; must reference
+| V-35.1-01 | Canonical address representation (separator character) | The separator character used to concatenate `tenant_id` and `local_id` in the canonical string representation of `TenantQualifiedAgentAddress`. | Conformance profile. | `:` |
+| V-35.1-02 | `local_id` generation method | The method used to generate `local_id` values (UUID v4, cryptographic random, monotonic counter with obfuscation, or other). | Conformance profile. | UUID v4 |
+| V-35.1-03 | Pending relationship timeout | The bounded time after which a pending relationship is automatically terminated. | Conformance profile. | 60 seconds |
+| V-35.1-04 | Stricter cardinality limits | Host-local cardinality limits that are stricter than the defaults in the cardinality table. | Conformance profile. | None (use defaults) |
+| V-35.1-05 | Delegation scope schema | The schema used to describe delegation scope, duration, and limitations in `delegate` relationship metadata. | Conformance profile. | Implementation-defined |
+| V-35.1-06 | Archived relationship retention | The retention period for archived (deleted) relationship records. | Conformance profile. | Same as evidence retention |
+| V-35.1-07 | Cross-tenant relationship policy | The specific cross-tenant policies applied to relationship creation, visibility, and resolution. | Conformance profile; must reference
 [Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md)
 and
 [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md). | Deny by default |
-| V-6.1-08 | Relationship snapshot consistency model | Whether resolution returns a strong-consistency snapshot or a eventually-consistent snapshot of relationship state. | Conformance profile. | Strong consistency |
-| V-6.1-09 | Resolution cache invalidation mechanism | The mechanism used to invalidate resolution cache entries on relationship state changes (immediate, event-driven, TTL-based, or hybrid). | Conformance profile. | Event-driven |
-| V-6.1-10 | Signal provenance validation strictness | Whether provenance validation at reception is hard-fail (reject signal) or soft-fail (log warning, allow signal). | Conformance profile. | Hard-fail |
-| V-6.2-01 | Address resolution combination mechanism | How the host combines the durable registry entry with the activation/placement projection to produce a `ResolutionState`, including handling of missing placement and stale references. | Conformance profile. | Registry-first with placement overlay |
-| V-6.2-02 | Maximum delegation chain length | The maximum number of elements permitted in the `delegation_chain` field before the signal is rejected. | Conformance profile. | 128 |
-| V-6.2-03 | Moved outcome delivery mechanism | How the host signals that an agent's placement has changed since the last resolution (informational diagnostic, explicit placement field, or separate notification). | Conformance profile. | Informational diagnostic on placement-request |
+| V-35.1-08 | Relationship snapshot consistency model | Whether resolution returns a strong-consistency snapshot or a eventually-consistent snapshot of relationship state. | Conformance profile. | Strong consistency |
+| V-35.1-09 | Resolution cache invalidation mechanism | The mechanism used to invalidate resolution cache entries on relationship state changes (immediate, event-driven, TTL-based, or hybrid). | Conformance profile. | Event-driven |
+| V-35.1-10 | Signal provenance validation strictness | Whether provenance validation at reception is hard-fail (reject signal) or soft-fail (log warning, allow signal). | Conformance profile. | Hard-fail |
+| V-35.2-01 | Address resolution combination mechanism | How the host combines the durable registry entry with the activation/placement projection to produce a `ResolutionState`, including handling of missing placement and stale references. | Conformance profile. | Registry-first with placement overlay |
+| V-35.2-02 | Maximum delegation chain length | The maximum number of elements permitted in the `delegation_chain` field before the signal is rejected. | Conformance profile. | 128 |
+| V-35.2-03 | Moved outcome delivery mechanism | How the host signals that an agent's placement has changed since the last resolution (informational diagnostic, explicit placement field, or separate notification). | Conformance profile. | Informational diagnostic on placement-request |

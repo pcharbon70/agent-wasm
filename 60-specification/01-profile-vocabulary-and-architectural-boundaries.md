@@ -40,11 +40,11 @@ orchestration.
 This chapter is normative by default within its stated scope.
 Material visibly marked non-normative does not create conformance
 obligations.
-Promotion to `status: normative` requires evidence from the Phase 1
-integration tests in
-Section 1.4
-and a passing cross-milestone fixture run recorded in
-Section 1.4.1.4.
+ Promotion to `status: normative` requires evidence from the Phase 1
+ integration tests in
+ Section Integration Test Expectations
+ and a passing cross-milestone fixture run recorded in
+ the cross-milestone fixture regression test case within that section.
 
 Governing policies:
 [Specification Authority](../SPECIFICATION-AUTHORITY.md)
@@ -678,14 +678,14 @@ Any regression MUST be recorded with its approval status.
 | Ownership assignments | Required | Fixed by this chapter. |
 | Concrete model selection | Required | User or authorized tenant operator binds logical slots outside artifacts. |
 | Credential custody | Required for end-user distributions | Separated-custody profile keeps raw provider and external-service credentials outside host, Port, and guest processes. |
-| Reducer exports | Required | `describe`, `initialize`, `reduce`, `migrate`. |
+| Required exports | Required | `describe`, `initialize`, `reduce`, `migrate`. |
 | State location | Required | Host-owned; never in guest memory. |
 | Turn serialization | Required | One committed turn per agent at a time. |
 | Outbox commit | Required | Atomic state+journal+outbox commit. |
 | Failure on trap/timeout | Required | Nothing committed for that turn. |
 | Initial Wasm feature set | Required | Core Wasm 3.0; exclusions listed in Section 1.2. |
 | WASI surface | Required | No WASI for bootstrap; explicit selection later (Section 1.2). |
-| Extism runtime family | MAY | Wasmtime (reference) or Wazero (independent) at release. |
+| Extism runtime family | Required | Wasmtime (reference) and Wazero (independent) at release. |
 | Synchronous host functions | SHOULD NOT | Preferred pattern is directive continuation. |
 | Guest state in Extism variables | SHOULD NOT | Treated as disposable cache at best. |
 | Instance pooling across tenants | SHOULD NOT | Must prove state erasure; not a default. |

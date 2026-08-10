@@ -2,7 +2,7 @@
 title: "Single-Agent Host Flow And Milestone Acceptance"
 kind: specification
 created: "2026-08-08"
-status: draft
+status: normative
 spec_version: "0.1.0"
 tags:
   - milestone-03
@@ -145,7 +145,7 @@ The Milestone 3 exit report MUST include:
 1. **Semantic clauses**: Summary of normative requirements satisfied.
 2. **Fixtures**: List of all integration tests with pass/fail status.
 3. **Replay results**: Evidence that canonical re-encoding and replay produce identical results.
-4. **Unresolved variability**: Any implementation-defined choices not yet documented.
+4. **Unresolved variability**: Any variability choices not yet documented.
 5. **Durability gaps**: Precise durability gaps intentionally deferred to Milestone 4.
 
 > **Normative definition.**
@@ -474,10 +474,8 @@ Any approved variability MUST be documented in the Milestone 3 exit report.
 | Host flow invariants | Required | 6 invariants fixed by this chapter |
 | Representative flows | Required | 6 flows fixed by this chapter |
 | Turn evidence recording | Required | 8 evidence fields fixed by this chapter |
-| Turn evidence retention | Implementation-defined | Documented in conformance profile |
-| Host flow optimization | Implementation-defined | Documented in conformance profile |
-| Failure recovery | Implementation-defined | Documented in conformance profile |
-| Observability | Implementation-defined | Documented in conformance profile |
+
+Other variability choices are documented in the section on host-defined selections.
 
 ## Rationale and evidence (non-normative)
 

@@ -48,6 +48,15 @@ Related chapters:
 
 ## 3.1 Contract And Data Model
 
+### Patch and StateOperation
+
+> **Normative definition.**
+This chapter defines the internal patch model used by the host for atomic
+state application with revision tracking and precondition enforcement.
+It converts from the wire format `StatePatch` defined in
+[Turn Lifecycle Protocols And Canonical Encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md#state-patch)
+before application.
+
 ### StateOperation
 
 > **Normative definition.**
@@ -116,7 +125,7 @@ Patch {
   base_revision: string,
   state_schema_version: string?,
   operations: StateOperation[],
-  created_at: timestamp,
+  created_at: UnixTimestamp,
   created_by: string
 }
 ```
@@ -198,7 +207,7 @@ Revision {
   id: string,
   sequence_number: int,
   state_hash: string,
-  timestamp: timestamp,
+  timestamp: UnixTimestamp,
   previous_revision: string
 }
 ```
@@ -208,7 +217,7 @@ Revision {
 | `id` | string | Yes | Revision identifier (hash) |
 | `sequence_number` | int | Yes | Monotonic sequence number |
 | `state_hash` | string | Yes | Cryptographic hash of state |
-| `timestamp` | timestamp | Yes | Revision creation timestamp |
+| `timestamp` | UnixTimestamp | Yes | Revision creation timestamp |
 | `previous_revision` | string | Yes | Parent revision ID |
 
 ## 3.2 Behavior And Integration

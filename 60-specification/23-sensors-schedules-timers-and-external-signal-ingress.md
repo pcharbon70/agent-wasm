@@ -2,7 +2,7 @@
 title: "Sensors Schedules Timers And External Signal Ingress"
 kind: specification
 created: "2026-08-08"
-status: draft
+status: normative
 spec_version: "0.1.0"
 tags:
   - milestone-03
@@ -602,10 +602,8 @@ Any approved variability MUST be documented in the Milestone 3 exit report.
 | Schedule expression structure | Required | Fields fixed by this chapter |
 | Durable timer structure | Required | Fields fixed by this chapter |
 | Signal admission boundary | Required | 5 steps fixed by this chapter |
-| Source authentication | Implementation-defined | Documented in conformance profile |
-| Deduplication window | Implementation-defined | Documented in conformance profile |
-| Jitter determinism | Implementation-defined | Documented in conformance profile |
-| Schedule expression syntax | Implementation-defined | Documented in conformance profile |
+
+Other variability choices are documented in the section on host-defined selections.
 
 ## Rationale and evidence (non-normative)
 

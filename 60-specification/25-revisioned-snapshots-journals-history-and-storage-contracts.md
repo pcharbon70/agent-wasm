@@ -91,9 +91,6 @@ LifecycleState {
   Terminated
 }
 
-TenantId = string
-AgentId = string
-UnixTimestamp = string
 ```
 
 `TenantId`, `AgentId`, and `UnixTimestamp` are defined in
@@ -254,7 +251,7 @@ ConversationEntry {
 - `signal_id` from `JournalEntry.signal_id`
 - `role` derived from `JournalEntry.directives` (User or Assistant based on directive type)
 - `content` derived from `JournalEntry.directives` (filtered for user-facing content)
-- `timestamp` derived from `JournalEntry.entry_id` (or host-provided timestamp)
+- `timestamp` from `JournalEntry.timestamp` (or host-provided timestamp)
 - `directives` from `JournalEntry.directives` (filtered for user-facing directives)
 
 > **Normative definition.**

@@ -51,6 +51,12 @@ The signal envelope carries the transport, identity, causality,
 and delivery metadata required for deterministic routing and processing.
 
 > **Normative definition.**
+This SignalEnvelope extends the definition in
+[Turn Lifecycle Protocols And Canonical Encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md#signal-envelope)
+with host-injected fields for multi-tenant isolation, authorization,
+and distributed tracing.
+
+> **Normative definition.**
 
 ```
 SignalEnvelope {
@@ -345,6 +351,7 @@ without exposing secrets or implementation internal state.
 | `signal.expired` | TTL violations | `timestamp_too_old` |
 | `signal.duplicate` | Duplicate detection | `identity_matches` |
 | `signal.dead_letter` | Dead-letter queue | `retry_exhausted` |
+| `signal.timeout` | Turn deadline exceeded | `deadline_exceeded` |
 
 ## Implementation-defined choices
 
@@ -392,8 +399,6 @@ conformance obligation for current implementations:
    does not require dynamic priority adjustment for base conformance.
 
 ## 1.4 Section - Phase 1 Integration Tests
-
-### Successful routing
 
 ### Successful routing
 
@@ -514,12 +519,8 @@ no regressions.
 
 Expected behavior:
 
-- All Phase 1 fixtures: PASS.
-- All Phase 2 fixtures: PASS.
-- All Phase 3 fixtures: PASS.
-- All Phase 4 fixtures: PASS.
-- All Phase 5 fixtures: PASS.
-- All Milestone 2 Phase 1 fixtures: PASS.
+- All Milestone 1 fixtures: PASS.
+- All earlier Milestone 2 Phase 1 fixtures: PASS.
 
 Any approved variability MUST be documented in the Milestone 2 exit report.
 

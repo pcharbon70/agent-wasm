@@ -91,7 +91,7 @@ LifecycleChange {
 `JournalEntry` is defined in
 [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md).
 `LifecycleState` is defined in
-[Agent Registry Activation Cancellation And Completion](22-agent-registry-activation-cancellation-and-completion.md).
+[Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md).
 `TenantId` and `AgentId` are defined in
 [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md).
 
@@ -160,11 +160,11 @@ OutboxState {
 `DirectiveId` is defined in
 [Directives Strategies Continuations And Terminal States](13-directives-strategies-continuations-and-terminal-states.md) as `Directive.id`.
 
-`DirectiveTarget.type` and `Directive.id` from
+`DirectiveTarget` is defined locally in this chapter. `Directive.id` from
 [Directives Strategies Continuations And Terminal States](13-directives-strategies-continuations-and-terminal-states.md)
-live in separate namespaces. `Directive.id` identifies the directive for the agent
-turn (assigned by the agent during reduction). `DirectiveTarget.type` identifies
-the dispatch category for the host outbox layer. The relationship is:
+identifies the directive for the agent turn (assigned by the agent during reduction).
+`DirectiveTarget.type` identifies the dispatch category for the host outbox layer.
+The two live in separate namespaces. The relationship is:
 an outbox entry with `target.type = Internal` and `address` matching a
 `Directive.id` refers to an in-process directive. Outbox entries for
 `Effect`, `Signal`, and `Timer` targets have their own `address` space and
