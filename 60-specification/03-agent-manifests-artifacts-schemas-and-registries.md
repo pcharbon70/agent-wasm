@@ -3,7 +3,7 @@ title: "Agent Manifests Artifacts Schemas And Registries"
 kind: specification
 created: "2026-08-08"
 status: draft
-spec_version: "0.1.0"
+spec_version: "0.2.0"
 tags:
   - milestone-01
   - phase-03
@@ -11,6 +11,7 @@ tags:
   - manifest
   - schema
   - registry
+  - model-requirements
 aliases:
   - "M1-P3 Manifests And Artifacts"
 ---
@@ -27,6 +28,11 @@ of
 Contracts, Profiles, And Artifacts.
 It defines immutable executable artifacts and reviewable manifests that can
 be resolved without instantiating guest code.
+
+Version `0.2.0` replaces the `0.1.0` manifest contract for AI-capable
+artifacts. It adds logical model requirements and model-slot declarations;
+concrete providers, models, endpoints, connections, and credentials remain
+deployment configuration and are not artifact declarations.
 
 This chapter is normative by default within its stated scope.
 Material visibly marked non-normative does not create conformance
@@ -170,6 +176,7 @@ The following fields are REQUIRED:
 | `routes` | `Route[]` | Declared routes |
 | `state_schemas` | `StateSchema[]` | Declared state schemas |
 | `strategies` | `Strategy[]` | Declared strategies |
+| `model_requirements` | `ModelRequirement[]` | Logical model slots and portable capability requirements |
 | `required_capabilities` | `Capability[]` | Required host capabilities |
 | `required_features` | `string[]` | Required Wasm features beyond Core 3.0 |
 | `migrations` | `Migration[]` | State migration definitions |
@@ -257,7 +264,8 @@ Strategy {
   description: string,
   snapshot_schema: SchemaRef,
   reducer_entry: string,
-  terminal_states: string[]
+  terminal_states: string[],
+  model_slots: string[]
 }
 > **Normative definition.**
 
@@ -265,6 +273,43 @@ Strategy {
 
 Strategies are implemented as plug-in reducer exports.
 The host invokes strategies via the `reduce` export.
+Every value in `model_slots` MUST identify one entry in the manifest's
+`model_requirements` field.
+An empty list declares that the strategy does not request model access.
+
+### Model requirement definition
+
+A model requirement declares what an agent needs from a model without
+selecting a vendor or credential-bearing connection.
+
+> **Normative definition.**
+
+```
+ModelRequirement {
+  slot_id: string,
+  description: string,
+  required_features: ModelFeature[],
+  min_context_tokens: u64,
+  min_output_tokens: u64,
+  optional: bool
+}
+
+ModelFeature = "text-generation" | "streaming" | "tool-calling" |
+               "structured-output"
+```
+
+The `slot_id` values MUST be unique within the manifest.
+The manifest MUST NOT place a concrete provider, model identifier, adapter,
+endpoint, connection identifier, authentication header, secret, or credential
+handle in a model requirement or any other model-selection field.
+The end user binds each required slot to a compatible model connection under
+[Provider-Neutral Model Requests Responses Streaming And Usage Contract And Data Model](41-provider-neutral-model-requests-responses-streaming-and-usage-contract-and-data-model.md).
+An optional requirement MAY remain unbound, but an attempt to use its slot
+while unbound fails at runtime.
+An artifact with a non-empty `model_requirements` field MUST include
+`ModelAccess` in `required_capabilities`. An untrusted guest artifact MUST NOT
+request `CredentialUse`, `SecretRead`, or `SecretWrite`; authenticated effect
+workers receive any use-only authority independently at dispatch.
 
 ### Capability definition
 
@@ -540,6 +585,8 @@ The test MUST verify that:
 3. Schemas are validated for field types, initial state, and migrations.
 4. Cache keys are computed correctly and cache hits are verified.
 5. Provenance records are recorded and retained.
+6. Every model slot is unique, portable, and free of concrete provider,
+   endpoint, or credential material.
 
 ### Malformed artifacts
 
@@ -550,6 +597,9 @@ The test MUST verify that:
 2. Invalid manifest JSON is rejected with an `artifact.manifest.malformed` diagnostic.
 3. Missing required manifest fields are rejected with an `artifact.manifest.missing_field` diagnostic.
 4. Digest mismatches are rejected with an `artifact.digest.mismatch` diagnostic.
+5. Concrete provider, model, endpoint, authentication, or credential fields in
+   a model requirement are rejected with an
+   `artifact.manifest.forbidden_model_selection` diagnostic.
 
 ### Incompatible artifacts
 
@@ -633,6 +683,7 @@ Any regression MUST be recorded with its approval status.
 | Route definition | Required | Fields fixed by this chapter |
 | State schema definition | Required | Fields fixed by this chapter |
 | Strategy definition | Required | Fields fixed by this chapter |
+| Model requirement definition | Required | Logical slots and portable feature constraints; concrete selection prohibited |
 | Capability definition | Required | Fields fixed by this chapter |
 | Migration definition | Required | Fields fixed by this chapter |
 | Schema identifiers | Required | Format fixed by this chapter |

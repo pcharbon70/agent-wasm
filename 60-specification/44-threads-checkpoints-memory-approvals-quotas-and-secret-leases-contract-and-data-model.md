@@ -3,7 +3,7 @@ title: "Threads Checkpoints Memory Approvals Quotas And Secret Leases Contract A
 kind: specification
 created: "2026-08-09"
 status: draft
-spec_version: "0.1.0"
+spec_version: "0.2.0"
 tags:
   - milestone-07
   - phase-04
@@ -15,6 +15,7 @@ tags:
   - secret-leases
   - contract
   - data-model
+  - credential-custody
 aliases:
   - "M7-P4 Contract And Data Model"
 ---
@@ -34,6 +35,13 @@ approvals, quotas, and secret leases, including conversation threads, messages,
 participants, causal links, content references, visibility, redaction, retention,
 checkpoints as versioned projections, and memory references with provenance,
 tenant scope, confidence, promotion, and deletion policy.
+
+Version `0.2.0` replaces the `0.1.0` secret-lease assumption that a principal
+accesses a secret held by the host. A credential lease now grants a scoped,
+auditable use through a credential custodian; it never grants secret read or
+export. End-user distributions support a separated-custody profile in which
+raw provider and external-service credentials remain outside the host, Port,
+plugin, and guest processes.
 
 This chapter is normative by default within its stated scope.
 Material visibly marked non-normative does not create conformance
@@ -286,6 +294,167 @@ Deletion policy defines when memory is deleted:
 - `temporary`: Memory is deleted after a configurable period.
 - `conditional`: Memory is deleted based on conditions (e.g., confidence below threshold).
 
+### Credential custodians, leases, handles, and receipts
+
+> **Normative definition.**
+A credential custodian is a user-controlled trust domain that holds or obtains
+provider or external-service authentication material and executes narrowly
+typed operations.
+The custodian is authenticated as a `Service` principal. The host component
+requesting a use is authenticated as an `EffectWorker` principal under
+[Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md).
+
+> **Normative definition.**
+
+```
+CustodyMode = "external-broker" | "provider-workload-identity" | "host-local"
+CredentialStatus = "active" | "suspended" | "expired" | "revoked" | "deleted"
+
+CredentialCustodian {
+  custodian_id: string,
+  tenant_id: TenantId,
+  custody_mode: CustodyMode,
+  endpoint_ref: string,
+  authenticated_transport_profile: string,
+  policy_revision: u64,
+  status: CredentialStatus
+}
+
+SecretLease {
+  lease_id: string,
+  tenant_id: TenantId,
+  principal_id: PrincipalId,
+  purpose: string,
+  custodian_id: string,
+  credential_handle_ref: OpaqueHandleRef,
+  handle_fingerprint: string,
+  allowed_operations: string[],
+  allowed_resources: string[],
+  issued_at: timestamp,
+  expires_at: timestamp,
+  non_exportable: true,
+  status: CredentialStatus
+}
+
+CredentialUseRequest {
+  credential_use_id: string,
+  request_id: string,
+  lease_id: string,
+  credential_handle_ref: OpaqueHandleRef,
+  tenant_id: TenantId,
+  principal_id: PrincipalId,
+  agent_address: TenantQualifiedAgentAddress,
+  artifact_digest: string,
+  model_binding_id: string?,
+  model_binding_revision: u64?,
+  connector_binding_id: string?,
+  connector_binding_revision: u64?,
+  operation: string,
+  resource: string,
+  request_digest: string,
+  deadline: timestamp,
+  nonce: string,
+  budget: JsonObject
+}
+
+CredentialUseReceipt {
+  credential_use_id: string,
+  request_id: string,
+  custodian_id: string,
+  handle_fingerprint: string,
+  model_binding_id: string?,
+  model_binding_revision: u64?,
+  connector_binding_id: string?,
+  connector_binding_revision: u64?,
+  operation: string,
+  resource: string,
+  request_digest: string,
+  outcome: "completed" | "denied" | "failed" | "cancelled",
+  external_reference: string?,
+  usage: JsonObject?,
+  completed_at: timestamp,
+  receipt_digest: string,
+  signature_ref: string?
+}
+```
+
+`OpaqueHandleRef` is a protected, sender-constrained reference. Possession of
+its serialized value alone MUST NOT authorize an operation. It MUST NOT contain
+raw credential material and MUST NOT be exposed to a guest, plugin manifest,
+provider or connector adapter, diagnostic, evidence record, trace, crash
+artifact, or support bundle. `handle_fingerprint` is a domain-separated, non-authority-bearing
+correlation value and MUST NOT be reversible to the handle.
+
+`SecretLease` is retained as the stable type name for compatibility, but its
+semantic operation is credential use, not secret access. `non_exportable` is
+always `true` and is not a configuration choice. There is no read, reveal,
+unwrap, decrypt-for-caller, copy, or export operation in this contract.
+
+For an operation authorized through a model or connector binding, the request
+and receipt MUST carry exactly one matching binding-id and binding-revision
+pair. Model and connector binding pairs MUST NOT both be populated. The
+custodian MUST include the authorized pair unchanged in its receipt.
+
+### Custody modes and conformance claims
+
+`external-broker` means a user-controlled out-of-process gateway holds an
+external-service credential and performs the typed operation.
+`provider-workload-identity` means the custodian obtains provider-native
+ephemeral authority and performs the operation without a long-lived user key.
+In both modes, the host receives only bounded results and a receipt.
+
+`host-local` is an explicit compatibility mode in which authentication
+material may enter the host trust boundary. It MAY be implemented, but it MUST
+be disabled by default in end-user distributions, MUST require an explicit
+warning and operator approval, and MUST NOT claim
+`separated-credential-custody` conformance.
+
+An end-user distribution claiming `separated-credential-custody` MUST satisfy
+all of the following:
+
+1. Use `external-broker` or `provider-workload-identity` for authenticated
+   provider and connector operations.
+2. Keep raw provider and external-service credentials outside host, BEAM, Port, guest, plugin,
+   durable-store, log, trace, crash-dump, and support-bundle boundaries.
+3. Authenticate host-to-custodian transport using a sender identity whose
+   private material is held outside general host-process memory.
+4. Deny direct authenticated provider or external-service egress that bypasses the custodian.
+5. Enforce tenant, principal, agent, artifact digest, binding revision,
+   operation, resource, request digest, deadline, nonce, and budget inside the
+   custodian, independently of host validation.
+6. Return a verifiable receipt for every completed, denied, failed, or
+   cancelled use.
+
+The user or authorized tenant operator MUST be able to register, replace,
+suspend, and revoke a custodian connection independently of plugin artifacts.
+A plugin installation MUST NOT require a user to paste credential material
+into a manifest or agent configuration under separated custody.
+
+> **Non-normative note.**
+Separated credential custody is not end-to-end content secrecy. The host still
+processes model and tool intents, and a broker that performs an external
+request can observe service-bound content. Users should control or explicitly
+trust that broker; content classification and encryption are separate policy
+concerns.
+
+### Typed gateway boundary
+
+The credential custodian is not a general HTTP proxy. A
+`CredentialUseRequest` MUST identify an operation from a registered typed
+catalog. The custodian MUST reject:
+
+- arbitrary URL or origin changes;
+- arbitrary HTTP methods or provider operations;
+- caller-supplied authentication or forwarding headers;
+- provider, model, connector, connection, resource, or binding substitution;
+- a payload whose canonical digest does not match `request_digest`;
+- expired deadlines, repeated nonces, revoked leases, and excess budgets;
+- tenant, principal, agent, or artifact mismatches.
+
+Credential rotation MAY occur entirely inside the custodian while a compatible
+lease remains active. Rotation MUST NOT require plugin reinstall, artifact
+change, or delivery of the new credential to the host.
+
 ## Variability register
 
 ### 44.1.1 Thread visibility
@@ -312,3 +481,25 @@ Deletion policy defines when memory is deleted:
 - **Recommendation**: The host SHOULD support forward migration only.
 - **Permitted presentation**: The host MAY log schema migration events for observability.
 - **Limit**: The host MUST not allow backward migration to older schemas.
+
+### 44.1.4 Credential custody mode
+
+- **Permission**: The host MAY implement `host-local` compatibility mode.
+- **Recommendation**: End-user distributions SHOULD default to
+  `external-broker` or `provider-workload-identity`.
+- **Permitted presentation**: The host MAY present custody mode, custodian
+  health, lease status, and receipt summaries to the authorized user.
+- **Limit**: `host-local` MUST NOT claim
+  `separated-credential-custody` conformance.
+
+### 44.1.5 Custodian transport and receipt verification
+
+- **Permission**: The authenticated transport and receipt signature mechanism
+  are implementation-defined.
+- **Recommendation**: The host SHOULD use sender-constrained workload identity
+  and independently verifiable receipts.
+- **Permitted presentation**: The host MAY present non-authority-bearing
+  custodian and receipt fingerprints.
+- **Limit**: The mechanism MUST prevent bearer-handle replay and MUST keep
+  authentication material outside general host-process memory for separated
+  custody.

@@ -3,7 +3,7 @@ title: "Threat Model Principals Trust Classes And Grant Vocabulary"
 kind: specification
 created: "2026-08-09"
 status: draft
-spec_version: "0.1.0"
+spec_version: "0.2.0"
 tags:
   - milestone-05
   - phase-01
@@ -12,6 +12,7 @@ tags:
   - principals
   - trust-classes
   - grants
+  - credential-custody
 aliases:
   - "M5-P1 Threat Model Principals Trust Classes And Grant Vocabulary"
 ---
@@ -28,6 +29,11 @@ of
 Capabilities, Plugins, Security, And Tenancy.
 It defines adversaries, protected assets, authenticated identities, trust
 zones, and the vocabulary used by every authorization decision.
+
+Version `0.2.0` replaces the `0.1.0` assumption that keeping a credential out
+of guest memory is sufficient. End-user distributions now have a
+separated-credential-custody boundary in which the host can request an
+authorized credential use but cannot read or export the underlying credential.
 
 This chapter is normative by default within its stated scope.
 Material visibly marked non-normative does not create conformance
@@ -99,6 +105,9 @@ The host MUST defend against the following threat actors:
 6. **Dependency compromise**: A plugin or external dependency is compromised.
 7. **Operator error**: An operator misconfigures the system.
 8. **Co-tenant attacker**: A tenant attempts to access shared resources.
+9. **Compromised host runtime**: A defect, dependency compromise, memory
+   disclosure, crash artifact, or introspection facility exposes data held by
+   the host process.
 
 > **Normative definition.**
 Each threat actor MUST have corresponding countermeasures documented in section
@@ -111,13 +120,17 @@ The host MUST protect the following assets:
 
 1. **Host memory**: The host process memory space.
 2. **State**: Agent state, journal, snapshots, and outbox entries.
-3. **Secrets**: API keys, tokens, and other credentials.
+3. **Credentials**: API keys, refresh tokens, private keys, and other
+   authentication material, including protection from host-process custody in
+   the separated-credential-custody profile.
 4. **Policy**: Authorization policies, trust classes, and grants.
 5. **Artifacts**: Agent and plugin WASM modules.
 6. **Audit evidence**: Logs and records of all authorization decisions.
 7. **External systems**: Downstream services contacted by the agent.
 8. **Availability**: The host process and its resources.
 9. **Model context**: The LLM context window and its contents.
+10. **Credential-use authority**: Opaque handles, grants, binding revisions,
+    nonces, and receipts that could otherwise be replayed or broadened.
 
 > **Normative definition.**
 Each protected asset MUST have corresponding access controls documented in
@@ -135,6 +148,11 @@ The host MUST support the following principal forms:
 5. **Operator**: A system operator with administrative privileges.
 6. **Effect worker**: A worker that processes external effects.
 7. **External result source**: A source of external results (e.g., API).
+
+An external credential custodian is authenticated as a `Service` principal.
+A component dispatching an authorized use on behalf of an agent is
+authenticated as an `EffectWorker` principal. Neither role changes the
+authority of the originating agent.
 
 > **Normative definition.**
 
@@ -187,11 +205,14 @@ The host MUST enforce the following trust classes:
 2. **Reviewed plugin**: Framework plugins that have been reviewed and signed.
    Run in a sandbox with limited external access based on grants.
 3. **Privileged host integration**: Host-owned integrations with full access.
-   Run with the host's privileges.
+   Run with the host's privileges, but do not gain access to credentials held
+   by a user-controlled custodian.
 4. **Maintenance migration**: Migration artifacts that have been reviewed.
    Run with limited access for migration purposes only.
 5. **Operator trust**: Operators with administrative privileges.
-   Run with full access to configuration and policy.
+   Run with full access to host configuration and policy. In the
+   separated-credential-custody profile this trust class does not grant raw
+   credential export from the custodian.
 
 > **Normative definition.**
 
@@ -279,7 +300,7 @@ A principal MUST present a valid grant for every capability it exercises.
 
 ```
 Capability = Effects | Signals | Timers | ChildLifecycle | ModelAccess | ToolUse |
-             Retrieval | CodeExecution | SecretRead | SecretWrite |
+             Retrieval | CodeExecution | CredentialUse | SecretRead | SecretWrite |
              StateRead | StateWrite | DirectiveWrite | ScheduleWrite |
              AgentActivate | AgentDeactivate | AgentCancel | TenantRead | TenantWrite
 ```
@@ -288,6 +309,36 @@ Capability = Effects | Signals | Timers | ChildLifecycle | ModelAccess | ToolUse
 Each capability value binds a specific authorization dimension.
 The host MUST enforce each capability independently.
 A principal MUST present a valid grant for every capability it exercises.
+
+> **Normative definition.**
+`CredentialUse` authorizes one typed operation through a registered credential
+custodian. It does not authorize reading, unwrapping, copying, logging, or
+returning credential bytes.
+`CredentialUse`, `SecretRead`, and `SecretWrite` are independent capabilities.
+The host MUST NOT interpret a `ModelAccess`, `Effects`, `SecretRead`, or
+`SecretWrite` grant as an implicit `CredentialUse` grant.
+The host MUST NOT grant `CredentialUse`, `SecretRead`, or `SecretWrite` to an
+untrusted guest artifact.
+For a model effect, the agent needs `ModelAccess`; the authenticated effect
+worker separately needs an attenuated `CredentialUse` grant for the selected
+binding and operation.
+
+> **Normative definition.**
+An end-user distribution MUST support a `separated-credential-custody`
+conformance profile. Under that profile, raw provider and external-service credentials MUST NOT
+enter host or Port process memory, guest memory, plugin configuration,
+environment variables, durable state, journals, logs, traces, crash dumps, or
+support bundles. Only opaque sender-constrained handles and bounded receipts
+defined in
+[Threads Checkpoints Memory Approvals Quotas And Secret Leases Contract And Data Model](44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md)
+may cross the custodian boundary.
+
+> **Non-normative note.**
+Separated custody limits credential theft from a compromised host. It does not
+make a compromised host harmless: the host may still attempt operations within
+an active handle's scope. Independent custodian checks, narrow resources,
+budgets, deadlines, nonces, revocation, and user-visible receipts bound that
+residual risk.
 
 > **Normative definition.**
 The `tenant_id` field is optional and is only set for grants that are scoped
@@ -359,6 +410,8 @@ classes and grant vocabulary:
 | `auth.grant_expiry` | Grant has expired |
 | `auth.grant_revocation` | Grant has been revoked |
 | `auth.untrusted_publisher` | Artifact publisher is not trusted |
+| `auth.credential_use_only` | A caller attempted to convert use-only authority into credential read authority |
+| `auth.credential_export_forbidden` | A caller attempted to export credential material or a transferable bearer value |
 | `trust.untrusted_guest` | Guest artifact is untrusted |
 | `trust.unreviewed_plugin` | Plugin has not been reviewed |
 | `tenant.isolation_violation` | Tenant isolation boundary crossed |
@@ -568,6 +621,13 @@ The following tests MUST verify security enforcement:
 3. **Trust class sandboxing**: Verify that untrusted guests are sandboxed.
 4. **Audit log completeness**: Verify that all authorization decisions are logged.
 5. **Secret isolation**: Verify that secrets are not exposed to untrusted guests.
+6. **Separated credential custody**: Place a sentinel credential only in a
+   user-controlled custodian and verify it never appears in host or Port
+   process memory, guest I/O, state, journals, logs, traces, crash artifacts,
+   or support bundles.
+7. **Use-only enforcement**: Verify that `CredentialUse` permits the scoped
+   external operation while credential read, unwrap, export, and cross-binding
+   replay are rejected.
 
 > **Normative definition.**
 Each test MUST verify that no unauthorized or partial state is left after the
@@ -624,4 +684,6 @@ gates.
 | Audit log retention | Implementation-defined | Document in conformance profile | Must preserve audit trail |
 | Trust class assignment | Implementation-defined | Document in conformance profile | Must enforce trust boundaries |
 | Tenant isolation | Implementation-defined | Document in conformance profile | Must prevent cross-tenant access |
-| Secret management | Implementation-defined | Document in conformance profile | Must prevent exposure to untrusted guests |
+| Credential custody | Required for end-user distributions | Support and document `separated-credential-custody` | Raw provider and external-service credentials must remain outside host, Port, and guest processes |
+| Host-local credential compatibility | Optional | Disabled by default and explicitly selected | Must not claim separated-credential-custody conformance |
+| Credential-use grants | Required | Independent, use-only `CredentialUse` capability | Must not imply `SecretRead` or `SecretWrite` |

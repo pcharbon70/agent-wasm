@@ -3,7 +3,7 @@ title: "Tool Catalogs Retrieval Code Execution And Connectors Behavior And Integ
 kind: specification
 created: "2026-08-09"
 status: draft
-spec_version: "0.1.0"
+spec_version: "0.2.0"
 tags:
   - milestone-07
   - phase-02
@@ -16,6 +16,7 @@ tags:
   - capability-resolution
   - tool-execution
   - outcome-definitions
+  - credential-custody
 aliases:
   - "M7-P2 Behavior And Integration"
 ---
@@ -34,6 +35,11 @@ It establishes the behavior and integration rules for tool catalogs,
 retrieval, code execution, and connectors, including tool resolution,
 catalog policy filtering, execution through durable effect attempts,
 and outcome definitions.
+
+Version `0.2.0` replaces authenticated connector execution inside a plugin or
+host adapter with dual authorization and a typed credential-custodian dispatch.
+Connector artifacts never receive provider credentials, refresh tokens,
+authentication headers, or opaque credential handles.
 
 This chapter is normative by default within its stated scope.
 Material visibly marked non-normative does not create conformance
@@ -83,6 +89,7 @@ Related chapters:
 [Provider-Neutral Model Requests Responses Streaming And Usage Behavior And Integration](41-provider-neutral-model-requests-responses-streaming-and-usage-behavior-and-integration.md),
 [Provider-Neutral Model Requests Responses Streaming And Usage Failure Evidence And Operational Notes](41-provider-neutral-model-requests-responses-streaming-and-usage-failure-evidence-and-operational-notes.md),
 [Provider-Neutral Model Requests Responses Streaming And Usage Phase 1 Integration Tests](41-provider-neutral-model-requests-responses-streaming-and-usage-phase-1-integration-tests.md),
+[Threads Checkpoints Memory Approvals Quotas And Secret Leases Behavior And Integration](44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-behavior-and-integration.md),
 [Tool Catalogs Retrieval Code Execution And Connectors Contract And Data Model](42-tool-catalogs-retrieval-code-execution-and-connectors-contract-and-data-model.md),
 [Tool Catalogs Retrieval Code Execution And Connectors Failure Evidence And Operational Notes](42-tool-catalogs-retrieval-code-execution-and-connectors-failure-evidence-and-operational-notes.md),
 [Tool Catalogs Retrieval Code Execution And Connectors Phase 2 Integration Tests](42-tool-catalogs-retrieval-code-execution-and-connectors-phase-2-integration-tests.md).
@@ -148,9 +155,11 @@ When the host receives a tool execution request, it MUST:
 4. **Create the effect attempt**: The host MUST create a durable effect
    attempt for the tool execution. The attempt captures the request,
    the tool descriptor, and the execution context.
-5. **Execute the tool**: The host MUST invoke the tool through the
-   framework plugin or connector interface. The execution is bounded by
-   the `timeout_ms` and `resource_budget` fields.
+5. **Prepare and execute the tool**: The host MUST invoke an approved tool
+   handler or ask the connector to prepare a typed operation. An authenticated
+   connector operation MUST be executed by its bound credential custodian as
+   defined below. Execution is bounded by the `timeout_ms` and
+   `resource_budget` fields.
 6. **Normalize the result**: The host MUST normalize the tool result
    into the common format defined in section 42.1. Normalization includes
    schema validation, content filtering, and provenance capture.
@@ -164,6 +173,39 @@ Tool execution through durable effect attempts ensures that all tool
 operations are auditable, replayable, and crash-resistant.
 This is consistent with the deterministic reducer semantics defined in
 [Deterministic Reducer Semantics And Milestone Acceptance](14-deterministic-reducer-semantics-and-milestone-acceptance.md).
+
+### Authenticated connector dispatch
+
+For an authenticated connector operation, the host MUST:
+
+1. Authorize the originating agent's tool or connector capability for the
+   operation, resource, tenant, deadline, and budget.
+2. Resolve exactly one active, user-approved connector authentication binding
+   and pin its revision to the durable effect attempt.
+3. Have the connector prepare a registered typed operation without
+   authentication material, an arbitrary origin, or an arbitrary method.
+4. Independently authorize the authenticated effect worker's `CredentialUse`
+   for the binding, custodian, lease fingerprint, operation, resource, request
+   digest, deadline, nonce, and budget.
+5. Send the typed request to the custodian, which independently validates the
+   complete scope and performs authentication, refresh, and external I/O.
+6. Verify the custodian receipt before admitting the normalized tool result.
+
+The agent's tool capability MUST NOT imply `CredentialUse`.
+`CredentialUse` MUST NOT imply permission to invoke the tool, change its
+resource, read or export a credential, or mint a bearer token. Retry and replay
+MUST preserve the connector binding revision, custodian, operation, resource,
+request digest, and budget; each attempt uses a fresh nonce.
+
+In the `separated-credential-custody` profile, the host and native Port MUST
+NOT have direct authenticated egress to the connector's external service.
+Raw credentials, refresh tokens, and authentication headers MUST NOT enter
+plugin or guest I/O, host or Port memory, durable effects, journals,
+diagnostics, evidence, traces, crash artifacts, or support bundles. Opaque
+handles MUST remain protected sender-constrained references and MUST NOT enter
+plugin or guest I/O, connector adapters, diagnostics, evidence, traces, crash
+artifacts, or support bundles.
+The canonical `credential.*` diagnostics from Section 44 MUST be preserved.
 
 ### Capability mapping for tool execution
 
@@ -186,6 +228,10 @@ Capability mapping ensures that agents only have access to the tools and
 operations that they have been granted.
 This is consistent with the capability policy defined in
 [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md).
+
+For an authenticated connector, `connector.<name>.execute` authorizes only the
+agent-side domain operation. The effect worker also requires the independently
+attenuated `CredentialUse` capability.
 
 ### Outcome definitions
 
@@ -350,5 +396,7 @@ chapter.
 | Result normalization order | Section 42.2 | MAY | Must validate schema, filter content, capture provenance. Order is informational. |
 | Diagnostic message format | Section 42.2 | MAY | Must include all required fields. Free-text portion is informational. |
 | Evidence record field order | Section 42.2 | SHOULD | Must include all required fields. Order is informational. |
+| Authenticated connector custody | Section 42.2 | Required for end-user distributions | Must use the user-approved binding and Section 44 typed-use boundary without exposing credentials or handles. |
+| Connector retry | Section 42.2 | MAY | Must preserve binding, custodian, operation, resource, digest, and budget and reconcile uncertain outcomes. |
 | Integration test ordering | Section 42.4 | MAY | Must cover all required scenarios. Order is informational. |
 | Cross-milestone fixture selection | Section 42.4 | MUST | Must include all fixtures listed in section 42.4.4. |

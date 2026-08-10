@@ -25,6 +25,11 @@ This is the selective entry point to the archive. See the
   — selects Elixir/OTP as the product language and public API, treats the
   native Extism worker as a private supervised Port component, and defines the
   Hex, Mix-release, OCI, attestation, upgrade, and rollback pipeline.
+- [Provider-Neutral Model Requests Contract](../60-specification/41-provider-neutral-model-requests-responses-streaming-and-usage-contract-and-data-model.md)
+  and [Credential Custody Contract](../60-specification/44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md)
+  — make model choice an end-user-approved installation binding and keep raw
+  provider and connector credentials outside the Elixir/OTP host, native Port,
+  and Wasm guest in the separated-custody product profile.
 
 ## Active inquiries
 
@@ -107,5 +112,6 @@ This is the selective entry point to the archive. See the
   profile is stable enough for an initial Agent WASM contract.
 - Select two independent runtimes and build the cold/warm, boundary,
   governance, isolation, and portability evaluation matrix.
-- Define how capability decisions and output provenance bind artifact,
-  principal, purpose, invocation, and downstream model context.
+- Qualify the model-binding and separated-credential-custody contracts against
+  real provider adapters, user-controlled gateways, workload identity,
+  process-memory inspection, crash artifacts, retry, and billing reconciliation.

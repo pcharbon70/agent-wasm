@@ -3,13 +3,15 @@ title: "Profile Vocabulary And Architectural Boundaries"
 kind: specification
 created: "2026-08-08"
 status: draft
-spec_version: "0.1.0"
+spec_version: "0.2.0"
 tags:
   - milestone-01
   - phase-01
   - architecture
   - profile
   - contract
+  - model-bindings
+  - credential-custody
 aliases:
   - "M1-P1 Profile Vocabulary"
 ---
@@ -28,6 +30,12 @@ It establishes the language-neutral vocabulary and responsibility split for a
 Jido-inspired agent system built on WebAssembly and Extism.
 It applies to all later milestones within Milestone 1 and provides the
 foundation for milestones 2 through 9.
+
+Version `0.2.0` clarifies two later-milestone ownership boundaries: concrete
+model selection belongs to the installing user or tenant operator, and raw
+provider or external-service credentials may remain in a user-controlled
+custodian outside the host while the host retains effect authorization and
+orchestration.
 
 This chapter is normative by default within its stated scope.
 Material visibly marked non-normative does not create conformance
@@ -55,7 +63,18 @@ Definitions are language-neutral and apply across all supported runtime families
   scheduling, effects, durability, topology, and audit evidence.
   The host is outside Wasm linear memory and runs in the selected host language.
   The host is the sole authority for tenant identity, artifact admission,
-  capability grants, turn scheduling, outbox commit, and effect execution.
+  capability grants, turn scheduling, outbox commit, and effect orchestration.
+  A typed external operation MAY be performed by an independently
+  authenticated credential custodian without transferring its credential to
+  the host.
+
+- **Credential custodian:** A user-controlled service that holds or obtains
+  provider or external-service authentication material and executes a narrowly typed operation
+  after independent scope validation. It returns bounded results and a
+  verifiable receipt, never credential bytes. It is outside the host process,
+  native Port process, and Wasm guest in the
+  `separated-credential-custody` profile defined by
+  [Threads Checkpoints Memory Approvals Quotas And Secret Leases Contract And Data Model](44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md).
 
 - **Engine:** The Wasm execution engine that compiles, instantiates, and runs
   Wasm modules.
@@ -79,8 +98,8 @@ Definitions are language-neutral and apply across all supported runtime families
   declarations.
 
 - **Agent:** A logical identity composed of a versioned definition, a
-  versioned state, installed capability references, strategy configuration,
-  routes, and lifecycle policy.
+  versioned state, installed capability references, logical model
+  requirements, strategy configuration, routes, and lifecycle policy.
   An agent definition is a metadata artifact.
   An agent instance is a live execution context with a mailbox, current state
   snapshot, turn lease, and active children.
@@ -109,11 +128,13 @@ Definitions are language-neutral and apply across all supported runtime families
   child events, and effect results.
   Signal transport semantics are separate from the signal envelope.
 
-- **Effect:** An observable action performed by the host on behalf of an
+- **Effect:** An observable action orchestrated by the host on behalf of an
   agent.
   Effects include external I/O, state changes in other systems,
   downstream signals, and approval requests.
-  Effects are authorized, attempted, recorded, and retried by the host.
+  Effects are authorized, orchestrated, attempted, recorded, and retried by
+  the host. A registered custodian MAY perform the credential-bearing portion
+  of a typed external effect.
 
 - **Artifact:** An immutable, content-addressed bundle of plug-in bytes,
   manifest, schema, and provenance metadata.
@@ -167,7 +188,9 @@ of this profile.
 | Policy and authorization | Host | Untrusted guests must not supply the only check that authorizes their own actions. |
 | Turn scheduling and serialization | Host | One committed turn advances one revision at a time per agent. |
 | Capability grants | Host | Grants are attenuated per invocation and enforced independently. |
-| Effect execution | Host | Effects are authority-bearing and must pass through trusted handlers. |
+| Effect authorization and orchestration | Host | Effects are authority-bearing and must pass through trusted handlers. |
+| Concrete model binding | Installing user or authorized tenant operator; stored and enforced by host | Agent and publisher declare requirements but do not choose provider accounts. |
+| Raw credential custody | User-controlled custodian for separated-custody profile | Host, native Port, and guest processes need only sender-constrained handles and receipts. |
 | Durable outbox commit | Host | The atomic commit of state, journal, and outbox is a host responsibility. |
 | Topology and identity registry | Host | Durable nodes reference identities and digests; live handles are disposable. |
 | Audit and provenance evidence | Host | Guest diagnostics may enrich but cannot replace host-owned records. |
@@ -187,8 +210,8 @@ The host invokes a plug-in through the reducer export.
 The reducer is the only mandatory plug-in export for this bootstrap profile.
 
 - **`describe(protocol_version) -> AgentManifest`:** Returns schemas, routes,
-  actions, strategy metadata, required capabilities, state versions, and
-  protocol versions.
+  actions, strategy metadata, logical model requirements, required
+  capabilities, state versions, and protocol versions.
   Results MAY be cached by the host.
 
 - **`initialize(init_request) -> TurnResult`:** Calculates initial state and
@@ -653,6 +676,8 @@ Any regression MUST be recorded with its approval status.
 | Clause | Type | Selection |
 | --- | --- | --- |
 | Ownership assignments | Required | Fixed by this chapter. |
+| Concrete model selection | Required | User or authorized tenant operator binds logical slots outside artifacts. |
+| Credential custody | Required for end-user distributions | Separated-custody profile keeps raw provider and external-service credentials outside host, Port, and guest processes. |
 | Reducer exports | Required | `describe`, `initialize`, `reduce`, `migrate`. |
 | State location | Required | Host-owned; never in guest memory. |
 | Turn serialization | Required | One committed turn per agent at a time. |

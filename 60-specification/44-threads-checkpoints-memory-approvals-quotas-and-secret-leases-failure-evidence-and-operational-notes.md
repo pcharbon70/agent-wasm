@@ -3,7 +3,7 @@ title: "Threads Checkpoints Memory Approvals Quotas And Secret Leases Failure Ev
 kind: specification
 created: "2026-08-09"
 status: draft
-spec_version: "0.1.0"
+spec_version: "0.2.0"
 tags:
   - milestone-07
   - phase-04
@@ -16,6 +16,7 @@ tags:
   - failure-evidence
   - diagnostics
   - implementation-defined-choices
+  - credential-custody
 aliases:
   - "M7-P4 Failure Evidence And Operational Notes"
 ---
@@ -35,6 +36,12 @@ checkpoints, memory, approvals, quotas, and secret leases, including failure
 outcomes, bounded diagnostics, evidence emission, implementation-defined
 choices, deferred work, and results that would invalidate earlier milestone
 assumptions.
+
+Version `0.2.0` replaces host-held secret-access failures with credential
+custodian, use-only scope, replay, receipt, and egress-boundary failures.
+Legacy `malformed_lease_input`, `unauthorized_lease_access`,
+`lease_expired`, and `lease_store_unavailable` codes are superseded by
+the `credential.*` codes below.
 
 This chapter is normative by default within its stated scope.
 Material visibly marked non-normative does not create conformance
@@ -116,7 +123,7 @@ approvals, quotas, and secret leases into the following categories:
 | `malformed_memory_input` | The memory input is malformed (invalid JSON, missing required fields, invalid field values). | Reject the input and emit a `malformed_memory_input` diagnostic. |
 | `malformed_approval_input` | The approval input is malformed (invalid JSON, missing required fields, invalid field values). | Reject the input and emit a `malformed_approval_input` diagnostic. |
 | `malformed_quota_input` | The quota input is malformed (invalid JSON, missing required fields, invalid field values). | Reject the input and emit a `malformed_quota_input` diagnostic. |
-| `malformed_lease_input` | The lease input is malformed (invalid JSON, missing required fields, invalid field values). | Reject the input and emit a `malformed_lease_input` diagnostic. |
+| `credential.lease.malformed` | Lease or opaque-handle metadata is malformed. | Reject without creating lease or use state. |
 
 #### Incompatible outcomes
 
@@ -132,7 +139,7 @@ approvals, quotas, and secret leases into the following categories:
 |------------|-------|---------------|
 | `conflicting_thread_visibility` | The thread visibility is conflicting with the current visibility. | Reject the input and emit a `conflicting_thread_visibility` diagnostic. |
 | `conflicting_quota_limit` | The quota limit is conflicting with the current limit. | Reject the input and emit a `conflicting_quota_limit` diagnostic. |
-| `conflicting_lease_expiry` | The lease expiry is conflicting with the current expiry. | Reject the input and emit a `conflicting_lease_expiry` diagnostic. |
+| `credential.lease.conflicting_expiry` | Lease update races or conflicts with its current revision. | Reject and require revision reload. |
 
 #### Unauthorized outcomes
 
@@ -143,7 +150,7 @@ approvals, quotas, and secret leases into the following categories:
 | `unauthorized_memory_access` | The agent is not authorized to access the memory. | Reject the request and emit an `unauthorized_memory_access` diagnostic. |
 | `unauthorized_approval_access` | The agent is not authorized to access the approval. | Reject the request and emit an `unauthorized_approval_access` diagnostic. |
 | `unauthorized_quota_access` | The agent is not authorized to access the quota. | Reject the request and emit an `unauthorized_quota_access` diagnostic. |
-| `unauthorized_lease_access` | The agent is not authorized to access the lease. | Reject the request and emit an `unauthorized_lease_access` diagnostic. |
+| `credential.use.unauthorized` | Agent domain authority or effect-worker `CredentialUse` authority is absent. | Reject before custodian dispatch. |
 
 #### Exhausted outcomes
 
@@ -151,7 +158,7 @@ approvals, quotas, and secret leases into the following categories:
 |------------|-------|---------------|
 | `quota_exhausted` | The quota is exhausted. | Reject the request and emit a `quota_exhausted` diagnostic. |
 | `approval_expired` | The approval request has expired. | Reject the request and emit an `approval_expired` diagnostic. |
-| `lease_expired` | The secret lease has expired. | Reject the request and emit a `lease_expired` diagnostic. |
+| `credential.handle.expired` | The credential lease or handle has expired. | Reject new use and reconcile in-flight work. |
 
 #### Unavailable outcomes
 
@@ -162,7 +169,21 @@ approvals, quotas, and secret leases into the following categories:
 | `memory_store_unavailable` | The memory store is unavailable. | Retry the request or reject and emit a `memory_store_unavailable` diagnostic. |
 | `approval_store_unavailable` | The approval store is unavailable. | Retry the request or reject and emit an `approval_store_unavailable` diagnostic. |
 | `quota_store_unavailable` | The quota store is unavailable. | Retry the request or reject and emit a `quota_store_unavailable` diagnostic. |
-| `lease_store_unavailable` | The lease store is unavailable. | Retry the request or reject and emit a `lease_store_unavailable` diagnostic. |
+| `credential.lease_store.unavailable` | Versioned lease metadata is unavailable. | Do not dispatch; retry under bounded policy. |
+
+#### Credential custody outcomes
+
+| Diagnostic | Cause | Host behavior |
+| --- | --- | --- |
+| `credential.handle.malformed` | Handle reference or fingerprint fails structural validation. | Reject before policy evaluation. |
+| `credential.handle.revoked` | Lease or handle was revoked. | Reject new use and invalidate cached decisions. |
+| `credential.custodian.unavailable` | Registered custodian cannot serve the request. | Preserve durable effect for bounded retry or fail by policy. |
+| `credential.use.scope_mismatch` | Custodian, tenant, principal, agent, artifact, binding, operation, resource, digest, deadline, or budget differs from authorization. | Reject and emit security evidence. |
+| `credential.use.export_forbidden` | Caller requests credential read, reveal, unwrap, export, bearer conversion, or authentication headers. | Reject as non-retryable security failure. |
+| `credential.use.replay` | Nonce or completed use identity is replayed. | Reject without external dispatch. |
+| `credential.receipt.invalid` | Receipt correlation, digest, signature, or transport proof is invalid. | Reject result admission and reconcile. |
+| `credential.mode.host_local_unapproved` | Host-local custody is selected without explicit approval and warning. | Refuse activation. |
+| `credential.egress.bypass` | Host or Port attempts authenticated provider or external-service egress outside the custodian. | Deny network operation and emit critical evidence. |
 
 ### Bounded diagnostics
 
@@ -184,7 +205,9 @@ Every diagnostic MUST include the following fields:
 
 > **Normative definition.**
 Diagnostics MUST be bounded. They MUST NOT expose:
-- Secrets or secret references.
+- Credentials, authentication headers, opaque handle references, or
+  transferable bearer values.
+- Custodian endpoint or transport internals.
 - Internal host implementation details.
 - Other agents' data or state.
 
@@ -210,7 +233,13 @@ Every evidence entry MUST include the following fields:
 | `memory_id` | The `MemoryId` of the memory (if applicable). | Host runtime |
 | `approval_id` | The `ApprovalId` of the approval (if applicable). | Host runtime |
 | `quota_id` | The `QuotaId` of the quota (if applicable). | Host runtime |
-| `lease_id` | The `LeaseId` of the lease (if applicable). | Host runtime |
+| `lease_fingerprint` | Non-authority-bearing lease correlation fingerprint (if applicable). | Host runtime |
+| `credential_use_fingerprint` | Non-authority-bearing use correlation fingerprint (if applicable). | Host runtime |
+| `custodian_id` | Registered custodian identity (if applicable). | Host runtime |
+| `model_binding_id` | Model binding identity (if applicable). | Host runtime |
+| `model_binding_revision` | Model binding revision (if applicable). | Host runtime |
+| `connector_binding_id` | Connector authentication binding identity (if applicable). | Host runtime |
+| `connector_binding_revision` | Connector authentication binding revision (if applicable). | Host runtime |
 | `phase` | The phase identifier (`milestone-07`, `phase-04`). | Host runtime |
 | `section` | The section identifier (`4.1`, `4.2`, `4.3`). | Host runtime |
 | `contract` | The contract identifier (e.g., `44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model`). | Host runtime |
@@ -252,16 +281,22 @@ leases are defined as follows:
 | `quota.exhausted` | Emitted when quota is exhausted. |
 | `quota.suspended` | Emitted when quota is suspended. |
 | `quota.deleted` | Emitted when quota is deleted. |
-| `lease.created` | Emitted when a secret lease is created. |
-| `lease.accessed` | Emitted when a secret lease is accessed. |
-| `lease.renewed` | Emitted when a secret lease is renewed. |
-| `lease.expired` | Emitted when a secret lease expires. |
-| `lease.revoked` | Emitted when a secret lease is revoked. |
-| `lease.deleted` | Emitted when a secret lease is deleted. |
+| `credential.custodian.registered` | Emitted when a user registers a custodian connection. |
+| `credential.lease.created` | Emitted when a use-only credential lease is created. |
+| `credential.lease.renewed` | Emitted when lease metadata is renewed. |
+| `credential.lease.expired` | Emitted when a credential lease expires. |
+| `credential.lease.revoked` | Emitted when a credential lease is revoked. |
+| `credential.lease.deleted` | Emitted when credential lease metadata is tombstoned. |
+| `credential.use.requested` | Emitted before a typed request is sent to the custodian. |
+| `credential.use.completed` | Emitted after a valid completion receipt is admitted. |
+| `credential.use.denied` | Emitted when policy or custodian denies a use. |
+| `credential.use.failed` | Emitted when a use fails or cannot be reconciled. |
 
 > **Normative definition.**
 Evidence MUST be bounded. It MUST NOT expose:
-- Secrets or secret references.
+- Credentials, authentication headers, opaque handle references, or
+  transferable bearer values.
+- Custodian endpoint or transport internals.
 - Internal host implementation details.
 - Other agents' data or state.
 
@@ -277,7 +312,9 @@ The following implementation-defined choices MUST be documented by the host:
 | Checkpoint schema migration | Forward migration only | MUST be documented in host configuration. |
 | Approval routing strategy | `any` | MUST be documented in host configuration. |
 | Quota reconciliation interval | 1 hour | MUST be documented in host configuration. |
-| Secret lease non-exportability | `true` | MUST be documented in host configuration. |
+| Credential custody mode | `external-broker` for end-user distribution | MUST document custody mode and conformance claim. |
+| Custodian transport identity | Implementation-defined | MUST document sender constraint and private-material boundary. |
+| Receipt verification | Implementation-defined | MUST document correlation, digest, and signature or transport proof. |
 | Approval expiry default | 24 hours | MUST be documented in host configuration. |
 | Memory retention default | `permanent` | MUST be documented in host configuration. |
 
@@ -290,7 +327,7 @@ The following work is deferred and MUST be tracked with priority and description
 |------|-------------|----------|
 | Parallel approvals | Support parallel approvals (e.g., require N out of M approvers). | Medium |
 | Quota burst allowance | Support burst allowances (temporary overages). | Low |
-| Secret lease rotation | Support secret rotation without invalidating leases. | Medium |
+| Multi-custodian failover | Support explicit user-approved failover without runtime model or credential substitution. | Medium |
 | Memory predictive promotion | Support predictive promotion based on usage patterns. | Low |
 | Approval conditional decisions | Support conditional decisions (e.g., "approve if X"). | Medium |
 | Quota predictive scaling | Support predictive scaling based on usage patterns. | Low |
@@ -302,9 +339,13 @@ The following work is deferred and MUST be tracked with priority and description
 ### Results that would invalidate earlier milestone assumptions
 
 > **Normative definition.**
-No results have been identified that invalidate earlier milestone assumptions.
-If any result is identified, it MUST be documented and reported to the
-milestone maintainer.
+Evidence that raw credentials must enter host or Port process memory for a
+deployment claiming `separated-credential-custody` invalidates that claim and
+requires a contract revision before promotion. Evidence that sender
+constraints, scope checks, nonces, receipts, or direct-egress denial cannot be
+enforced independently by the custodian also requires revision of the threat
+model and this contract. Every such result MUST be reported to the milestone
+maintainer.
 
 ## Variability register
 
@@ -321,3 +362,16 @@ milestone maintainer.
 - **Recommendation**: The host SHOULD retain evidence for at least 30 days.
 - **Permitted presentation**: The host MAY present the configured retention period to the operator.
 - **Limit**: The host MUST enforce tenant data isolation for evidence.
+
+### 44.3.3 Custodian and receipt detail
+
+- **Permission**: The host MAY present custodian identity, custody mode,
+  binding revision, outcome, usage, and non-authority-bearing receipt
+  fingerprints to the authorized user.
+- **Recommendation**: The host SHOULD expose enough receipt detail for the user
+  to reconcile external-service use independently.
+- **Permitted presentation**: Diagnostic and evidence formatting is
+  implementation-defined.
+- **Limit**: Presentation MUST NOT include credentials, opaque handles,
+  authentication headers, external request bodies, or custodian transport
+  internals.

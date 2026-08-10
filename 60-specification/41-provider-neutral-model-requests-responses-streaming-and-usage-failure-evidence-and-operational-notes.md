@@ -3,16 +3,19 @@ title: "Provider-Neutral Model Requests Responses Streaming And Usage Failure Ev
 kind: specification
 created: "2026-08-09"
 status: draft
-spec_version: "0.1.0"
+spec_version: "0.2.0"
 tags:
   - milestone-07
   - phase-01
   - model-requests
+  - model-bindings
   - responses
   - streaming
   - usage
   - provider-neutral
+  - credential-use
   - failure-evidence
+  - diagnostics
 aliases:
   - "M7-P1 Failure Evidence And Operational Notes"
 ---
@@ -24,18 +27,19 @@ aliases:
 This chapter is a draft specification produced by
 [Phase 1](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/phase-01-provider-neutral-model-requests-responses-streaming-and-usage.md)
 of
-[Milestone 7](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/README.md)
---
-AI, Tools, Memory, And Human Control.
-It establishes the failure evidence and operational notes for provider-neutral
-model requests, responses, streaming, and usage, including failure outcomes,
-bounded diagnostics, evidence emission, and implementation-defined choices.
+[Milestone 7](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/README.md).
+It defines stable model-intent, binding, dispatch, response, receipt, and
+usage failures together with bounded diagnostics and evidence.
+
+Version `0.2.0` replaces the `0.1.0` diagnostics that treated an
+agent-supplied provider or model as an ordinary input. Concrete selection
+fields are now forbidden agent input; missing, stale, or incompatible
+user-controlled bindings are distinct failures.
 
 This chapter is normative by default within its stated scope.
 Material visibly marked non-normative does not create conformance
-obligations.
-Promotion to `status: normative` requires evidence from the Phase 1
-integration tests and a passing cross-milestone fixture run.
+obligations. Promotion to `status: normative` requires passing evidence from
+[Phase 1 Integration Tests](41-provider-neutral-model-requests-responses-streaming-and-usage-phase-1-integration-tests.md).
 
 Governing policies:
 [Specification Authority](../SPECIFICATION-AUTHORITY.md)
@@ -43,309 +47,196 @@ and
 [Conformance Vocabulary](../CONFORMANCE-VOCABULARY.md).
 
 Related chapters:
-[Signal Envelopes Causality Routing And Delivery](10-signals-causality-routing-and-delivery.md),
-[Actions Instructions Validation Plans And Results](11-actions-instructions-validation-plans-and-results.md),
-[State Operations Patches Revisions And Conflicts](12-state-operations-patches-revisions-and-conflicts.md),
-[Directives Strategies Continuations And Terminal States](13-directives-strategies-continuations-and-terminal-states.md),
-[Deterministic Reducer Semantics And Milestone Acceptance](14-deterministic-reducer-semantics-and-milestone-acceptance.md),
-[Extism Invocation Boundary Instances And Output Validation](20-extism-invocation-boundary-instances-and-output-validation.md),
-[Mailboxes Ordering Bounds Fairness And Turn Leases](21-mailboxes-ordering-bounds-fairness-and-turn-leases.md),
-[Agent Registry Activation Cancellation And Completion](22-agent-registry-activation-cancellation-and-completion.md),
-[Sensors Schedules Timers And External Signal Ingress](23-sensors-schedules-timers-and-external-signal-ingress.md),
-[Single-Agent Host Flow And Milestone Acceptance](24-single-agent-host-flow-and-milestone-acceptance.md),
-[Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md),
-[Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md),
-[Effect Handlers Attempts Idempotency And Result Signals](27-effect-handlers-attempts-idempotency-and-result-signals.md),
-[Retry Timer Recovery Replay Hibernate And Migration](28-retry-timer-recovery-replay-hibernate-and-migration.md),
-[Crash Injection Durable Effects And Milestone Acceptance](29-crash-injection-durable-effects-and-milestone-acceptance.md),
-[Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md),
-[Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md),
-[Framework Plugin Manifests Composition And Lifecycle Hooks](32-framework-plugin-manifests-composition-and-lifecycle-hooks.md),
-[Synchronous Host Functions WASI Restrictions And Tenant Isolation](33-synchronous-host-functions-wasi-restrictions-and-tenant-isolation.md),
-[Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md),
-[Agent Identity Addressing Ownership And Dependency Relations](35-agent-identity-addressing-ownership-and-dependency-relations.md),
-[Child Lifecycle Cancellation Monitoring And Restart Policy Contract And Data Model](36-child-lifecycle-cancellation-monitoring-and-restart-policy.md),
-[Fan-Out Fan-In Delegation And Result Aggregation Contract And Data Model](37-fan-out-fan-in-delegation-and-result-aggregation-contract-and-data-model.md),
-[Fan-Out Fan-In Delegation And Result Aggregation Behavior And Integration](37-fan-out-fan-in-delegation-and-result-aggregation-behavior-and-integration.md),
-[Fan-Out Fan-In Delegation And Result Aggregation Failure Evidence And Operational Notes](37-fan-out-fan-in-delegation-and-result-aggregation-failure-evidence-and-operational-notes.md),
-[Pod Topology Placement Activation Leases And Reconciliation Contract And Data Model](38-pod-topology-placement-activation-leases-and-reconciliation-contract-and-data-model.md),
-[Pod Topology Placement Activation Leases And Reconciliation Behavior And Integration](38-pod-topology-placement-activation-leases-and-reconciliation-behavior-and-integration.md),
-[Pod Topology Placement Activation Leases And Reconciliation Failure Evidence And Operational Notes](38-pod-topology-placement-activation-leases-and-reconciliation-failure-evidence-and-operational-notes.md),
-[Multi-Agent Recovery Clustering Seams And Milestone Acceptance Contract And Data Model](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-contract-and-data-model.md),
-[Multi-Agent Recovery Clustering Seams And Milestone Acceptance Behavior And Integration](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-behavior-and-integration.md),
-[Multi-Agent Recovery Clustering Seams And Milestone Acceptance Failure Evidence And Operational Notes](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-failure-evidence-and-operational-notes.md),
-[Multi-Agent Recovery Clustering Seams And Milestone Acceptance Phase 5 Integration Tests](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-phase-5-integration-tests.md),
 [Provider-Neutral Model Requests Responses Streaming And Usage Contract And Data Model](41-provider-neutral-model-requests-responses-streaming-and-usage-contract-and-data-model.md),
-[Provider-Neutral Model Requests Responses Streaming And Usage Behavior And Integration](41-provider-neutral-model-requests-responses-streaming-and-usage-behavior-and-integration.md).
+[Provider-Neutral Model Requests Responses Streaming And Usage Behavior And Integration](41-provider-neutral-model-requests-responses-streaming-and-usage-behavior-and-integration.md),
+[Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md),
+and
+[Threads Checkpoints Memory Approvals Quotas And Secret Leases Failure Evidence And Operational Notes](44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-failure-evidence-and-operational-notes.md).
 
 ## 41.3 Failure Evidence And Operational Notes
 
-### Failure outcomes
+### Stable diagnostics
 
-> **Normative definition.**
-The following failure outcomes are normative invariants that every
-host implementation MUST handle correctly for provider-neutral model
-requests, responses, streaming, and usage.
-Each outcome describes a specific failure condition and the expected
-host behavior.
+#### Intent and schema failures
 
-#### Malformed outcomes
+| Diagnostic | Cause | Retry classification |
+| --- | --- | --- |
+| `model.intent.malformed` | Intent does not satisfy the data model. | Non-retryable until input changes. |
+| `model.intent.missing_slot` | `model_slot` is absent or undeclared. | Non-retryable until input or definition changes. |
+| `model.intent.forbidden_selection` | Intent includes provider, model, adapter, connection, endpoint, authentication, or credential selection. | Non-retryable security failure. |
+| `model.intent.malformed_messages` | Messages are empty, invalid, or over limits. | Non-retryable until input changes. |
+| `model.intent.malformed_sampling` | Sampling controls are invalid or over policy. | Non-retryable until input changes. |
+| `model.intent.malformed_deadline` | Deadline is invalid or already expired. | Non-retryable until input changes. |
+| `model.intent.malformed_budget` | Budget is invalid or exceeds an absolute limit. | Non-retryable until input changes. |
 
-| Diagnostic | Cause | Host behavior |
-|------------|-------|---------------|
-| `model.request.malformed` | Model request with missing required fields. | Reject request; do NOT create partial request state. |
-| `model.request.malformed-messages` | Model request with empty or invalid `messages` list. | Reject request; do NOT create partial request state. |
-| `model.request.malformed-provider` | Model request with invalid `provider` format. | Reject request; do NOT create partial request state. |
-| `model.request.malformed-model` | Model request with invalid `model` format. | Reject request; do NOT create partial request state. |
-| `model.request.malformed-sampling` | Model request with invalid `sampling` controls. | Reject request; do NOT create partial request state. |
-| `model.request.malformed-deadline` | Model request with invalid `deadline` timestamp. | Reject request; do NOT create partial request state. |
-| `model.request.malformed-budget` | Model request with invalid `budget` value. | Reject request; do NOT create partial request state. |
-| `model.response.malformed-text` | Response with invalid `text` field. | Reject response; do NOT create partial response state. |
-| `model.response.malformed-structured` | Response with invalid `structured_value` field. | Reject response; do NOT create partial response state. |
-| `model.response.malformed-usage` | Response with invalid `usage` metrics. | Reject response; do NOT create partial response state. |
+#### Binding and connection failures
 
-> **Non-normative note.**
-Malformed outcomes are caused by invalid input data.
-The host MUST reject malformed input without creating partial state,
-which is consistent with the atomic commit protocol defined in
-[Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md).
+| Diagnostic | Cause | Retry classification |
+| --- | --- | --- |
+| `model.binding.missing` | No active binding exists for the logical slot. | User reconfiguration required. |
+| `model.binding.stale` | Binding approval, policy, connection, or catalog revision is stale. | User review or reapproval required. |
+| `model.binding.incompatible` | Selected model lacks a declared feature or minimum capacity. | User reconfiguration required. |
+| `model.binding.unauthorized` | Caller or tenant cannot use the binding. | Non-retryable authorization failure. |
+| `model.binding.conflict` | Concurrent configuration attempted to update the same revision. | Retry configuration after reload. |
+| `model.connection.unavailable` | Recorded connection is inactive or unavailable. | Retry only if the same connection recovers. |
+| `model.request.unavailable_provider` | Pinned provider is unavailable. | Retry only against the same pinned request. |
+| `model.request.unavailable_model` | Pinned model is unavailable or removed. | User reconfiguration for a new intent. |
 
-#### Incompatible outcomes
+#### Request, response, and usage failures
 
-| Diagnostic | Cause | Host behavior |
-|------------|-------|---------------|
-| `model.request.unavailable_provider` | Model request with unregistered `provider`. | Reject request; do NOT create partial request state. |
-| `model.request.unavailable_model` | Model request with unavailable `model`. | Reject request; do NOT create partial request state. |
-| `model.request.tool_call_mismatch` | Response with tool requests that do not match `tool_definitions`. | Reject response; do NOT create partial response state. |
-| `model.request.invalid_structured_output` | Response with `structured_value` that does not conform to `structured_output_schema`. | Reject response; do NOT create partial response state. |
+| Diagnostic | Cause | Retry classification |
+| --- | --- | --- |
+| `model.request.duplicate_id` | A non-equivalent request reused an existing identity. | Non-retryable conflict. |
+| `model.request.unauthorized` | Originating agent lacks `ModelAccess`. | Non-retryable authorization failure. |
+| `model.request.cross_tenant_tool` | A tool definition crosses tenant authority. | Non-retryable security failure. |
+| `model.request.cross_tenant_result` | Result target crosses tenant authority. | Non-retryable security failure. |
+| `model.request.quota_exhausted` | Authorized budget or quota is exhausted. | Retry only after budget changes. |
+| `model.request.exhausted_concurrency` | Concurrency limit is reached. | Retryable with bounded backoff. |
+| `model.request.exhausted_stream` | Stream limit or buffer bound is reached. | Retryable only from a safe request boundary. |
+| `model.request.tool_call_mismatch` | Returned tool is not in the request catalog. | New intent required after tool definition changes. |
+| `model.request.invalid_structured_output` | Returned value fails its JSON Schema. | New intent MAY change prompt or sampling. |
+| `model.request.safety_refused` | Provider or policy refuses content. | Non-retryable without content or policy change. |
+| `model.request.timeout` | Request exceeds its bounded timeout. | Retryable only with idempotency reconciliation. |
+| `model.request.late_response` | Result arrives after deadline or cancellation. | Not automatically retryable. |
+| `model.request.cancelled` | Authorized cancellation terminated the request. | New intent required. |
+| `model.request.ambiguous_billing` | Provider and host usage calculations disagree. | Reconciliation required. |
+| `model.response.malformed_text` | Text event or final text violates encoding or bounds. | Adapter or provider correction required. |
+| `model.response.malformed_structured` | Structured payload is malformed before schema validation. | Adapter or provider correction required. |
+| `model.response.malformed_usage` | Usage metrics are negative, inconsistent, or over bounds. | Reconciliation required. |
+| `model.adapter.error` | Pinned adapter fails while preparing or normalizing. | Retryable only if request identity is preserved. |
+| `model.network.error` | Authenticated custodian transport fails. | Retryable only if outcome is reconciled. |
 
-> **Non-normative note.**
-Incompatible outcomes are caused by input data that is structurally valid
-but semantically inconsistent with the model or provider.
-The host MUST reject incompatible input without creating partial state,
-which is consistent with the validation rules defined in
-[Provider-Neutral Model Requests Responses Streaming And Usage Contract And Data Model](41-provider-neutral-model-requests-responses-streaming-and-usage-contract-and-data-model.md).
+Credential-custody failures use the canonical `credential.*` diagnostics
+defined in
+[Section 44.3](44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-failure-evidence-and-operational-notes.md).
+The model subsystem MUST preserve those codes rather than translating them to
+generic adapter or network errors.
 
-#### Conflicting outcomes
+### Failure-state invariants
 
-| Diagnostic | Cause | Host behavior |
-|------------|-------|---------------|
-| `model.request.duplicate-id` | Two model requests with the same `request_id` submitted concurrently. | Reject second request; do NOT create partial request state. |
-| `model.request.conflicting-cancellation` | Two cancellation requests for the same `request_id` submitted concurrently. | Reject second cancellation; do NOT create partial request state. |
+On every failure, the host MUST preserve these invariants:
 
-> **Non-normative note.**
-Conflicting outcomes are caused by concurrent or duplicate requests.
-The host MUST reject conflicting input without creating partial state,
-which is consistent with the atomic commit protocol defined in
-[Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md).
+1. A failure before durable request commit leaves no request, outbox entry,
+   quota reservation, provider call, or credential-use request.
+2. A failure after durable request commit retains the pinned binding and
+   idempotency identity.
+3. No retry changes provider, model, adapter, connection, custodian, or binding
+   revision.
+4. No rejected response advances authoritative agent state.
+5. Quota and usage are reconciled after uncertain provider outcomes.
+6. Diagnostics and evidence contain no prompt body unless policy permits it,
+   and never contain credentials, authentication headers, handle references,
+   arbitrary endpoint URLs, unbounded provider errors, or raw custodian
+   responses.
 
-#### Unauthorized outcomes
+### Bounded diagnostics
 
-| Diagnostic | Cause | Host behavior |
-|------------|-------|---------------|
-| `model.request.unauthorized` | Model request whose `agent_address` does not have the `model.request.create` capability. | Reject request; do NOT create partial request state. |
-| `model.request.cross-tenant-tool` | Model request that grants cross-tenant tool access. | Reject request; do NOT create partial request state. |
-| `model.request.cross-tenant-result` | Model request that grants cross-tenant result sharing. | Reject request; do NOT create partial request state. |
+Every model diagnostic MUST include:
 
-> **Non-normative note.**
-Unauthorized outcomes are caused by principals that lack the required
-capabilities.
-The host MUST reject unauthorized requests without creating partial
-state, which is consistent with the capability policy defined in
-[Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md).
+| Field | Meaning |
+| --- | --- |
+| `diagnostic_code` | Stable code from this chapter or Section 44. |
+| `phase` and `contract` | `milestone-07`, `phase-01`, and this contract family. |
+| `boundary` | `intent-admission`, `binding-resolution`, `request-commit`, `credential-dispatch`, `stream-normalization`, `result-admission`, or `usage-reconciliation`. |
+| `tenant_id` and `agent_address` | Authenticated bounded identities. |
+| `intent_id` or `request_id` | Correlation identity when created. |
+| `model_slot` | Logical slot. |
+| `binding_id` and `binding_revision` | Only after binding resolution. |
+| `provider` and `model` | Only after binding resolution and when policy permits operator visibility. |
+| `retryable` | Whether the same pinned request may be retried. |
+| `timestamp` | Host timestamp. |
 
-#### Exhausted outcomes
+The diagnostic MUST NOT include `credential_handle_ref`,
+`handle_fingerprint`, credential bytes, authentication headers, request
+bodies, provider URLs, or custodian transport details. A stable non-authority
+bearing correlation fingerprint MAY be included if the conformance profile
+documents its derivation.
 
-| Diagnostic | Cause | Host behavior |
-|------------|-------|---------------|
-| `model.request.quota_exhausted` | Agent's budget is insufficient to cover the request. | Reject request; do NOT create partial request state. |
-| `model.request.exhausted-concurrency` | Host would exceed the implementation-defined maximum number of concurrent model requests. | Reject request; do NOT create partial request state. |
-| `model.request.exhausted-stream` | Host would exceed the implementation-defined maximum number of concurrent streaming responses. | Reject request; do NOT create partial request state. |
+### Evidence emission
 
-> **Non-normative note.**
-Exhausted outcomes are caused by resource limits.
-The host MUST reject exhausted requests without creating partial state,
-which is consistent with the resource limits defined in
-[Profile Vocabulary And Architectural Boundaries](01-profile-vocabulary-and-architectural-boundaries.md).
+The host MUST emit bounded evidence for:
 
-#### Unavailable outcomes
+| Evidence type | Meaning |
+| --- | --- |
+| `model.intent.admitted` | Intent schema and agent authority accepted. |
+| `model.binding.resolved` | A specific approved binding revision was selected. |
+| `model.request.created` | Durable request and outbox effect committed. |
+| `model.request.dispatch_requested` | Credential-use dispatch was requested. |
+| `model.request.streaming` | First valid normalized event admitted. |
+| `model.response.completed` | Final response validated and committed. |
+| `model.response.failed` | Final failure recorded. |
+| `model.request.cancelled` | Cancellation reached its durable terminal state. |
+| `model.usage.recorded` | Verified or reconciled usage committed. |
 
-| Diagnostic | Cause | Host behavior |
-|------------|-------|---------------|
-| `model.request.unavailable-provider` | Provider adapter is not active in the adapter registry. | Reject request; do NOT create partial request state. |
-| `model.request.unavailable-model` | Model is not available from the provider. | Reject request; do NOT create partial request state. |
-| `model.request.timeout` | Request exceeded the implementation-defined timeout. | Cancel request; do NOT create partial response state. |
-| `model.request.late-response` | Response arrived after the `deadline`. | Accept response but mark as late in diagnostics. |
+Each entry MUST include tenant, agent, intent or request identity, model slot,
+binding id and revision when resolved, policy version, outcome, timestamp, and
+the relevant evidence digest. Provider and model MAY be included for the
+authorized user and audit roles. Credential-use evidence is emitted by
+Section 44 and correlated by a non-authority-bearing use fingerprint.
 
-> **Non-normative note.**
-Unavailable outcomes are caused by providers or models that are not active
-or not available.
-The host MUST reject unavailable requests without creating partial
-state, which is consistent with the provider adapter contract defined in
-[Framework Plugin Manifests Composition And Lifecycle Hooks](32-framework-plugin-manifests-composition-and-lifecycle-hooks.md).
+Evidence MUST NOT contain credentials, authentication headers, opaque handles,
+prompt or response bodies, arbitrary endpoints, or unbounded provider and
+custodian payloads.
 
-#### Safety outcomes
+### Retry classification
 
-| Diagnostic | Cause | Host behavior |
-|------------|-------|---------------|
-| `model.request.safety_refused` | Provider refused the request due to safety filters. | Reject response; emit safety metadata in diagnostics. |
-| `model.request.content_filter` | Response text was filtered by the provider's content filters. | Accept response but mark as filtered in diagnostics. |
+The same pinned request MAY be retried only for:
 
-> **Non-normative note.**
-Safety outcomes are caused by the provider's content filters.
-The host MUST reject or accept the response based on the filter result
-and emit safety metadata in diagnostics.
+- bounded connection unavailability where no provider outcome occurred;
+- adapter or custodian transport failure with idempotency reconciliation;
+- timeout with status reconciliation;
+- concurrency exhaustion before dispatch.
 
-### Bounded diagnostics and evidence
-
-> **Normative definition.**
-The host MUST emit bounded diagnostics and evidence for every failure
-outcome.
-Diagnostics identify the phase contract, profile, and failed boundary
-without exposing secrets.
-Evidence is recorded in the durable audit log as defined in
-[Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md).
-
-> **Normative definition.**
-Every diagnostic MUST include the following fields:
-
-| Field | Content | Source |
-|-------|---------|--------|
-| `diagnostic` | The failure diagnostic code (e.g., `model.request.malformed`). | Host runtime. |
-| `phase` | The phase that produced the diagnostic (`Phase 1`). | Host runtime. |
-| `section` | The section that produced the diagnostic (e.g., `41.3`). | Host runtime. |
-| `contract` | The contract that produced the diagnostic (e.g., `Provider-Neutral Model Requests Responses Streaming And Usage`). | Host runtime. |
-| `profile` | The conformance profile that produced the diagnostic. | Host runtime. |
-| `failed_boundary` | The failed boundary (e.g., `model.request.create`, `model.request.stream`, `model.request.cancel`). | Host runtime. |
-| `timestamp` | The ISO 8601 timestamp of diagnostic emission. | Host clock. |
-| `message` | A human-readable description of the failure. | Host runtime. |
-
-> **Non-normative note.**
-The bounded diagnostic format ensures that diagnostics are consistent,
-auditable, and actionable.
-The `phase`, `section`, `contract`, `profile`, and `failed_boundary`
-fields enable operators to quickly identify the source and context
-of a failure.
-The `message` field provides a human-readable description that enables
-operators to understand the failure and take corrective action.
-
-> **Normative definition.**
-Every evidence record MUST include the following fields:
-
-| Field | Content | Source |
-|-------|---------|--------|
-| `evidence_type` | The evidence type (`model.request.created`, `model.request.completed`, `model.request.failed`, `model.request.cancelled`, `model.response.text_delta`, `model.response.tool_request_delta`, `model.usage.recorded`). | Host runtime. |
-| `request_id` | The `request_id` of the model request. | Host runtime. |
-| `agent_address` | The `TenantQualifiedAgentAddress` of the agent that originated the request. | Host runtime. |
-| `provider` | The provider adapter identifier. | Host runtime. |
-| `model` | The model identifier. | Host runtime. |
-| `timestamp` | The ISO 8601 timestamp of evidence emission. | Host clock. |
-| `evidence_digest` | A deterministic hash of the evidence record. | Host runtime. |
-
-> **Non-normative note.**
-The evidence record format ensures that all model request events are auditable
-and tamper-evident.
-The `evidence_digest` field enables downstream systems to verify that
-the evidence record has not been tampered with after creation.
-This is consistent with the provenance and audit contract defined in
-[Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md).
+The host MUST NOT automatically retry missing, stale, incompatible, or
+unauthorized bindings; forbidden selection attempts; quota exhaustion;
+credential-use denials; safety refusals; tool mismatches; structured-output
+failures; or invalid receipts. These require user action, a new intent, or an
+operator reconciliation decision.
 
 ### Implementation-defined choices
 
-> **Normative definition.**
-The following implementation-defined choices are documented by this section.
-Host implementations MUST document these choices in the conformance
-profile.
-
-| Choice | Description | Constraint |
-|--------|-------------|------------|
-| Maximum concurrent requests | The maximum number of concurrent model requests. | Must be at least 1 and at most the implementation-defined maximum. Must be documented in the conformance profile. |
-| Maximum concurrent streams | The maximum number of concurrent streaming responses. | Must be at least 1 and at most the implementation-defined maximum. Must be documented in the conformance profile. |
-| Request timeout | The maximum duration of a model request before timeout. | Must be longer than the maximum expected model response duration. Must be documented in the conformance profile. |
-| Streaming buffer size | The maximum size of the streaming response buffer. | Must be at least 1 KB and at most the implementation-defined maximum. Must be documented in the conformance profile. |
-| Usage recording interval | The interval between usage recordings (for long-running streams). | Must be at least 1 second and at most the implementation-defined maximum. Must be documented in the conformance profile. |
-
-> **Non-normative note.**
-The implementation-defined choices above provide flexibility for
-different deployment scenarios while ensuring that constraints are
-documented and auditable.
-Host implementations MUST document these choices in the conformance
-profile so that operators can understand the system's behavior.
+| Choice | Documentation requirement |
+| --- | --- |
+| Maximum concurrent requests and streams | Publish tenant and connection limits and queue behavior. |
+| Request and cancellation timeout | Publish hard bounds and clock source. |
+| Stream buffer size | Publish byte and event limits and backpressure behavior. |
+| Retry count and backoff | Publish bounds; preserve pinned selection and idempotency. |
+| Usage reconciliation algorithm | Publish provider observation and host calculation precedence. |
+| Diagnostic visibility | Publish which roles may see provider/model identifiers. |
+| Evidence retention | Publish retention and tenant isolation. |
 
 ### Deferred work
 
-> **Normative definition.**
-The following work is deferred to future phases or milestones:
+Automatic model routing, provider fallback, speculative multi-model execution,
+quality-based selection, and cost optimization are deferred. They MUST NOT be
+implemented as hidden extensions to the `0.2.0` binding contract.
 
-1. **Multi-model parallelism**: Running multiple model requests in
-   parallel across different providers is deferred to Milestone 8.
-2. **Model routing**: Routing model requests to the optimal provider
-   based on cost, latency, and quality is deferred to Milestone 8.
-3. **Model caching**: Caching model responses for repeated requests is
-   deferred to Milestone 8.
-4. **Model fallback**: Automatically falling back to a different model
-   or provider on failure is deferred to Milestone 8.
+### Results invalidating this contract
 
-> **Non-normative note.**
-The deferred work above is not within the scope of Phase 1 but may
-be addressed in future phases.
-Implementations MUST NOT implement deferred work without evidence from
-the corresponding future phase.
+The contract requires revision if evidence shows that:
 
-### Results that would invalidate an earlier milestone assumption
+1. A provider cannot be called through a typed custodian without exposing its
+   long-lived credential to the host.
+2. Provider idempotency or status reconciliation cannot prevent duplicate
+   billing after an uncertain outcome.
+3. Catalog metadata cannot reliably establish declared feature compatibility.
+4. A provider-neutral intent cannot preserve required semantics without
+   provider-specific selection by guest code.
 
-> **Non-normative note.**
-The following results from Phase 1 would invalidate an earlier milestone
-assumption:
+## Variability register
 
-1. **Model requests bypass the durable journal**: If model requests
-   bypass the durable journal, this would invalidate the assumption
-   defined in
-   [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md)
-   that all state transitions are durable across host restarts.
-2. **Model requests bypass the atomic commit protocol**: If model requests
-   bypass the atomic commit protocol, this would invalidate the assumption
-   defined in
-   [Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md)
-   that all state transitions are atomic.
-3. **Model requests allow cross-tenant authority leaks**: If model requests
-   allow cross-tenant tool access or result sharing, this would invalidate
-   the assumption defined in
-   [Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md)
-   that all principals are isolated by tenant.
-4. **Model requests require shared mutable guest state**: If model requests
-   require shared mutable guest state, this would invalidate the assumption
-   defined in
-   [Deterministic Reducer Semantics And Milestone Acceptance](14-deterministic-reducer-semantics-and-milestone-acceptance.md)
-   that all state transitions are deterministic and replayable.
+| Item | Permission | Recommendation | Constraint |
+| --- | --- | --- | --- |
+| Diagnostic provider/model visibility | Optional | Restrict to user and audit roles | Never expose credential or handle material |
+| Correlation fingerprints | Optional | Domain-separated non-authority-bearing digest | Must not be usable for credential access |
+| Retry policy | Implementation-defined | Retry only reconciled transient failures | Must preserve recorded selection |
+| Evidence retention | Implementation-defined | Retain through release and incident windows | Must enforce tenant isolation and redaction |
+| Automatic routing and fallback | Deferred | Require explicit user reconfiguration | Must not occur at runtime |
 
-> **Non-normative note.**
-These results would indicate a design flaw in Phase 1 and would require
-a revision of the Phase 1 contracts before promotion to `status:
-normative`.
-Implementations MUST NOT deviate from the contracts defined in this
-chapter without evidence from a corresponding revision.
+## Rationale and evidence (non-normative)
 
-### Cross-references and precedence
-
-> **Non-normative note.**
-This section's failure evidence and operational notes integrate with the
-following earlier chapters:
-
-1. For failure diagnostics: this section takes precedence over
-   [Actions Instructions Validation Plans And Results](11-actions-instructions-validation-plans-and-results.md)
-   for questions of model-specific diagnostic format.
-2. For evidence emission: this section takes precedence over
-   [Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md)
-   for questions of model-specific evidence record format.
-3. For capability enforcement: this section takes precedence over
-   [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md)
-   for questions of model-specific capability enforcement.
-4. For resource limits: this section takes precedence over
-   [Profile Vocabulary And Architectural Boundaries](01-profile-vocabulary-and-architectural-boundaries.md)
-   for questions of model-specific resource limits.
-5. For provider adapters: this section takes precedence over
-   [Framework Plugin Manifests Composition And Lifecycle Hooks](32-framework-plugin-manifests-composition-and-lifecycle-hooks.md)
-   for questions of model-specific adapter behavior.
-6. Where both sections are applicable and agree, they are mutually
-   reinforcing.
+Separating intent, binding, and credential failures gives users actionable
+diagnostics: a plugin bug is different from missing installation
+configuration, and both are different from a custodian outage. Preserving the
+original custody diagnostic also prevents an adapter from hiding a credential
+scope or replay violation behind a generic network error.

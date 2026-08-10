@@ -3,7 +3,7 @@ title: "Framework Plugin Manifests Composition And Lifecycle Hooks"
 kind: specification
 created: "2026-08-09"
 status: draft
-spec_version: "0.1.0"
+spec_version: "0.2.0"
 tags:
   - milestone-05
   - phase-03
@@ -11,6 +11,7 @@ tags:
   - manifest
   - composition
   - lifecycle-hooks
+  - model-bindings
 aliases:
   - "M5-P3 Framework Plugin Manifests Composition And Lifecycle Hooks"
 ---
@@ -28,6 +29,11 @@ Capabilities, Plugins, Security, And Tenancy.
 It defines the declarative manifest contract, deterministic composition
 ordering, and the trust-tier separation between framework plugins and
 individual Extism guest modules.
+
+Version `0.2.0` replaces the `0.1.0` lifecycle for plugins that use models.
+It adds portable model requirements and a user-controlled `configure` gate.
+Concrete model, connection, endpoint, and credential choices are mutable
+installation configuration and are not controlled by the publisher or guest.
 
 This chapter is normative by default within its stated scope.
 Material visibly marked non-normative does not create conformance
@@ -108,13 +114,14 @@ FrameworkPluginManifest {
   state_namespaces: string[],
   schemas: SchemaDeclaration[],
   strategies: StrategyDeclaration[],
+  model_requirements: ModelRequirementDeclaration[]?,
   directives: DirectiveDeclaration[],
   schedules: ScheduleDeclaration[],
   requested_grants: Capability[],
   lifecycle_ownership: LifecycleOwnership?
 }
 
-ManifestVersion = "1.0"
+ManifestVersion = "1.0" | "1.1"
 ```
 
 > **Normative definition.**
@@ -123,6 +130,10 @@ The host MUST reject any manifest whose `manifest_version` is not
 recognised.
 The host MUST compare `manifest_version` as an exact string match,
 not as a numeric range.
+
+Manifest version `"1.0"` has no `model_requirements` field and the host MUST
+treat it as an empty list. Manifest version `"1.1"` requires the field, which
+MAY be empty. A plugin that requests model access MUST use version `"1.1"`.
 
 ### 3.1.1 Plugin Dependencies
 
@@ -423,7 +434,8 @@ StrategyDeclaration {
   name: string,
   description: string?,
   priority: u32,
-  capabilities_required: Capability[]?
+  capabilities_required: Capability[]?,
+  model_slots: string[]?
 }
 ```
 
@@ -431,6 +443,41 @@ StrategyDeclaration {
 The host MUST enforce that strategy `strategy_id` values are unique
 within the plugin and do not conflict with strategies from other
 installed plugins after composition.
+Every declared `model_slots` value MUST identify a model requirement in the
+same manifest. A strategy that requests a model slot MUST include
+`ModelAccess` in `capabilities_required`.
+
+### Model requirements
+
+> **Normative definition.**
+The `model_requirements` field declares logical model slots and portable
+capability constraints. It describes what plugin behavior needs; it does not
+select who provides the model or which credentials authorize it.
+
+> **Normative definition.**
+
+```
+ModelRequirementDeclaration {
+  slot_id: string,
+  description: string,
+  required_features: ModelFeature[],
+  min_context_tokens: u64,
+  min_output_tokens: u64,
+  optional: bool
+}
+
+ModelFeature = "text-generation" | "streaming" | "tool-calling" |
+               "structured-output"
+```
+
+The `slot_id` values MUST be unique within the plugin.
+The host MUST reject a model requirement containing a provider, model,
+adapter, connection, endpoint, authentication header, secret, or credential
+handle with `plugin.forbidden_model_selection`.
+The publisher MAY explain functional tradeoffs in `description`, but MUST NOT
+encode a concrete provider or model as a hidden compatibility requirement.
+The user-selected binding contract is defined in
+[Provider-Neutral Model Requests Responses Streaming And Usage Contract And Data Model](41-provider-neutral-model-requests-responses-streaming-and-usage-contract-and-data-model.md).
 
 ### Directives
 
@@ -504,6 +551,11 @@ The host MUST deny plugin installation when any requested grant is
 unresolvable under the current trust model.
 The host MUST emit the diagnostic `grant-unresolvable` in this case.
 
+A manifest with a non-empty `model_requirements` field MUST request
+`ModelAccess`. It MUST NOT request `CredentialUse`, `SecretRead`, or
+`SecretWrite` for an untrusted guest artifact. Credential use belongs to the
+authenticated host effect worker and is authorized independently at dispatch.
+
 > **Non-normative note.**
 Requested grants are declarative.
 The actual enforcement of these grants occurs at each policy evaluation
@@ -524,14 +576,16 @@ LifecycleOwnership = "host" | "publisher" | "shared"
 ```
 
 > **Normative definition.**
-When `lifecycle_ownership` is `"host"`, the host retains exclusive
-authority over install, enable, disable, upgrade, migrate, and remove
-operations.
+When `lifecycle_ownership` is `"host"`, the host retains exclusive authority
+over every host-controlled lifecycle operation. The user-owned `configure`
+operation is excluded.
 When `lifecycle_ownership` is `"publisher"`, the host MUST require
-explicit publisher-signed approval for every lifecycle transition.
+explicit publisher-signed approval for every publisher-controlled lifecycle
+transition. The user-owned `configure` operation is excluded.
 When `lifecycle_ownership` is `"shared"`, the host and publisher share
-authority according to the rules defined in
+authority over host-controlled transitions according to the rules defined in
 [Single-Agent Host Flow And Milestone Acceptance](24-single-agent-host-flow-and-milestone-acceptance.md).
+The user-owned `configure` operation is excluded.
 
 > **Normative definition.**
 Lifecycle ownership IS FIXED at plugin declaration and CANNOT be transferred
@@ -539,6 +593,12 @@ between host, publisher, or shared ownership after composition.
 Transfer of lifecycle ownership requires uninstall and reinstall with a new
 manifest declaring the desired ownership.
 This prevents confusion about responsibility for plugin lifecycle operations.
+
+Model binding configuration is always owned by the installing user or an
+authorized tenant operator. `lifecycle_ownership` MUST NOT allow a publisher,
+plugin, guest artifact, strategy, or agent instance to select or alter a
+provider, model, connection, endpoint, credential custodian, or credential
+handle.
 
 > **Non-normative note.**
 Lifecycle ownership controls who can promote or demote a plugin in the
@@ -715,22 +775,27 @@ before loading executable artifacts.
    any artifacts.
 2. **validate**: The host re-validates the manifest and all artifacts
    against their declared digests.
-3. **approve**: The host requires explicit approval for plugins with
+3. **configure**: The user or an authorized tenant operator binds every
+   required model slot to a compatible registered model connection. The
+   configuration is versioned outside the immutable plugin artifact and MUST
+   NOT accept raw credentials in the `separated-credential-custody` profile.
+4. **approve**: The host requires explicit approval for plugins with
    `lifecycle_ownership: "publisher"` or for any `privileged-host`
-   artifacts.
-4. **enable**: The host loads executable artifacts into the runtime
-   after install, validate, and approve have succeeded.
-5. **disable**: The host unloads executable artifacts and freezes the
+   artifacts. Approval evidence includes the configured model-binding
+   revisions and relevant grant revisions.
+5. **enable**: The host loads executable artifacts into the runtime
+   after install, validate, configure, and approve have succeeded.
+6. **disable**: The host unloads executable artifacts and freezes the
    plugin's state.
-6. **upgrade**: The host validates the new manifest, resolves the new
+7. **upgrade**: The host validates the new manifest, resolves the new
    grants, and composes the new version.
    Migration is handled by
    [Retry Timer Recovery Replay Hibernate And Migration](28-retry-timer-recovery-replay-hibernate-and-migration.md).
-7. **migrate**: The host applies migration artifacts in declared order,
+8. **migrate**: The host applies migration artifacts in declared order,
    validated against their source namespaces and target schemas.
-8. **rollback**: The host undoes migration artifacts in reverse order
+9. **rollback**: The host undoes migration artifacts in reverse order
    or restores the previous plugin version.
-9. **remove**: The host unregisters the plugin, unloads artifacts,
+10. **remove**: The host unregisters the plugin, unloads artifacts,
    and archives its state according to
    [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md).
 
@@ -748,6 +813,16 @@ loading) is critical: it ensures that no code runs before the manifest
 is fully validated and authorized.
 This separation is the primary mechanism for enforcing the trust-tier
 model defined in [Trust-tier separation](#trust-tier-separation).
+
+Installation MAY finish in a `configuration-required` state when a required
+model slot is unbound. This state records metadata only and MUST NOT permit
+`enable`. Binding configuration does not change the plugin artifact digest.
+Changing a binding creates a new binding revision, invalidates approval that
+covered the previous revision, and affects only model intents materialized
+after the change.
+An upgrade that adds a required slot or changes a slot's required features or
+limits MUST invalidate the affected binding and return the plugin to
+`configuration-required` until the user reconfigures and reapproves it.
 
 ### Composition and authorization before artifact loading
 
@@ -770,6 +845,12 @@ until the following conditions are all satisfied:
 6. For any `privileged-host` artifacts, the review evidence defined in
    [Reviewed preparation logic](#reviewed-preparation-logic) has been
    recorded.
+7. Every non-optional model requirement has exactly one active,
+   user-approved binding whose catalog metadata satisfies the requirement.
+8. Every configured model connection and opaque credential lease is active,
+   tenant-scoped, and authorized under
+   [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md).
+9. The approval evidence covers the current binding and policy revisions.
 
 > **Normative definition.**
 If any condition above is not satisfied, the host MUST fail the lifecycle
@@ -812,6 +893,12 @@ manifests composition and lifecycle hooks:
     still have active references.
 12. **Revoked publisher**: The publisher's trust class has been
     revoked.
+13. **Missing model binding**: A required model slot has no active,
+    user-approved binding.
+14. **Incompatible model binding**: The selected model does not satisfy the
+    slot's declared features or limits.
+15. **Unavailable credential connection**: The configured connection,
+    credential lease, or custodian is unavailable.
 
 > **Normative definition.**
 Each failure outcome MUST be mapped to a specific error code and bounded
@@ -841,6 +928,10 @@ boundary without exposing secrets.
 | `plugin.revoked_publisher` | The publisher's trust class has been revoked |
 | `plugin.schema_validation_failed` | A schema validation check failed |
 | `plugin.grant_unresolvable` | A requested grant cannot be resolved |
+| `plugin.forbidden_model_selection` | A manifest attempts to select a concrete provider, model, endpoint, connection, or credential |
+| `plugin.model_binding_missing` | A required model slot has no active user-approved binding |
+| `plugin.model_binding_incompatible` | A selected model does not satisfy the declared requirement |
+| `plugin.credential_connection_unavailable` | A configured model connection, lease, or custodian is unavailable |
 
 ### Missing dependency
 
@@ -1077,6 +1168,9 @@ the affected milestone MUST be revised and re-validated.
 | Conflict resolution priority | Implementation-defined | Document in conformance profile | Must resolve route priority conflicts explicitly |
 | Trust tier enforcement | Implementation-defined | Document in conformance profile | Must enforce all three trust tier rules |
 | Manifest version validation | Implementation-defined | Document in conformance profile | Must reject unsupported manifest versions |
+| Model requirement descriptions | Optional | Explain functional needs without naming a concrete provider or model | Must not become a hidden selection constraint |
+| Model binding configuration | Required | User or authorized tenant operator selects each required slot | Must remain outside artifact digest and publisher control |
+| Model binding revision approval | Required | Reapprove after binding or requirement changes | Existing in-flight requests remain pinned to their recorded revision |
 
 ## Operational variability register
 
@@ -1084,7 +1178,7 @@ the affected milestone MUST be revised and re-validated.
 |------|------------|----------------|------------|
 | Diagnostic formatting | Implementation-defined | Document in conformance profile | Must produce parseable output |
 | Audit log retention | Implementation-defined | Document in conformance profile | Must support forensic analysis |
-| Failure detection granularity | Implementation-defined | Document in conformance profile | Must detect all twelve failure outcomes |
+| Failure detection granularity | Implementation-defined | Document in conformance profile | Must detect all fifteen failure outcomes |
 
 ## 3.3 Failure Evidence And Operational Notes
 
@@ -1128,7 +1222,7 @@ Additional failure outcomes are defined in the failure semantics subsection of
 [Behavior And Integration](#32-behavior-and-integration), including
 missing dependency, version conflict, circular dependency, ambiguous
 route, orphaned state, and revoked publisher. Implementations MUST
-emit diagnostics for all twelve failure outcomes to provide operators
+emit diagnostics for all fifteen failure outcomes to provide operators
 with comprehensive failure visibility.
 
 ### Bounded diagnostics and evidence
@@ -1342,7 +1436,7 @@ reproducible evidence for later milestone and release gates.
 | `P3-SUCCESS-06` | Trust tier reviewed-preparation requires review evidence | Artifact is loaded only after review evidence is recorded |
 | `P3-SUCCESS-07` | Trust tier privileged-host is restricted to approved operations | Artifact is invoked only via the approved operation set |
 | `P3-SUCCESS-08` | install operation completes without loading artifacts | Plugin is in the registry; no artifacts are loaded into the runtime |
-| `P3-SUCCESS-09` | enable operation loads artifacts after install, validate, and approve | All artifacts are loaded into the runtime and the plugin is active |
+| `P3-SUCCESS-09` | enable operation loads artifacts after install, validate, configure, and approve | All artifacts are loaded into the runtime and the plugin is active |
 | `P3-SUCCESS-10` | disable operation unloads artifacts and freezes state | All artifacts are unloaded; state is frozen but preserved |
 | `P3-SUCCESS-11` | upgrade operation composes new version and migrates state | New version is installed; migration artifacts are applied |
 | `P3-SUCCESS-12` | rollback operation restores previous version | Previous version is restored; migration artifacts are undone in reverse |
@@ -1350,11 +1444,12 @@ reproducible evidence for later milestone and release gates.
 | `P3-SUCCESS-14` | Route resolution is unambiguous for all configured routes | All routes resolve to exactly one target; no diagnostic emitted |
 | `P3-SUCCESS-15` | State namespaces are isolated between plugins | Cross-plugin state access is prevented |
 | `P3-SUCCESS-16` | Schedule declarations generate signals deterministically | Schedule signals are emitted at the configured intervals |
-| `P3-SUCCESS-17` | Lifecycle ownership "host" allows host-only transitions | Publisher cannot trigger lifecycle transitions |
-| `P3-SUCCESS-18` | Lifecycle ownership "publisher" requires publisher-signed approval | Host requires explicit publisher signature for each transition |
-| `P3-SUCCESS-19` | Lifecycle ownership "shared" follows shared authority rules | Transitions follow the shared authority rules defined in
-[Single-Agent Host Flow And Milestone Acceptance](24-single-agent-host-flow-and-milestone-acceptance.md) |
+| `P3-SUCCESS-17` | Lifecycle ownership "host" allows host-only transitions | Publisher cannot trigger host-controlled transitions; the authenticated user retains `configure` authority |
+| `P3-SUCCESS-18` | Lifecycle ownership "publisher" requires publisher-signed approval | Host requires an explicit publisher signature for each publisher-controlled transition; `configure` remains user-owned |
+| `P3-SUCCESS-19` | Lifecycle ownership "shared" follows shared authority rules | Host-controlled transitions follow the shared authority rules in [Single-Agent Host Flow And Milestone Acceptance](24-single-agent-host-flow-and-milestone-acceptance.md); `configure` remains user-owned |
 | `P3-SUCCESS-20` | Grant resolution succeeds for all requested grants | All requested grants are resolved; no `grant-unresolvable` diagnostic |
+| `P3-SUCCESS-21` | User binds every required logical model slot to a compatible registered connection | Versioned bindings are stored outside the artifact and the plugin becomes approvable |
+| `P3-SUCCESS-22` | User changes a model binding without modifying the plugin artifact | Binding revision changes, artifact digest remains stable, and approval is required again |
 
 > **Non-normative note.**
 > Test IDs are stable across Phase 3 revisions.
@@ -1406,7 +1501,7 @@ reproducible evidence for later milestone and release gates.
 
 > **Normative definition.**
 > Tests `P3-SUCCESS-08` through `P3-SUCCESS-13` and `P3-SUCCESS-17`
-> through `P3-SUCCESS-19` verify that every lifecycle operation
+> through `P3-SUCCESS-22` verify that every lifecycle operation
 > completes successfully under normal conditions.
 > Each test MUST verify the post-condition of the operation, including
 > registry state, audit log entries, and artifact loading status.
@@ -1450,6 +1545,10 @@ reproducible evidence for later milestone and release gates.
 | `P3-FAIL-15` | Circular dependency between two plugins | `plugin.circular_dependency` |
 | `P3-FAIL-16` | Orphaned state prevents remove operation | `plugin.orphaned_state` |
 | `P3-FAIL-17` | Revoked publisher prevents all lifecycle operations | `plugin.revoked_publisher` |
+| `P3-FAIL-18` | Manifest attempts to select a provider, model, endpoint, connection, or credential | `plugin.forbidden_model_selection` |
+| `P3-FAIL-19` | Enable with an unbound required model slot | `plugin.model_binding_missing` |
+| `P3-FAIL-20` | Selected model lacks a required feature or minimum limit | `plugin.model_binding_incompatible` |
+| `P3-FAIL-21` | Configured credential custodian or lease is unavailable | `plugin.credential_connection_unavailable` |
 
 > **Non-normative note.**
 > Tests `P3-FAIL-06` and `P3-FAIL-07` are boundary-limit tests.
@@ -1542,6 +1641,9 @@ reproducible evidence for later milestone and release gates.
 | `P3-LIFE-10` | `rollback` on a plugin with no upgrade history is refused | Operation fails with diagnostic identifying no upgrade history |
 | `P3-LIFE-11` | Concurrent `upgrade` and `remove` on same plugin is serialized | Only one operation completes; the other is rejected or queued |
 | `P3-LIFE-12` | `disable` while an agent invocation is in progress completes gracefully | In-progress invocation completes or is cancelled cleanly |
+| `P3-LIFE-13` | `enable` before required model configuration | Operation fails with `plugin.model_binding_missing`; no artifact is loaded |
+| `P3-LIFE-14` | Binding changes after approval | Approval is invalidated; new intents use the new revision only after reapproval |
+| `P3-LIFE-15` | Upgrade changes a model requirement | Plugin returns to `configuration-required`; old version remains usable until replacement is approved |
 
 > **Non-normative note.**
 > Lifecycle enforcement tests verify that the host does not enter an

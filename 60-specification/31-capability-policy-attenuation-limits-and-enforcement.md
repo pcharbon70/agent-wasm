@@ -3,7 +3,7 @@ title: "Capability Policy Attenuation Limits And Enforcement"
 kind: specification
 created: "2026-08-09"
 status: draft
-spec_version: "0.1.0"
+spec_version: "0.2.0"
 tags:
   - milestone-05
   - phase-02
@@ -11,6 +11,7 @@ tags:
   - attenuation
   - limits
   - enforcement
+  - credential-use
 aliases:
   - "M5-P2 Capability Policy Attenuation Limits And Enforcement"
 ---
@@ -27,6 +28,10 @@ of
 Capabilities, Plugins, Security, And Tenancy.
 It establishes host-owned policy decisions that bind every invocation and
 effect to minimum authority and resource budgets.
+
+Version `0.2.0` extends the `0.1.0` policy input and attenuation contract with
+credential-use context. It explicitly separates an agent's `ModelAccess`
+authority from an effect worker's use-only `CredentialUse` authority.
 
 This chapter is normative by default within its stated scope.
 Material visibly marked non-normative does not create conformance
@@ -81,7 +86,8 @@ Related chapters:
 > **Normative definition.**
 The host MUST assemble a single policy evaluation input from authenticated
 principal, tenant, agent, artifact, plugin, purpose, signal, requested
-capability, resource, and runtime context.
+capability, resource, optional credential-use context, policy version, and
+runtime context.
 
 > **Normative definition.**
 
@@ -98,6 +104,8 @@ PolicyInput {
   signal: SignalContext,
   capability: Capability,
   resource: Resource,
+  credential_use: CredentialUseContext?,
+  policy_version: Version,
   runtime_context: RuntimeContext
 }
 
@@ -121,9 +129,25 @@ SignalContext = Defined in
   [Signal Envelopes Causality Routing And Delivery](10-signals-causality-routing-and-delivery.md).
 
 Capability = Defined in
-  [Effect Handlers Attempts Idempotency And Result Signals](27-effect-handlers-attempts-idempotency-and-result-signals.md).
+  [Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md).
 
 Resource = string
+
+CredentialUseContext {
+  credential_use_id: string,
+  custodian_id: string,
+  handle_fingerprint: string,
+  operation: string,
+  resource: Resource,
+  request_digest: string,
+  model_binding_id: string?,
+  model_binding_revision: u64?,
+  connector_binding_id: string?,
+  connector_binding_revision: u64?,
+  deadline: UnixTimestamp,
+  nonce: string,
+  budget: JsonObject
+}
 
 RuntimeContext {
   turn_id: TurnId,
@@ -152,6 +176,17 @@ The `plugin_id` and `plugin_version` fields are optional and are only set
 when the policy evaluation involves a plugin.
 The `session_id` and `parent_turn_id` fields are optional and reflect
 causal relationships that may affect policy decisions.
+
+> **Normative definition.**
+The `credential_use` field MUST be present exactly when `capability` is
+`CredentialUse` and MUST be absent for every other capability.
+It MUST contain a fingerprint rather than an opaque handle or credential.
+For a bound model or connector operation, exactly one matching binding-id and
+binding-revision pair MUST be present; model and connector binding pairs MUST
+NOT both be populated.
+Policy input, decision metadata, caches, and diagnostics MUST NOT contain raw
+credentials, authentication headers, credential handles, or transferable
+bearer values.
 
 > **Normative definition.**
 The host MUST include the `signal` field when the policy evaluation is
@@ -248,6 +283,13 @@ The host MUST use the following stable reason identifiers:
 12. **`approval-required`**: The capability requires explicit approval.
 13. **`capability-disabled`**: The capability is disabled in the current profile.
 14. **`capability-unavailable`**: The capability is not available in the current context.
+15. **`credential-scope-mismatch`**: The requested operation, resource,
+    binding, or budget is outside the credential-use grant.
+16. **`credential-export-forbidden`**: The caller requested credential read,
+    unwrap, export, or a transferable bearer value.
+17. **`credential-custodian-unavailable`**: The selected custodian cannot
+    perform the authorized operation.
+18. **`credential-replay`**: A nonce or credential-use request was reused.
 
 > **Non-normative note.**
 The reason identifiers enable consistent diagnostics across implementations
@@ -270,6 +312,9 @@ Attenuation MAY restrict the following dimensions:
 7. **byte counts**: Maximum byte counts for input or output.
 8. **durations**: Maximum duration for the capability execution.
 9. **invocation budgets**: Maximum number of invocations within a time window.
+10. **credential-use scopes**: Custodians, handle fingerprints, operations,
+    resources, model or connector bindings, and per-use budgets available to
+    an effect worker.
 
 > **Normative definition.**
 Attenuation is evaluated at policy evaluation time and is STATIC for the
@@ -347,7 +392,8 @@ AttenuationConfig {
   record_sets: RecordSetRestriction?,
   byte_counts: ByteCountRestriction?,
   durations: DurationRestriction?,
-  invocation_budgets: InvocationBudgetRestriction?
+  invocation_budgets: InvocationBudgetRestriction?,
+  credential_use: CredentialUseRestriction?
 }
 
 PathRestriction {
@@ -388,6 +434,16 @@ DurationRestriction {
 InvocationBudgetRestriction {
   max_invocations: u64,
   window_duration_ms: u64
+}
+
+CredentialUseRestriction {
+  allowed_custodians: string[],
+  allowed_handle_fingerprints: string[],
+  allowed_operations: string[],
+  allowed_resources: string[],
+  allowed_model_bindings: string[],
+  allowed_connector_bindings: string[],
+  max_cost_per_use: u64?
 }
 ```
 
@@ -430,6 +486,14 @@ The `window_duration_ms` field specifies the time window in milliseconds.
 Exceeding this budget MUST cause the capability execution to fail with
 a `budget-exceeded` diagnostic.
 
+> **Normative definition.**
+The `credential_use` restriction applies only to `CredentialUse` decisions.
+The requested custodian, handle fingerprint, operation, resource, model
+or connector binding, and cost MUST satisfy every populated allowlist or
+limit.
+The host MUST deny on any mismatch and MUST NOT broaden a restriction by
+falling back to another custodian, handle, connection, provider, or model.
+
 > **Non-normative note.**
 Attenuation enables fine-grained resource control without completely denying
 capabilities.
@@ -452,6 +516,11 @@ The host MUST evaluate policy at the following boundaries:
 4. **Directive validation**: Before a directive is validated for execution.
 5. **Effect dispatch**: Before an effect is dispatched to a handler.
 6. **Result admission**: Before a result is admitted to the turn.
+
+For an authenticated external effect, the host MUST evaluate the originating
+agent's domain capability and the effect worker's `CredentialUse` capability
+as two separate decisions. A cached `ModelAccess` or `Effects` decision MUST
+NOT satisfy the credential-use boundary.
 
 > **Normative definition.**
 The host MUST cache policy decisions when the policy input is unchanged.
@@ -602,6 +671,13 @@ attenuation limits and enforcement:
 8. **Attenuation violation**: A runtime attenuation restriction was violated.
 9. **Policy version mismatch**: The policy version in the input does not match
    the current active version.
+10. **Credential scope mismatch**: A credential-use request exceeds its
+    attenuated scope.
+11. **Credential export attempt**: A request attempts to reveal or convert
+    credential material.
+12. **Credential custodian unavailable**: The selected custodian cannot serve
+    the request.
+13. **Credential replay**: A credential-use nonce or request is reused.
 
 > **Normative definition.**
 Each failure outcome MUST be mapped to a specific error code and diagnostic
@@ -646,6 +722,10 @@ attenuation limits and enforcement:
 | `policy.byte_count_exceeded` | The byte count restriction was exceeded |
 | `policy.duration_exceeded` | The duration restriction was exceeded |
 | `policy.budget_exceeded` | The invocation budget was exceeded |
+| `policy.credential_scope_mismatch` | Credential use exceeds an allowed custodian, handle, operation, resource, model or connector binding, or budget |
+| `policy.credential_export_forbidden` | Credential read, unwrap, export, or bearer conversion was requested |
+| `policy.credential_custodian_unavailable` | The selected credential custodian is unavailable |
+| `policy.credential_replay` | A credential-use nonce or request was reused |
 
 > **Normative definition.**
 Each error code MUST be accompanied by a human-readable diagnostic message.
@@ -833,6 +913,14 @@ The following tests MUST verify failure handling:
 10. **Approval deadline exceeded**: Trigger an `approval-required` decision and wait
     for the approval deadline to expire without approval, verifying the
     `policy.approval_deadline_exceeded` error code.
+11. **Credential scope mismatch**: Change the model or connector binding,
+    resource, or budget after authorization and verify
+    `policy.credential_scope_mismatch`.
+12. **Credential export forbidden**: Request credential read or export with a
+    valid `CredentialUse` grant and verify
+    `policy.credential_export_forbidden`.
+13. **Credential replay**: Reuse a previously accepted nonce and verify
+    `policy.credential_replay`.
 
 > **Normative definition.**
 Each test MUST verify that the error code and diagnostic message match the
@@ -851,6 +939,9 @@ The following tests MUST verify security enforcement:
    policy version changes.
 4. **Revocation**: Verify that revoked grants prevent new invocations.
 5. **Audit logging**: Verify that all policy decisions and violations are logged.
+6. **Dual authorization**: Verify that agent `ModelAccess` does not satisfy
+   effect-worker `CredentialUse`, and that neither decision exposes a handle or
+   credential in policy input, caches, diagnostics, or audit evidence.
 
 > **Normative definition.**
 Each test MUST verify that no unauthorized or partial state is left after the
@@ -911,3 +1002,5 @@ gates.
 | Attenuation enforcement | Implementation-defined | Document in conformance profile | Must enforce all restrictions at runtime |
 | Tenant isolation | Implementation-defined | Document in conformance profile | Must prevent cross-tenant access |
 | Policy versioning | Implementation-defined | Document in conformance profile | Must invalidate cached decisions on version change |
+| Credential-use attenuation | Required | Enforce custodian, handle fingerprint, operation, resource, binding, nonce, and budget restrictions | Must deny on mismatch and must not expose credentials or handles |
+| Domain and credential authorization | Required | Evaluate as independent policy decisions | `ModelAccess` or `Effects` must not imply `CredentialUse` |

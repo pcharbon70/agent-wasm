@@ -3,15 +3,17 @@ title: "Provider-Neutral Model Requests Responses Streaming And Usage Contract A
 kind: specification
 created: "2026-08-09"
 status: draft
-spec_version: "0.1.0"
+spec_version: "0.2.0"
 tags:
   - milestone-07
   - phase-01
   - model-requests
+  - model-bindings
   - responses
   - streaming
   - usage
   - provider-neutral
+  - credential-use
 aliases:
   - "M7-P1 Contract And Data Model"
 ---
@@ -23,18 +25,23 @@ aliases:
 This chapter is a draft specification produced by
 [Phase 1](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/phase-01-provider-neutral-model-requests-responses-streaming-and-usage.md)
 of
-[Milestone 7](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/README.md)
---
-AI, Tools, Memory, And Human Control.
-It establishes the contract and data model for provider-neutral model
-requests, responses, streaming, and usage, including durable request
-records, response normalization, and usage tracking.
+[Milestone 7](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/README.md).
+It defines logical model requirements, user-controlled model bindings,
+provider-neutral intents, materialized requests, normalized responses,
+streaming, and usage.
+
+Version `0.2.0` replaces the `0.1.0` rules that sourced `provider` and
+`model` from the agent. An agent now names only a logical model slot. A
+user-approved, versioned binding is the sole source of the provider, model,
+connection, adapter, and credential-use reference. This version also replaces
+the implied adapter possession of provider credentials with the use-only
+credential contract in
+[Threads Checkpoints Memory Approvals Quotas And Secret Leases Contract And Data Model](44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md).
 
 This chapter is normative by default within its stated scope.
 Material visibly marked non-normative does not create conformance
-obligations.
-Promotion to `status: normative` requires evidence from the Phase 1
-integration tests and a passing cross-milestone fixture run.
+obligations. Promotion to `status: normative` requires passing evidence from
+[Phase 1 Integration Tests](41-provider-neutral-model-requests-responses-streaming-and-usage-phase-1-integration-tests.md).
 
 Governing policies:
 [Specification Authority](../SPECIFICATION-AUTHORITY.md)
@@ -42,326 +49,227 @@ and
 [Conformance Vocabulary](../CONFORMANCE-VOCABULARY.md).
 
 Related chapters:
-[Signal Envelopes Causality Routing And Delivery](10-signals-causality-routing-and-delivery.md),
-[Actions Instructions Validation Plans And Results](11-actions-instructions-validation-plans-and-results.md),
-[State Operations Patches Revisions And Conflicts](12-state-operations-patches-revisions-and-conflicts.md),
-[Directives Strategies Continuations And Terminal States](13-directives-strategies-continuations-and-terminal-states.md),
-[Deterministic Reducer Semantics And Milestone Acceptance](14-deterministic-reducer-semantics-and-milestone-acceptance.md),
-[Extism Invocation Boundary Instances And Output Validation](20-extism-invocation-boundary-instances-and-output-validation.md),
-[Mailboxes Ordering Bounds Fairness And Turn Leases](21-mailboxes-ordering-bounds-fairness-and-turn-leases.md),
-[Agent Registry Activation Cancellation And Completion](22-agent-registry-activation-cancellation-and-completion.md),
-[Sensors Schedules Timers And External Signal Ingress](23-sensors-schedules-timers-and-external-signal-ingress.md),
-[Single-Agent Host Flow And Milestone Acceptance](24-single-agent-host-flow-and-milestone-acceptance.md),
-[Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md),
-[Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md),
-[Effect Handlers Attempts Idempotency And Result Signals](27-effect-handlers-attempts-idempotency-and-result-signals.md),
-[Retry Timer Recovery Replay Hibernate And Migration](28-retry-timer-recovery-replay-hibernate-and-migration.md),
-[Crash Injection Durable Effects And Milestone Acceptance](29-crash-injection-durable-effects-and-milestone-acceptance.md),
-[Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md),
+[Agent Manifests Artifacts Schemas And Registries](03-agent-manifests-artifacts-schemas-and-registries.md),
 [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md),
 [Framework Plugin Manifests Composition And Lifecycle Hooks](32-framework-plugin-manifests-composition-and-lifecycle-hooks.md),
-[Synchronous Host Functions WASI Restrictions And Tenant Isolation](33-synchronous-host-functions-wasi-restrictions-and-tenant-isolation.md),
-[Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md),
-[Agent Identity Addressing Ownership And Dependency Relations](35-agent-identity-addressing-ownership-and-dependency-relations.md),
-[Child Lifecycle Cancellation Monitoring And Restart Policy Contract And Data Model](36-child-lifecycle-cancellation-monitoring-and-restart-policy.md),
-[Fan-Out Fan-In Delegation And Result Aggregation Contract And Data Model](37-fan-out-fan-in-delegation-and-result-aggregation-contract-and-data-model.md),
-[Fan-Out Fan-In Delegation And Result Aggregation Behavior And Integration](37-fan-out-fan-in-delegation-and-result-aggregation-behavior-and-integration.md),
-[Fan-Out Fan-In Delegation And Result Aggregation Failure Evidence And Operational Notes](37-fan-out-fan-in-delegation-and-result-aggregation-failure-evidence-and-operational-notes.md),
-[Pod Topology Placement Activation Leases And Reconciliation Contract And Data Model](38-pod-topology-placement-activation-leases-and-reconciliation-contract-and-data-model.md),
-[Pod Topology Placement Activation Leases And Reconciliation Behavior And Integration](38-pod-topology-placement-activation-leases-and-reconciliation-behavior-and-integration.md),
-[Pod Topology Placement Activation Leases And Reconciliation Failure Evidence And Operational Notes](38-pod-topology-placement-activation-leases-and-reconciliation-failure-evidence-and-operational-notes.md),
-[Multi-Agent Recovery Clustering Seams And Milestone Acceptance Contract And Data Model](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-contract-and-data-model.md),
-[Multi-Agent Recovery Clustering Seams And Milestone Acceptance Behavior And Integration](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-behavior-and-integration.md),
-[Multi-Agent Recovery Clustering Seams And Milestone Acceptance Failure Evidence And Operational Notes](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-failure-evidence-and-operational-notes.md),
-[Multi-Agent Recovery Clustering Seams And Milestone Acceptance Phase 5 Integration Tests](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-phase-5-integration-tests.md).
+[Effect Handlers Attempts Idempotency And Result Signals](27-effect-handlers-attempts-idempotency-and-result-signals.md),
+[Retry Timer Recovery Replay Hibernate And Migration](28-retry-timer-recovery-replay-hibernate-and-migration.md),
+and
+[Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md).
 
 ## 41.1 Contract And Data Model
 
-### Model request identity and provider constraints
+### Logical model requirements
 
-> **Normative definition.**
-A model request is a durable effect that represents a provider-neutral
-request to an AI model.
-The request captures the agent's intent, the model's constraints, and
-the expected response format without exposing provider-specific details.
+A model requirement describes portable behavior needed by an agent or
+strategy. It does not select a vendor.
 
-> **Normative definition.**
-Every model request MUST include the following fields:
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `slot_id` | string | Stable logical name unique within the agent definition. |
+| `description` | string | Human explanation of the slot's role. |
+| `required_features` | ModelFeature[] | Features the selected model and adapter MUST support. |
+| `min_context_tokens` | u64 | Minimum advertised context capacity. |
+| `min_output_tokens` | u64 | Minimum advertised output capacity. |
+| `optional` | bool | Whether installation may leave the slot unbound. |
 
-| Field | Content | Source |
-|-------|---------|--------|
-| `request_id` | A deterministic request identity derived from the agent address, turn sequence, and request payload hash. | Host runtime. |
-| `agent_address` | The `TenantQualifiedAgentAddress` of the agent that originated the request. | Agent. |
-| `provider` | The provider adapter identifier (e.g., `openai`, `anthropic`, `local`). | Agent. |
-| `model` | The model identifier (e.g., `gpt-4o`, `claude-3-5-sonnet`). | Agent. |
-| `messages` | A list of conversation messages (system, user, assistant). | Agent. |
-| `structured_output_schema` | The JSON Schema for the expected structured output, if applicable. | Agent. |
-| `tool_definitions` | The list of tool definitions available to the model. | Agent. |
-| `sampling` | Sampling controls: `temperature`, `top_p`, `max_tokens`, `frequency_penalty`, `presence_penalty`. | Agent. |
-| `deadline` | The ISO 8601 deadline by which the response MUST be received. | Agent. |
-| `budget` | The maximum cost (in implementation-defined units) for this request. | Agent. |
-| `trace_context` | The distributed tracing context for observability. | Host runtime. |
-| `created_at` | The ISO 8601 timestamp of request creation. | Host clock. |
-| `status` | The current status: `pending`, `streaming`, `completed`, `failed`, `cancelled`. | Host runtime. |
+`ModelFeature` is one of `text-generation`, `streaming`,
+`tool-calling`, or `structured-output`. A later specification version MAY
+add namespaced features.
 
-> **Non-normative note.**
-The `request_id` is deterministic to enable idempotent retry: if the same
-agent submits the same request payload, the host MUST produce the same
-`request_id`.
-This is consistent with the deterministic reducer semantics defined in
-[Deterministic Reducer Semantics And Milestone Acceptance](14-deterministic-reducer-semantics-and-milestone-acceptance.md).
+A requirement MUST NOT contain a provider, model identifier, adapter,
+connection, endpoint, authentication header, secret, or credential handle.
+A required slot MUST have exactly one active compatible binding before the
+agent definition is enabled. An optional slot MAY remain unbound, but an
+intent that uses it then fails with `model.binding.missing`.
 
-### Provider adapter registration and model resolution
+### Agent-originated model intent
 
-> **Normative definition.**
-Provider adapters are registered with the host and expose a common
-interface for model requests.
-The host resolves the `provider` and `model` fields of a model request
-to a registered adapter.
+An agent requests model behavior by emitting a provider-neutral `ModelIntent`.
 
-> **Normative definition.**
-Every provider adapter MUST include the following capabilities:
+| Field | Source | Meaning |
+| --- | --- | --- |
+| `intent_id` | Host runtime | Deterministic identity derived from agent address, turn, directive index, and canonical intent payload. |
+| `agent_address` | Host runtime | Authenticated originating agent. |
+| `model_slot` | Agent | Logical slot declared by the effective agent definition. |
+| `messages` | Agent | Ordered provider-neutral conversation messages. |
+| `structured_output_schema` | Agent | Optional JSON Schema for a structured result. |
+| `tool_definitions` | Agent | Bounded tools available to this request. |
+| `sampling` | Agent | Provider-neutral sampling limits accepted by policy. |
+| `deadline` | Agent and host policy | Absolute completion deadline, attenuated by the host. |
+| `budget` | Agent and host policy | Maximum authorized cost and token use. |
+| `trace_context` | Host runtime | Bounded tracing context. |
 
-| Capability | Description |
-|------------|-------------|
-| `create_request` | Create a provider-specific request from the neutral request. |
-| `stream_response` | Stream the provider-specific response as normalized events. |
-| `cancel_request` | Cancel an in-flight request. |
-| `check_status` | Check the status of an in-flight request. |
+The host MUST reject an intent that supplies `provider`, `model`,
+`adapter_id`, `connection_id`, `endpoint`, authentication headers,
+credential handles, or equivalent selection material with
+`model.intent.forbidden_selection`. Removing or ignoring such fields is not
+permitted because that would hide a publisher or guest selection attempt.
 
-> **Non-normative note.**
-Provider adapters are implemented as framework plugins as defined in
-[Framework Plugin Manifests Composition And Lifecycle Hooks](32-framework-plugin-manifests-composition-and-lifecycle-hooks.md).
-Each adapter is isolated in its own tenant and subject to the capability
-policy defined in
-[Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md).
+### User-controlled model connections and bindings
 
-### Response normalization
+A `ModelConnection` is registered by the end user or an authorized tenant
+operator independently of plugin installation.
 
-> **Normative definition.**
-Provider-specific responses are normalized into a common format before
-being recorded as durable effects.
-The normalized response captures the response text, structured value,
-tool requests, finish reason, usage, provider references, safety
-metadata, and diagnostics.
+| Field | Meaning |
+| --- | --- |
+| `connection_id` | Stable tenant-scoped connection identity. |
+| `tenant_id` | Owning tenant. |
+| `adapter_id` | Reviewed host adapter or external effect-worker adapter. |
+| `custody_mode` | `external-broker`, `provider-workload-identity`, or explicitly opted-in `host-local`. |
+| `custodian_id` | Registered credential custodian, if authentication is required. |
+| `credential_handle_ref` | Opaque sender-constrained reference, if authentication is required. |
+| `endpoint_ref` | Reference to an operator-approved endpoint registry entry. |
+| `catalog_revision` | Revision of advertised provider models and capabilities. |
+| `status` | `active`, `suspended`, `revoked`, or `unavailable`. |
 
-> **Normative definition.**
-Every normalized response MUST include the following fields:
+`endpoint_ref` MUST NOT be an arbitrary URL supplied by an agent or plugin.
+`credential_handle_ref` MUST NOT contain credential bytes and MUST NOT be
+sufficient as an unauthenticated bearer token.
 
-| Field | Content | Source |
-|-------|---------|--------|
-| `response_id` | A deterministic response identity derived from the `request_id` and response sequence number. | Host runtime. |
-| `request_id` | The `request_id` of the associated model request. | Normalized from provider. |
-| `text` | The response text, if any. | Normalized from provider. |
-| `structured_value` | The structured value (parsed from `structured_output_schema`), if applicable. | Normalized from provider. |
-| `tool_requests` | The list of tool requests made by the model. | Normalized from provider. |
-| `finish_reason` | The finish reason: `stop`, `length`, `content_filter`, `tool_calls`, `error`. | Normalized from provider. |
-| `usage` | The usage metrics: `prompt_tokens`, `completion_tokens`, `total_tokens`. | Normalized from provider. |
-| `provider_response_id` | The provider-specific response identifier (for debugging). | Normalized from provider. |
-| `provider_error` | The provider-specific error, if any. | Normalized from provider. |
-| `safety_metadata` | Safety metadata: `content_filter_results`, `safety_categories`. | Normalized from provider. |
-| `diagnostics` | Diagnostics: `latency_ms`, `retry_count`. | Host runtime. |
-| `created_at` | The ISO 8601 timestamp of response creation. | Host clock. |
+A `ModelBinding` records the user's concrete choice for one logical slot.
 
-> **Non-normative note.**
-Response normalization ensures that downstream components (such as
-tool handlers and structured output validators) can work with provider-neutral
-data without knowing the provider-specific format.
-This is consistent with the framework plugin model defined in
-[Framework Plugin Manifests Composition And Lifecycle Hooks](32-framework-plugin-manifests-composition-and-lifecycle-hooks.md).
+| Field | Source | Meaning |
+| --- | --- | --- |
+| `binding_id` | Host runtime | Stable binding identity. |
+| `revision` | Host runtime | Monotonically increasing binding revision. |
+| `tenant_id` | Installation context | Owning tenant. |
+| `agent_definition_digest` | Host runtime | Immutable composed definition being configured. |
+| `model_slot` | Manifest | Logical requirement being satisfied. |
+| `connection_id` | User configuration | Selected registered connection. |
+| `provider` | User configuration through catalog | Concrete provider identifier. |
+| `model` | User configuration through catalog | Concrete provider model identifier. |
+| `catalog_revision` | Host runtime | Catalog metadata used for compatibility validation. |
+| `configured_by` | Authentication context | User or authorized tenant operator. |
+| `approved_at` | Host clock | Time at which this revision was approved. |
+| `policy_version` | Host policy | Policy revision that authorized the binding. |
+| `status` | Host runtime | `active`, `pending-approval`, `stale`, `revoked`, or `unavailable`. |
 
-### Streaming normalization
+The user is the selection authority. A publisher, guest artifact, strategy,
+agent instance, provider adapter, or credential custodian MUST NOT create or
+change a binding on the user's behalf.
 
-> **Normative definition.**
-Streaming responses are normalized into a sequence of events that include
-the response text delta, tool request deltas, and finish event.
-The host MUST emit a signal for each normalized streaming event.
+Bindings are mutable configuration stored outside the immutable artifact.
+Changing a binding MUST create a new revision and MUST NOT change the plugin
+or agent artifact digest. Approval of one revision MUST NOT authorize a later
+revision. Compatibility is evaluated from signed or operator-approved model
+catalog metadata against every requirement field.
 
-> **Normative definition.**
-Every streaming event MUST include the following fields:
+### Materialized model request
 
-| Field | Content | Source |
-|-------|---------|--------|
-| `event_id` | A deterministic event identity derived from the `request_id` and event sequence number. | Host runtime. |
-| `request_id` | The `request_id` of the associated model request. | Normalized from provider. |
-| `event_type` | The event type: `text_delta`, `tool_request_delta`, `finish`. | Normalized from provider. |
-| `text_delta` | The text delta (for `text_delta` events), if applicable. | Normalized from provider. |
-| `tool_request_delta` | The tool request delta (for `tool_request_delta` events), if applicable. | Normalized from provider. |
-| `finish_reason` | The finish reason (for `finish` events), if applicable. | Normalized from provider. |
-| `usage` | The cumulative usage (for `finish` events), if applicable. | Normalized from provider. |
-| `created_at` | The ISO 8601 timestamp of event creation. | Host clock. |
+After authorization and binding resolution, the host materializes a durable
+`ModelRequest`.
 
-> **Non-normative note.**
-Streaming events are bounded observations: they do NOT create durable
-effects until the response is finalized.
-This ensures that partial streaming data does not pollute the durable
-journal and can be discarded on cancellation or failure.
+| Field | Source |
+| --- | --- |
+| `request_id` | Host, derived from agent address, turn, directive index, canonical intent, binding id, and binding revision. |
+| `intent_id` | Admitted intent. |
+| `agent_address` | Authenticated intent context. |
+| `model_slot` | Admitted intent. |
+| `binding_id` and `binding_revision` | Active approved binding. |
+| `connection_id` and `adapter_id` | Bound connection. |
+| `provider` and `model` | User-approved binding. |
+| `messages`, `structured_output_schema`, `tool_definitions`, `sampling` | Validated intent. |
+| `deadline` and `budget` | Attenuated policy result. |
+| `trace_context` and `created_at` | Host runtime and host clock. |
+| `status` | `pending`, `dispatching`, `streaming`, `completed`, `failed`, or `cancelled`. |
 
-### Usage tracking and budget enforcement
+The materialized request MUST NOT contain a raw credential, authentication
+header, arbitrary endpoint, or transferable bearer value. The durable record
+stores the binding and connection revisions, not credential bytes or the
+opaque handle. The versioned connection registry retains the protected
+handle reference needed for dispatch.
 
-> **Normative definition.**
-Usage tracking records the token counts and cost for each model request.
-The host MUST enforce the `budget` constraint by rejecting requests
-that would exceed the agent's remaining budget.
+The host MUST atomically record the materialized request and its outbox effect
+before an external provider is contacted. Retry and replay MUST use the
+recorded binding, connection, provider, model, and request digest. They MUST
+NOT resolve a new default or silently select an alternative.
 
-> **Normative definition.**
-Every usage record MUST include the following fields:
+### Provider adapter contract
 
-| Field | Content | Source |
-|-------|---------|--------|
-| `usage_id` | A deterministic usage identity derived from the `request_id`. | Host runtime. |
-| `request_id` | The `request_id` of the associated model request. | Normalized from provider. |
-| `agent_address` | The `TenantQualifiedAgentAddress` of the agent that originated the request. | Host runtime. |
-| `provider` | The provider adapter identifier. | Host runtime. |
-| `model` | The model identifier. | Host runtime. |
-| `prompt_tokens` | The number of prompt tokens used. | Normalized from provider. |
-| `completion_tokens` | The number of completion tokens used. | Normalized from provider. |
-| `total_tokens` | The total number of tokens used. | Normalized from provider. |
-| `cost` | The cost in implementation-defined units. | Host runtime. |
-| `currency` | The currency (e.g., `USD`). | Host runtime. |
-| `created_at` | The ISO 8601 timestamp of usage recording. | Host clock. |
+A provider adapter is a reviewed host integration or authenticated external
+effect worker. It is not an untrusted guest artifact.
 
-> **Non-normative note.**
-Usage records are stored in the durable journal as defined in
-[Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md).
-Budget enforcement is performed by the capability policy defined in
-[Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md).
+Every adapter MUST implement:
 
-### Durable request and result records
+| Operation | Responsibility |
+| --- | --- |
+| `validate_model` | Verify catalog identity and capabilities. |
+| `prepare_dispatch` | Convert a materialized request into a bounded typed provider operation without authentication material. |
+| `normalize_event` | Convert provider stream events into normalized events. |
+| `cancel_request` | Request cancellation of an in-flight operation. |
+| `check_status` | Reconcile an uncertain operation by idempotency identity. |
 
-> **Normative definition.**
-Durable model request and result records are stored in the durable
-journal.
-The prompt and content payloads are stored separately with redacted
-references to protect sensitive data.
+In the `separated-credential-custody` profile, the adapter MUST NOT receive,
+read, unwrap, or log the provider credential. The prepared operation is
+executed through `CredentialUse` by the custodian defined in Section 44.
 
-> **Normative definition.**
-The durable request record includes the following fields:
+### Normalized response and streaming events
 
-| Field | Content | Source |
-|-------|---------|--------|
-| `request_id` | The `request_id` of the model request. | Host runtime. |
-| `agent_address` | The `TenantQualifiedAgentAddress` of the agent that originated the request. | Agent. |
-| `provider` | The provider adapter identifier. | Agent. |
-| `model` | The model identifier. | Agent. |
-| `messages` | The conversation messages (redacted reference). | Agent. |
-| `structured_output_schema` | The JSON Schema for the expected structured output, if applicable. | Agent. |
-| `tool_definitions` | The list of tool definitions available to the model. | Agent. |
-| `sampling` | Sampling controls. | Agent. |
-| `deadline` | The ISO 8601 deadline. | Agent. |
-| `budget` | The maximum cost. | Agent. |
-| `trace_context` | The distributed tracing context. | Host runtime. |
-| `created_at` | The ISO 8601 timestamp of request creation. | Host clock. |
-| `status` | The current status. | Host runtime. |
+Every normalized response MUST include:
 
-> **Normative definition.**
-The durable result record includes the following fields:
+| Field | Meaning |
+| --- | --- |
+| `response_id` | Deterministic identity derived from request identity and final sequence. |
+| `request_id` | Associated materialized request. |
+| `text` | Optional normalized text. |
+| `structured_value` | Optional validated structured value. |
+| `tool_requests` | Validated requested tools. |
+| `finish_reason` | `stop`, `length`, `content_filter`, `tool_calls`, or `error`. |
+| `usage` | Prompt, completion, total token, and cost observations. |
+| `provider_response_ref` | Bounded provider correlation reference. |
+| `safety_metadata` | Bounded provider safety result. |
+| `credential_use_receipt_ref` | Verified custodian receipt correlation. |
+| `diagnostics` | Bounded latency and retry information. |
+| `created_at` | Host timestamp. |
 
-| Field | Content | Source |
-|-------|---------|--------|
-| `response_id` | The `response_id` of the normalized response. | Host runtime. |
-| `request_id` | The `request_id` of the associated model request. | Host runtime. |
-| `text` | The response text (redacted reference). | Normalized from provider. |
-| `structured_value` | The structured value, if applicable. | Normalized from provider. |
-| `tool_requests` | The list of tool requests made by the model. | Normalized from provider. |
-| `finish_reason` | The finish reason. | Normalized from provider. |
-| `usage` | The usage metrics. | Normalized from provider. |
-| `provider_error` | The provider-specific error, if any. | Normalized from provider. |
-| `safety_metadata` | Safety metadata. | Normalized from provider. |
-| `diagnostics` | Diagnostics. | Host runtime. |
-| `created_at` | The ISO 8601 timestamp of response creation. | Host clock. |
+A streaming event includes `event_id`, `request_id`, monotonically
+increasing `sequence`, `event_type`, the applicable bounded delta,
+cumulative usage when available, and `created_at`. Event types are
+`text_delta`, `tool_request_delta`, and `finish`.
 
-> **Non-normative note.**
-Prompt and content payloads are stored with redacted references to
-protect sensitive data.
-The actual payloads are stored in a separate, access-controlled storage
-layer as defined in
-[Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md).
-This ensures that durable records do not expose sensitive data to
-unauthorized principals.
+Streaming events are observations and MUST NOT mutate authoritative agent
+state directly. The final normalized response and usage record are durable.
+The host MAY retain bounded streaming events for diagnostics if its
+conformance profile documents retention and redaction.
 
-### Tool call mismatch handling
+### Usage and durable evidence
 
-> **Normative definition.**
-If the model returns tool requests that do not match the `tool_definitions`
-provided in the request, the host MUST reject the response with
-`model.request.tool_call_mismatch`.
-The agent MUST be notified to update the tool definitions and retry.
+Every usage record MUST include `usage_id`, `request_id`,
+`agent_address`, `model_slot`, `binding_id`, `binding_revision`,
+`provider`, `model`, token counts, cost, currency or cost unit,
+`credential_use_receipt_ref`, and `created_at`.
 
-> **Non-normative note.**
-Tool call mismatch handling prevents the model from executing tools
-that were not explicitly granted.
-This is consistent with the capability policy defined in
-[Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md).
+Prompt and response bodies MUST be represented in durable request and result
+records by access-controlled content references when policy classifies them as
+sensitive. A durable record MUST NOT contain raw credentials, authentication
+headers, opaque credential handles, arbitrary endpoint URLs, or unbounded
+provider errors.
 
-### Structured output validation
+If a returned tool request is not present in `tool_definitions`, the host MUST
+reject the response with `model.request.tool_call_mismatch`. If a structured
+value does not satisfy `structured_output_schema`, the host MUST reject it
+with `model.request.invalid_structured_output`.
 
-> **Normative definition.**
-If a `structured_output_schema` is provided, the host MUST validate
-the response's `structured_value` against the schema.
-Invalid structured output MUST be rejected with `model.request.invalid_structured_output`.
-The agent MUST be notified to fix the schema or retry with different sampling.
+## Variability register
 
-> **Non-normative note.**
-Structured output validation ensures that the response conforms to
-the expected format.
-This is consistent with the schema validation defined in
-[Actions Instructions Validation Plans And Results](11-actions-instructions-validation-plans-and-results.md).
+| Item | Permission | Recommendation | Constraint |
+| --- | --- | --- | --- |
+| Concrete provider and model selection | Required | User-approved binding for every required slot | Agent, publisher, adapter, and custodian selection is prohibited |
+| Binding storage backend | Implementation-defined | Versioned tenant-scoped registry | Must remain outside artifact digest and preserve revision history |
+| Model catalog source | Implementation-defined | Signed provider catalog or operator-approved registry | Compatibility decision and catalog revision must be auditable |
+| Adapter implementation | Implementation-defined | Reviewed host integration or authenticated external worker | Must implement the common contract and never expose credentials |
+| Sensitive content storage | Implementation-defined | Access-controlled content references | Durable records and evidence must remain bounded |
+| Streaming-event retention | Optional | Do not retain deltas by default | Retention and redaction must be documented |
+| Cost units and currency | Implementation-defined | Preserve provider observation and host calculation | Budget enforcement method must be documented |
+| Credential custody | Required for end-user distributions | Use separated credential custody | Host-local mode must be explicit and cannot claim separated-custody conformance |
+| Automatic model routing or fallback | Deferred | Require an explicit user binding | Runtime must not silently change provider or model |
 
-### Results that would invalidate an earlier milestone assumption
+## Rationale and evidence (non-normative)
 
-> **Non-normative note.**
-The following results from Phase 1 would invalidate an earlier milestone
-assumption:
-
-1. **Model requests bypass the durable journal**: If model requests
-   bypass the durable journal, this would invalidate the assumption
-   defined in
-   [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md)
-   that all state transitions are durable across host restarts.
-2. **Model requests bypass the atomic commit protocol**: If model requests
-   bypass the atomic commit protocol, this would invalidate the assumption
-   defined in
-   [Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md)
-   that all state transitions are atomic.
-3. **Model requests allow cross-tenant authority leaks**: If model requests
-   allow cross-tenant tool access or result sharing, this would invalidate
-   the assumption defined in
-   [Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md)
-   that all principals are isolated by tenant.
-4. **Model requests require shared mutable guest state**: If model requests
-   require shared mutable guest state, this would invalidate the assumption
-   defined in
-   [Deterministic Reducer Semantics And Milestone Acceptance](14-deterministic-reducer-semantics-and-milestone-acceptance.md)
-   that all state transitions are deterministic and replayable.
-
-> **Non-normative note.**
-These results would indicate a design flaw in Phase 1 and would require
-a revision of the Phase 1 contracts before promotion to `status:
-normative`.
-Implementations MUST NOT deviate from the contracts defined in this
-chapter without evidence from a corresponding revision.
-
-### Cross-references and precedence
-
-> **Non-normative note.**
-This section's contract and data model integrate with the following
-earlier chapters:
-
-1. For model request validation: this section takes precedence over
-   [Actions Instructions Validation Plans And Results](11-actions-instructions-validation-plans-and-results.md)
-   for questions of model-specific validation.
-2. For durable storage: this section takes precedence over
-   [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md)
-   for questions of model-specific storage.
-3. For atomic commits: this section takes precedence over
-   [Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md)
-   for questions of model-specific atomic commits.
-4. For capability enforcement: this section takes precedence over
-   [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md)
-   for questions of model-specific capability enforcement.
-5. For security and audit: this section takes precedence over
-   [Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md)
-   for questions of model-specific security.
-6. Where both sections are applicable and agree, they are mutually
-   reinforcing.
+Logical slots keep agent artifacts portable while making installation the
+point where an end user chooses cost, privacy, locality, and provider trust.
+Versioned bindings make that choice observable and replayable. Use-only
+credential custody narrows the Elixir/OTP host to orchestration: it can request
+the bound operation, but the separated-custody product does not need provider
+credential bytes in the BEAM, its native Port, or a Wasm guest.

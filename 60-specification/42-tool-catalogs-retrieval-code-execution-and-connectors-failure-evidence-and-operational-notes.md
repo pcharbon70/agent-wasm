@@ -3,7 +3,7 @@ title: "Tool Catalogs Retrieval Code Execution And Connectors Failure Evidence A
 kind: specification
 created: "2026-08-09"
 status: draft
-spec_version: "0.1.0"
+spec_version: "0.2.0"
 tags:
   - milestone-07
   - phase-02
@@ -14,6 +14,7 @@ tags:
   - failure-evidence
   - diagnostics
   - implementation-defined-choices
+  - credential-custody
 aliases:
   - "M7-P2 Failure Evidence And Operational Notes"
 ---
@@ -31,6 +32,11 @@ AI, Tools, Memory, And Human Control.
 It establishes the failure evidence and operational notes for tool catalogs,
 retrieval, code execution, and connectors, including failure outcomes,
 bounded diagnostics, evidence emission, and implementation-defined choices.
+
+Version `0.2.0` adds authenticated-connector binding and custody failures.
+The tool layer preserves canonical `credential.*` diagnostics and does not
+translate a scope, export, replay, receipt, or custodian failure into a generic
+connector error.
 
 This chapter is normative by default within its stated scope.
 Material visibly marked non-normative does not create conformance
@@ -80,6 +86,7 @@ Related chapters:
 [Provider-Neutral Model Requests Responses Streaming And Usage Behavior And Integration](41-provider-neutral-model-requests-responses-streaming-and-usage-behavior-and-integration.md),
 [Provider-Neutral Model Requests Responses Streaming And Usage Failure Evidence And Operational Notes](41-provider-neutral-model-requests-responses-streaming-and-usage-failure-evidence-and-operational-notes.md),
 [Provider-Neutral Model Requests Responses Streaming And Usage Phase 1 Integration Tests](41-provider-neutral-model-requests-responses-streaming-and-usage-phase-1-integration-tests.md),
+[Threads Checkpoints Memory Approvals Quotas And Secret Leases Failure Evidence And Operational Notes](44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-failure-evidence-and-operational-notes.md),
 [Tool Catalogs Retrieval Code Execution And Connectors Contract And Data Model](42-tool-catalogs-retrieval-code-execution-and-connectors-contract-and-data-model.md),
 [Tool Catalogs Retrieval Code Execution And Connectors Behavior And Integration](42-tool-catalogs-retrieval-code-execution-and-connectors-behavior-and-integration.md),
 [Tool Catalogs Retrieval Code Execution And Connectors Phase 2 Integration Tests](42-tool-catalogs-retrieval-code-execution-and-connectors-phase-2-integration-tests.md).
@@ -190,6 +197,22 @@ The host MUST reject unavailable requests without creating partial
 state, which is consistent with the framework plugin contract defined
 in [Framework Plugin Manifests Composition And Lifecycle Hooks](32-framework-plugin-manifests-composition-and-lifecycle-hooks.md).
 
+#### Credential custody outcomes
+
+| Diagnostic | Cause | Host behavior |
+| --- | --- | --- |
+| `credential.use.unauthorized` | Domain tool authority or effect-worker `CredentialUse` is absent. | Reject before custodian dispatch. |
+| `credential.use.scope_mismatch` | Connector binding, operation, resource, digest, deadline, nonce, or budget differs from authorization. | Reject without external service contact. |
+| `credential.use.export_forbidden` | Caller requests credential read, refresh-token return, authentication headers, or bearer conversion. | Reject as a non-retryable security failure. |
+| `credential.use.replay` | A connector credential-use nonce or completed use identity is replayed. | Reject without external service contact. |
+| `credential.custodian.unavailable` | The pinned custodian cannot serve the operation. | Preserve the durable attempt for bounded retry or fail by policy. |
+| `credential.receipt.invalid` | Receipt correlation, digest, signature, or transport proof is invalid. | Reject tool-result admission and reconcile. |
+| `credential.egress.bypass` | Host, Port, plugin, or guest attempts authenticated service egress outside the custodian. | Deny the operation and emit critical evidence. |
+
+These diagnostics are defined by Section 44 and MUST be preserved unchanged.
+`tool.execution.connector_failure` MUST NOT replace a more specific
+`credential.*` outcome.
+
 #### Safety outcomes
 
 | Diagnostic | Cause | Host behavior |
@@ -208,8 +231,9 @@ warnings in diagnostics.
 > **Normative definition.**
 The host MUST emit bounded diagnostics and evidence for every failure
 outcome.
-Diagnostics identify the phase contract, profile, and failed boundary
-without exposing secrets.
+Diagnostics identify the phase contract, profile, and failed boundary without
+exposing credentials, refresh tokens, authentication headers, opaque handles,
+custodian transport details, or transferable bearer values.
 Evidence is recorded in the durable audit log as defined in
 [Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md).
 
@@ -245,6 +269,9 @@ Every evidence record MUST include the following fields:
 | `request_id` | The `request_id` of the tool/retrieval/code execution request. | Host runtime |
 | `agent_address` | The `TenantQualifiedAgentAddress` of the agent that originated the request. | Host runtime |
 | `tool_id` | The `tool_id` of the tool executed (for tool executions). | Host runtime |
+| `connector_binding_id` | User-approved connector authentication binding, if applicable. | Host runtime |
+| `connector_binding_revision` | Pinned connector binding revision, if applicable. | Host runtime |
+| `credential_use_fingerprint` | Non-authority-bearing use correlation, if applicable. | Host runtime |
 | `language` | The `language` of the code executed (for code executions). | Host runtime |
 | `timestamp` | The ISO 8601 timestamp of evidence emission. | Host clock |
 | `evidence_digest` | A deterministic hash of the evidence record. | Host runtime |
@@ -256,6 +283,9 @@ The `evidence_digest` field enables downstream systems to verify that
 the evidence record has not been tampered with after creation.
 This is consistent with the provenance and audit contract defined in
 [Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md).
+Evidence MUST NOT contain credentials, refresh tokens, authentication headers,
+opaque handles, arbitrary endpoints, request bodies, or unbounded custodian
+and external-service errors.
 
 ### Implementation-defined choices
 
@@ -274,6 +304,8 @@ profile.
 | Retrieval timeout | The default maximum duration of a retrieval request before timeout. | Must be longer than the maximum expected retrieval duration. Must be documented in the conformance profile. |
 | Sandbox memory limit | The maximum memory for code execution sandboxes. | Must be at least 64 MB and at most the implementation-defined maximum. Must be documented in the conformance profile. |
 | Sandbox network access | Whether code execution sandboxes have network access. | Must be configurable per tool or globally. Must be documented in the conformance profile. |
+| Connector custody mode | External broker, provider workload identity, or explicit host-local compatibility. | End-user separated-custody distributions must keep credentials outside host, Port, plugin, and guest processes. |
+| Connector receipt verification | Signature or authenticated-transport proof mechanism. | Must bind request, operation, resource, binding revision, outcome, and usage. |
 
 > **Non-normative note.**
 The implementation-defined choices above provide flexibility for
@@ -295,8 +327,9 @@ The following work is deferred to future phases or milestones:
    to Milestone 9.
 4. **Tool analytics**: Analytics and metrics for tool usage is deferred
    to Milestone 9.
-5. **Connector authentication caching**: Caching connector authentication
-   tokens is deferred to Milestone 8.
+5. **Multi-custodian connector failover**: Explicit user-approved failover
+   without runtime credential or resource substitution is deferred to
+   Milestone 8.
 
 > **Non-normative note.**
 The deferred work items are not within the scope of Phase 2 but may
@@ -326,6 +359,11 @@ assumption:
    mutable guest state, this would invalidate the assumption defined in
    [Deterministic Reducer Semantics And Milestone Acceptance](14-deterministic-reducer-semantics-and-milestone-acceptance.md)
    that all state transitions are deterministic and replayable.
+5. **Connector credentials enter product processes**: If an authenticated
+   connector requires raw credentials, refresh tokens, or authentication
+   headers in host, Port, plugin, or guest memory, the deployment cannot claim
+   `separated-credential-custody` and this contract requires revision before
+   promotion.
 
 > **Non-normative note.**
 These results would indicate a design flaw in Phase 2 and would require
@@ -355,7 +393,9 @@ following earlier chapters:
 5. For framework plugins: this section takes precedence over
    [Framework Plugin Manifests Composition And Lifecycle Hooks](32-framework-plugin-manifests-composition-and-lifecycle-hooks.md)
    for questions of tool-specific plugin behavior.
-6. Where both sections are applicable and agree, they are mutually
+6. For credential-custody failures: Section 44 takes precedence for canonical
+   diagnostics, handle non-exposure, and receipt evidence.
+7. Where both sections are applicable and agree, they are mutually
     reinforcing.
 
 ## Variability register
@@ -377,5 +417,6 @@ chapter.
 | Diagnostic message format | Section 42.3 | MAY | Must include all required fields. Free-text portion is informational. |
 | Evidence record field order | Section 42.3 | SHOULD | Must include all required fields. Order is informational. |
 | Evidence record hash algorithm | Section 42.3 | MAY | Must be deterministic. Documented in conformance profile. |
+| Credential diagnostic preservation | Section 42.3 | Required | Canonical Section 44 codes must remain intact and evidence must contain no credential or handle. |
 | Integration test ordering | Section 42.4 | MAY | Must cover all required scenarios. Order is informational. |
 | Cross-milestone fixture selection | Section 42.4 | MUST | Must include all fixtures listed in section 42.4.4. |

@@ -3,7 +3,7 @@ title: "Agentic Workflows Provenance Safety And Milestone Acceptance Failure Evi
 kind: specification
 created: "2026-08-09"
 status: draft
-spec_version: "0.1.0"
+spec_version: "0.2.0"
 tags:
   - milestone-07
   - phase-05
@@ -14,6 +14,8 @@ tags:
   - failure-evidence
   - diagnostics
   - implementation-defined-choices
+  - model-bindings
+  - credential-custody
 aliases:
   - "M7-P5 Failure Evidence And Operational Notes"
 ---
@@ -33,6 +35,10 @@ workflows, provenance, safety, and milestone acceptance, including failure
 outcomes, bounded diagnostics, evidence emission, implementation-defined
 choices, deferred work, and results that would invalidate earlier milestone
 assumptions.
+
+Version `0.2.0` aligns workflow failures and evidence with logical model
+bindings and canonical `credential.*` custody failures. It supersedes
+workflow-level secret-access diagnostics.
 
 This chapter is normative by default within its stated scope.
 Material visibly marked non-normative does not create conformance
@@ -115,7 +121,7 @@ safety, and milestone acceptance into the following categories:
 | `malformed_provenance_reference` | The provenance reference is malformed (invalid JSON, missing required fields, invalid field values). | Reject the input and emit a `malformed_provenance_reference` diagnostic. |
 | `malformed_approval_request` | The approval request is malformed (invalid JSON, missing required fields, invalid field values). | Reject the input and emit a `malformed_approval_request` diagnostic. |
 | `malformed_quota_request` | The quota request is malformed (invalid JSON, missing required fields, invalid field values). | Reject the input and emit a `malformed_quota_request` diagnostic. |
-| `malformed_lease_request` | The lease request is malformed (invalid JSON, missing required fields, invalid field values). | Reject the input and emit a `malformed_lease_request` diagnostic. |
+| `credential.lease.malformed` | Credential lease or handle metadata is malformed. | Reject without creating use state. |
 
 #### Incompatible outcomes
 
@@ -132,7 +138,7 @@ safety, and milestone acceptance into the following categories:
 | `conflicting_provenance_reference` | The provenance reference is conflicting with existing references. | Reject the input and emit a `conflicting_provenance_reference` diagnostic. |
 | `conflicting_approval_status` | The approval status is conflicting with the current status. | Reject the input and emit a `conflicting_approval_status` diagnostic. |
 | `conflicting_quota_limit` | The quota limit is conflicting with the current limit. | Reject the input and emit a `conflicting_quota_limit` diagnostic. |
-| `conflicting_lease_expiry` | The lease expiry is conflicting with the current expiry. | Reject the input and emit a `conflicting_lease_expiry` diagnostic. |
+| `credential.lease.conflicting_expiry` | Credential lease revision or expiry conflicts. | Reject and require revision reload. |
 
 #### Unauthorized outcomes
 
@@ -142,8 +148,8 @@ safety, and milestone acceptance into the following categories:
 | `unauthorized_provenance_reference_access` | The agent is not authorized to access the provenance reference. | Reject the request and emit an `unauthorized_provenance_reference_access` diagnostic. |
 | `unauthorized_approval_access` | The agent is not authorized to access the approval. | Reject the request and emit an `unauthorized_approval_access` diagnostic. |
 | `unauthorized_quota_access` | The agent is not authorized to access the quota. | Reject the request and emit an `unauthorized_quota_access` diagnostic. |
-| `unauthorized_lease_access` | The agent is not authorized to access the lease. | Reject the request and emit an `unauthorized_lease_access` diagnostic. |
-| `unauthorized_model_access` | The agent is not authorized to access the model. | Reject the request and emit an `unauthorized_model_access` diagnostic. |
+| `credential.use.unauthorized` | Agent domain authority or effect-worker `CredentialUse` authority is absent. | Reject before custodian dispatch. |
+| `model.request.unauthorized` | The agent is not authorized to use its logical model slot. | Reject before model dispatch. |
 | `unauthorized_tool_access` | The agent is not authorized to access the tool. | Reject the request and emit an `unauthorized_tool_access` diagnostic. |
 
 #### Exhausted outcomes
@@ -153,7 +159,7 @@ safety, and milestone acceptance into the following categories:
 | `workflow_budget_exhausted` | The workflow budget is exhausted. | Terminate the workflow and emit a `workflow_budget_exhausted` diagnostic. |
 | `quota_exhausted` | The quota is exhausted. | Reject the request and emit a `quota_exhausted` diagnostic. |
 | `approval_expired` | The approval request has expired. | Reject the request and emit an `approval_expired` diagnostic. |
-| `lease_expired` | The secret lease has expired. | Reject the request and emit a `lease_expired` diagnostic. |
+| `credential.handle.expired` | Credential lease or handle has expired. | Reject new use and reconcile in-flight work. |
 | `model_stream_cancelled` | The model stream has been cancelled. | Terminate the model stream and emit a `model_stream_cancelled` diagnostic. |
 
 #### Unavailable outcomes
@@ -164,9 +170,14 @@ safety, and milestone acceptance into the following categories:
 | `provenance_reference_store_unavailable` | The provenance reference store is unavailable. | Retry the request or reject and emit a `provenance_reference_store_unavailable` diagnostic. |
 | `approval_store_unavailable` | The approval store is unavailable. | Retry the request or reject and emit an `approval_store_unavailable` diagnostic. |
 | `quota_store_unavailable` | The quota store is unavailable. | Retry the request or reject and emit a `quota_store_unavailable` diagnostic. |
-| `lease_store_unavailable` | The lease store is unavailable. | Retry the request or reject and emit a `lease_store_unavailable` diagnostic. |
-| `model_unavailable` | The model is unavailable. | Retry the request or reject and emit a `model_unavailable` diagnostic. |
+| `credential.custodian.unavailable` | Pinned credential custodian is unavailable. | Retry only the same pinned workflow operation under bounded policy. |
+| `model.connection.unavailable` | The pinned model connection is unavailable. | Retry only the same pinned workflow operation or require user reconfiguration. |
 | `tool_unavailable` | The tool is unavailable. | Retry the request or reject and emit a `tool_unavailable` diagnostic. |
+
+Model and credential failures MUST preserve the canonical diagnostic from
+Sections 41 and 44. The workflow layer MUST NOT translate a binding, scope,
+export, replay, receipt, or custodian failure into a generic workflow,
+network, or tool error.
 
 ### Bounded diagnostics
 
@@ -188,7 +199,9 @@ Every diagnostic MUST include the following fields:
 
 > **Normative definition.**
 Diagnostics MUST be bounded. They MUST NOT expose:
-- Secrets or secret references.
+- Credentials, authentication headers, opaque handle references, or
+  transferable bearer values.
+- Custodian endpoint or transport internals.
 - Internal host implementation details.
 - Other agents' data or state.
 
@@ -213,7 +226,10 @@ Every evidence entry MUST include the following fields:
 | `provenance_reference_id` | The `ReferenceId` of the provenance reference (if applicable). | Host runtime |
 | `approval_id` | The `ApprovalId` of the approval (if applicable). | Host runtime |
 | `quota_id` | The `QuotaId` of the quota (if applicable). | Host runtime |
-| `lease_id` | The `LeaseId` of the lease (if applicable). | Host runtime |
+| `lease_fingerprint` | Non-authority-bearing credential lease fingerprint (if applicable). | Host runtime |
+| `credential_use_fingerprint` | Non-authority-bearing credential-use fingerprint (if applicable). | Host runtime |
+| `model_binding_id` | Pinned model binding identity (if applicable). | Host runtime |
+| `model_binding_revision` | Pinned model binding revision (if applicable). | Host runtime |
 | `model_id` | The `ModelId` of the model (if applicable). | Host runtime |
 | `tool_id` | The `ToolId` of the tool (if applicable). | Host runtime |
 | `phase` | The phase identifier (`milestone-07`, `phase-05`). | Host runtime |
@@ -246,9 +262,12 @@ acceptance are defined as follows:
 | `quota.reserved` | Emitted when quota is reserved. |
 | `quota.consumed` | Emitted when quota is consumed. |
 | `quota.exhausted` | Emitted when quota is exhausted. |
-| `lease.created` | Emitted when a secret lease is created. |
-| `lease.revoked` | Emitted when a secret lease is revoked. |
-| `lease.expired` | Emitted when a secret lease expires. |
+| `credential.lease.created` | Emitted when a use-only credential lease is created. |
+| `credential.lease.revoked` | Emitted when a credential lease is revoked. |
+| `credential.lease.expired` | Emitted when a credential lease expires. |
+| `credential.use.requested` | Emitted before typed custodian dispatch. |
+| `credential.use.completed` | Emitted after valid receipt admission. |
+| `credential.use.denied` | Emitted when policy or custodian denies a use. |
 | `model_stream.started` | Emitted when a model stream starts. |
 | `model_stream.completed` | Emitted when a model stream completes. |
 | `model_stream.cancelled` | Emitted when a model stream is cancelled. |
@@ -259,7 +278,9 @@ acceptance are defined as follows:
 
 > **Normative definition.**
 Evidence MUST be bounded. It MUST NOT expose:
-- Secrets or secret references.
+- Credentials, authentication headers, opaque handle references, or
+  transferable bearer values.
+- Custodian endpoint or transport internals.
 - Internal host implementation details.
 - Other agents' data or state.
 

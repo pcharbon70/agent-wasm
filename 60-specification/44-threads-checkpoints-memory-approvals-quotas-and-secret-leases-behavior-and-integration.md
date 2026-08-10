@@ -3,7 +3,7 @@ title: "Threads Checkpoints Memory Approvals Quotas And Secret Leases Behavior A
 kind: specification
 created: "2026-08-09"
 status: draft
-spec_version: "0.1.0"
+spec_version: "0.2.0"
 tags:
   - milestone-07
   - phase-04
@@ -15,6 +15,7 @@ tags:
   - secret-leases
   - behavior
   - integration
+  - credential-custody
 aliases:
   - "M7-P4 Behavior And Integration"
 ---
@@ -30,8 +31,12 @@ of
 --
 AI, Tools, Memory, And Human Control.
 It establishes the behavior and integration rules for threads, checkpoints,
-memory, approvals, quotas, and secret leases, including approval requests,
-quota enforcement, and secret lease lifecycle.
+memory, approvals, quotas, and credential leases, including approval requests,
+quota enforcement, use-only credential dispatch, and receipt admission.
+
+Version `0.2.0` replaces secret access through a host-held lease with typed,
+use-only credential dispatch through a user-controlled custodian. Raw
+credential access is not part of the lease lifecycle.
 
 This chapter is normative by default within its stated scope.
 Material visibly marked non-normative does not create conformance
@@ -246,63 +251,101 @@ Reconciliation MUST:
 ### Secret leases
 
 > **Normative definition.**
-The host MUST manage secret leases according to the following lifecycle:
+The host MUST manage credential leases according to this metadata and use
+lifecycle:
 
-1. **Creation**: The host creates a secret lease for a principal.
-2. **Access**: The principal accesses the secret using the lease.
-3. **Renewal**: The principal renews the lease before expiry.
-4. **Expiry**: The lease expires and the principal loses access.
-5. **Revocation**: The host revokes the lease before expiry.
-6. **Deletion**: The lease is deleted.
+1. **Custodian registration**: The user registers an authenticated custodian
+   and approved typed operation catalog. No provider or external-service
+   credential is sent to the host.
+2. **Handle enrollment**: The custodian issues a sender-constrained opaque
+   handle reference and non-authority-bearing fingerprint.
+3. **Lease creation**: The host records tenant, principal, purpose, operation,
+   resource, expiry, custodian, and handle fingerprint metadata.
+4. **Use authorization**: The host independently authorizes the originating
+   domain capability and the effect worker's `CredentialUse`.
+5. **Typed use**: The custodian validates and executes the scoped operation.
+6. **Receipt admission**: The host verifies the custodian receipt before
+   admitting the external result and usage.
+7. **Renewal or rotation**: Lease metadata may be renewed; credential rotation
+   remains inside the custodian.
+8. **Expiry, suspension, revocation, or deletion**: New uses are denied and
+   in-flight work is reconciled.
 
 > **Normative definition.**
 The host MUST enforce the following secret lease behaviors:
 
 | Behavior | Description |
 |----------|-------------|
-| `active` | The lease is active and the principal can access the secret. |
-| `expired` | The lease has expired and the principal loses access. |
-| `revoked` | The lease has been revoked and the principal loses access. |
-| `deleted` | The lease is deleted. |
+| `active` | The lease may authorize a scoped typed use. |
+| `suspended` | New uses are denied pending user or operator action. |
+| `expired` | New uses are denied after the expiry time. |
+| `revoked` | New uses are permanently denied. |
+| `deleted` | Metadata is tombstoned subject to evidence retention. |
 
 > **Normative definition.**
-The host MUST enforce non-exportability for secret leases.
-If `non_exportable` is true, the host MUST:
-1. Prevent the secret from being exported from the host.
-2. Log any export attempts.
-3. Emit a `secret.export_attempt` diagnostic.
+`non_exportable` is always `true`. The host and custodian MUST reject secret
+read, reveal, unwrap, decrypt-for-caller, copy, export, bearer-token minting,
+and authentication-header return operations with
+`credential.use.export_forbidden`.
+The host MUST NOT offer an API that returns the opaque handle to a guest,
+plugin, adapter, log reader, or support operator.
 
 > **Normative definition.**
-The host MUST log all secret lease operations for audit.
-Operations include:
-- Lease creation.
-- Lease access.
-- Lease renewal.
-- Lease expiry.
-- Lease revocation.
-- Lease deletion.
+Before accepting a `CredentialUseRequest`, the host MUST validate the lease
+state and policy, and the custodian MUST independently validate:
+
+- authenticated caller and tenant;
+- principal, agent, and artifact digest;
+- exactly one model or connector binding id and revision when present;
+- handle, operation, and resource scope;
+- canonical request digest;
+- deadline and unique nonce;
+- per-use and cumulative budget.
+
+The custodian MUST reject any arbitrary origin, method, authentication header,
+provider, model, connector, or resource substitution, digest change, replay,
+or scope expansion.
 
 > **Normative definition.**
-When a secret lease is revoked, the host MUST:
+For a valid use, the host MUST:
+
+1. Atomically record the external effect before dispatch.
+2. Emit `credential.use.requested` without handle or credential material.
+3. Send the typed request through authenticated custodian transport.
+4. Normalize bounded stream or result data.
+5. Verify receipt correlation, digest, and signature or transport proof.
+6. Emit `credential.use.completed` or `credential.use.denied`.
+7. Admit the external result only after receipt verification.
+
+> **Normative definition.**
+When a credential lease is revoked, the host MUST:
 1. Mark the lease as `revoked`.
-2. Invalidate any active access using the lease.
-3. Emit a `secret.lease_revoked` diagnostic.
-4. Log the revocation for audit.
+2. Invalidate cached policy decisions and reject uses not yet dispatched.
+3. Request cancellation or reconciliation of in-flight uses.
+4. Emit `credential.lease.revoked` evidence.
+5. Ensure that a later retry does not silently use another handle or custodian.
 
 > **Normative definition.**
-When a secret lease expires, the host MUST:
+When a credential lease expires, the host MUST:
 1. Mark the lease as `expired`.
-2. Invalidate any active access using the lease.
-3. Emit a `lease.expired` diagnostic.
-4. Emit a `lease.expired` evidence entry.
-5. Log the expiry for audit.
+2. Reject new uses with `credential.handle.expired`.
+3. Reconcile any already-dispatched operation.
+4. Emit `credential.lease.expired` evidence.
 
 > **Normative definition.**
-When a secret lease is deleted, the host MUST:
+When a credential lease is deleted, the host MUST:
 1. Mark the lease as `deleted`.
-2. Invalidate any active access using the lease.
-3. Emit a `lease.deleted` evidence entry.
-4. Log the deletion for audit.
+2. Reject new uses.
+3. Retain a bounded tombstone for revocation and evidence consistency.
+4. Emit `credential.lease.deleted` evidence.
+
+> **Normative definition.**
+In the `separated-credential-custody` profile, the host MUST route every
+authenticated provider or connector operation through an `external-broker` or
+`provider-workload-identity` custodian. Direct authenticated provider or
+external-service egress from the host and Port processes MUST be denied. A `host-local` connection
+MAY be used only after explicit user or operator opt-in and warning, and the
+resulting deployment MUST NOT claim separated-custody conformance.
 
 ## Variability register
 
@@ -320,12 +363,16 @@ When a secret lease is deleted, the host MUST:
 - **Permitted presentation**: The host MAY present the configured burst allowance to the operator.
 - **Limit**: The host MUST document the configured burst allowance.
 
-### 44.2.3 Secret lease non-exportability
+### 44.2.3 Credential custody mode
 
-- **Permission**: The host MAY configure non-exportability for secret leases.
-- **Recommendation**: The host SHOULD default to `true` for non-exportability.
-- **Permitted presentation**: The host MAY present the configured non-exportability to the operator.
-- **Limit**: The host MUST document the configured non-exportability.
+- **Permission**: The host MAY expose an explicitly opted-in `host-local`
+  compatibility mode.
+- **Recommendation**: End-user distributions SHOULD use
+  `external-broker` or `provider-workload-identity`.
+- **Permitted presentation**: The host MAY present custody mode, custodian
+  health, and bounded receipt status to the authorized user.
+- **Limit**: Credential leases are always non-exportable; `host-local` MUST
+  NOT claim separated-custody conformance.
 
 ### 44.2.4 Quota reconciliation interval
 
@@ -333,3 +380,14 @@ When a secret lease is deleted, the host MUST:
 - **Recommendation**: The host SHOULD reconcile quotas at least once per hour.
 - **Permitted presentation**: The host MAY present the configured interval to the operator.
 - **Limit**: The host MUST document the configured interval.
+
+### 44.2.5 Custodian retry and reconciliation
+
+- **Permission**: Retry count, backoff, and receipt-reconciliation transport
+  are implementation-defined.
+- **Recommendation**: The host SHOULD reconcile uncertain outcomes before
+  retry.
+- **Permitted presentation**: The host MAY present bounded attempt and receipt
+  summaries.
+- **Limit**: Retry MUST preserve the original operation, resource, binding,
+  handle, request digest, and budget while using a fresh nonce.
