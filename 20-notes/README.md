@@ -255,6 +255,23 @@ open workbenches in inquiries, and session evidence in the journal.
   — documents Section 4.4 implementation: canonical flow verification, invalid
   input handling, resource handling, and earlier milestone fixture regression
   checks.
+- [M8-P5 Section 5.1 Contract And Data Model Implementation](m8-p5-contract-and-data-model-implementation.md)
+  — documents Section 5.1 implementation: deterministic crash injection,
+  adversarial testing suites (capability, import, output, secret, tenant-residue,
+  resource-exhaustion, supply-chain, audit-tampering), and performance
+  measurement across representative sizes.
+- [M8-P5 Section 5.2 Behavior And Integration Implementation](m8-p5-behavior-and-integration-implementation.md)
+  — documents Section 5.2 implementation: runtime timing ratio comparison with
+  environmental context, formal/reference model maintenance, and release
+  acceptance publication.
+- [M8-P5 Section 5.3 Failure Evidence And Operational Notes Implementation](m8-p5-failure-evidence-and-operational-notes-implementation.md)
+  — documents Section 5.3 implementation: failure outcomes (malformed,
+  incompatible, conflicting, unauthorized, exhausted, unavailable), bounded
+  diagnostics, implementation-defined choices, and deferred work.
+- [M8-P5 Section 5.4 Phase 5 Integration Tests Implementation](m8-p5-integration-tests-implementation.md)
+  — documents Section 5.4 implementation: canonical flow verification, invalid
+  input handling, resource handling, and earlier milestone fixture regression
+  checks.
 
 ## Maintaining this index
 
