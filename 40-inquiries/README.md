@@ -30,9 +30,9 @@ findings, and outcomes here. Promote conclusions that stand alone into notes.
 ### Documents
 
 - [Which Host Implementation Approach Should Agent WASM Use?](which-host-implementation-approach-should-agent-wasm-use.md)
-  — tests the provisional Elixir/OTP plus Rust worker recommendation against
-  Rust-only, Go-only, and Rustler alternatives using semantic, performance,
-  scheduler, crash, packaging, and engineering evidence.
+  — records the resolved Elixir/OTP product-language choice, its private
+  supervised Port worker, the packaging evidence, and the remaining boundary
+  qualification work.
 - [How Should Agent WASM Use WebAssembly?](how-should-agent-wasm-use-webassembly.md)
   — open inquiry into the pinned language profile, runtime set, capabilities,
   resource controls, output safety, evidence, and portability gate.

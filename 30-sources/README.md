@@ -68,9 +68,21 @@ what the source supports, how it reached its conclusions, and its limits.
   — documents lightweight isolated processes, non-blocking mailbox sends,
   links, monitors, supervision, process bottlenecks, and the gap between a raw
   mailbox and Agent WASM's explicit admission bounds.
+- [Elixir Project: Mix Releases](elixir-project-2026-mix-releases.md) — defines
+  self-contained release contents, application `priv`, target compatibility,
+  ERTS inclusion, runtime configuration, and release customization.
 - [Erlang NIFs, Dirty Schedulers, and Ports](erlang-project-2026-nifs-dirty-schedulers-and-ports.md)
   — establishes VM-wide NIF failure scope, lengthy-work scheduling rules,
   cooperative cancellation constraints, and external Port isolation.
+- [Phoenix Esbuild Binary Installer](phoenix-project-2026-esbuild-binary-installer.md)
+  — supplies an established Elixir developer experience for selecting,
+  installing, and invoking a target-specific private executable.
+- [Docker Multi-Platform Builds](docker-project-2026-multi-platform-builds.md)
+  — explains OCI manifest lists, automatic target selection, builders,
+  emulation, native nodes, and cross-compilation.
+- [GitHub Artifact Attestations](github-project-2026-artifact-attestations.md)
+  — documents digest-bound SLSA provenance, Sigstore bundles, registry
+  publication, action permissions, and subject requirements.
 - [Go Concurrency, Context, and C Interoperation](go-project-2026-concurrency-context-and-cgo.md)
   — covers goroutines, channels, bounded workers, cooperative cancellation,
   the cgo boundary, and built-in fuzzing.

@@ -29,6 +29,9 @@ whose time and execution context matter.
 
 ### Documents
 
+- [2026-08-10 Elixir Port Packaging Probe](2026-08-10-elixir-port-packaging-probe.md)
+  — records the framed Port test, production Mix release, container build,
+  missing-CA and locale failures, corrections, and final non-root health smoke.
 - [2026-08-09 Phase 1 Implementation](2026-08-09-phase-1-implementation.md)
   — documents Phase 1 of Milestone 7 implementation: PR merge, section-by-section
   implementation notes, key design decisions, cross-references, and open questions.

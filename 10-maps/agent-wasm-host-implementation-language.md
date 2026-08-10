@@ -4,6 +4,7 @@ kind: map
 created: "2026-08-10"
 tags:
   - agent-tools
+  - deployment
   - elixir
   - extism
   - go
@@ -19,20 +20,24 @@ aliases:
 
 ## Scope
 
-This map connects the repository's host responsibilities to Rust, Go, Elixir,
-and Elixir/Rust through Rustler. It distinguishes control-plane language from
-Wasm engine language, process boundary, independent conformance runtime, and
-guest SDK language.
+This map records why Elixir/OTP is the selected Agent WASM product language and
+routes from that decision into its private native-worker boundary, packaging,
+and qualification evidence. Earlier Rust, Go, and Rustler comparisons remain
+available as provenance, not as parallel public product platforms. Guest SDK
+languages remain independent of the host choice.
 
 ## Start here
 
+- [Elixir/OTP Port Finished-Product Packaging and Release Pipeline](../20-notes/elixir-otp-port-finished-product-packaging-and-release-pipeline.md)
+  — makes Elixir/OTP the sole public programming and operations model, bundles
+  a private native worker under application `priv`, and supplies an executable
+  Mix/OCI release pipeline.
 - [Agent WASM Host Implementation Language and Runtime Boundary](../20-notes/agent-wasm-host-implementation-language-and-runtime-boundary.md)
-  — compares the four choices, audits the current Extism Elixir/Rustler path,
-  recommends an Elixir control plane with a process-isolated Rust worker, and
-  defines the gates that could reverse that recommendation.
+  — preserves the comparative research that led to Elixir/OTP and the
+  process-isolated worker boundary.
 - [Which Host Implementation Approach Should Agent WASM Use?](../40-inquiries/which-host-implementation-approach-should-agent-wasm-use.md)
-  — keeps the decision open until semantic, performance, scheduler, fault,
-  tenant, packaging, and team evidence exists.
+  — records the resolved product-language choice and separates it from the
+  still-open engineering qualification of the Port adapter.
 
 ## Trails
 
@@ -71,14 +76,35 @@ guest SDK language.
 
 ### Elixir control plane
 
+- [Elixir/OTP Port Finished-Product Packaging and Release Pipeline](../20-notes/elixir-otp-port-finished-product-packaging-and-release-pipeline.md)
+  — joins OTP ownership, Port lifecycle, protocol fencing, Mix releases, Hex
+  installation, OCI publication, attestations, upgrades, and rollback.
 - [Elixir Processes, Mailboxes, and Supervision](../30-sources/elixir-project-2026-processes-and-supervision.md)
   — lightweight isolated actors, message queues, links, monitors, and
   supervision, plus the need for explicit mailbox admission bounds.
+- [Elixir Project: Mix Releases](../30-sources/elixir-project-2026-mix-releases.md)
+  — establishes the self-contained release, target-specific build, ERTS, and
+  application `priv` layout.
+- [Phoenix Esbuild Binary Installer](../30-sources/phoenix-project-2026-esbuild-binary-installer.md)
+  — provides an established Elixir-facing pattern for managing a target-native
+  private executable at build time.
 - [Jido Runtime and Coordination](../30-sources/agentjido-2026-jido-runtime-and-coordination.md)
   — the existing Elixir framework semantics that make OTP alignment relevant.
 - [Erlang NIFs, Dirty Schedulers, and Ports](../30-sources/erlang-project-2026-nifs-dirty-schedulers-and-ports.md)
   — the authoritative choice between in-VM native speed and external-process
   fault containment.
+
+### Finished-product release evidence
+
+- [Docker Multi-Platform Builds](../30-sources/docker-project-2026-multi-platform-builds.md)
+  — explains how one OCI product name selects separate Linux AMD64 and ARM64
+  release images.
+- [GitHub Artifact Attestations](../30-sources/github-project-2026-artifact-attestations.md)
+  — binds the published product digest to build provenance and a Sigstore
+  bundle.
+- [2026-08-10 Elixir Port Packaging Probe](../50-journal/2026-08-10-elixir-port-packaging-probe.md)
+  — preserves the test, release, container, failure, correction, and final
+  health evidence behind the example pipeline.
 
 ### Rustler and current Elixir Extism evidence
 
@@ -104,16 +130,16 @@ guest SDK language.
 
 - Does a framed Port materially affect end-to-end service objectives after
   Wasm execution, validation, and durability are included?
-- Can a Rustler adapter remain responsive under worst-case dirty CPU load and
+- Can cooperative Extism cancellation and the Port worker's hard-kill fallback
   stop real engine work before turn leases expire?
-- Is a BEAM-node failure an acceptable native-engine fault domain for every
-  intended trust and availability profile?
+- Does a bounded worker pool recover cleanly from panic, abort, malformed
+  frames, and output truncation without losing authoritative state?
 - Which synchronous host functions, if any, cannot be converted into input
   context or asynchronous directives?
-- Does the independent Go/Wazero runtime support the exact first profile with
-  equivalent limits, reset, cancellation, and errors?
-- Which approach is safest for the actual team's expertise and release
-  environment?
+- Which Linux targets should the first Hex and OCI product promise, and can
+  each be built and exercised on native CI?
+- Can the checksum/attestation-verifying installer meet offline and restricted
+  build requirements?
 
-These questions remain in the
-[host implementation inquiry](../40-inquiries/which-host-implementation-approach-should-agent-wasm-use.md).
+These qualify the selected private boundary. They do not create additional
+public host-language platforms.

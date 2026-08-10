@@ -19,11 +19,15 @@ This is the selective entry point to the archive. See the
   host lifecycle, durability, security and plugins, multi-agent topology, AI,
   assurance, and platform operations.
 
+## Selected implementation
+
+- [Elixir/OTP Port Finished-Product Packaging and Release Pipeline](../20-notes/elixir-otp-port-finished-product-packaging-and-release-pipeline.md)
+  — selects Elixir/OTP as the product language and public API, treats the
+  native Extism worker as a private supervised Port component, and defines the
+  Hex, Mix-release, OCI, attestation, upgrade, and rollback pipeline.
+
 ## Active inquiries
 
-- [Which Host Implementation Approach Should Agent WASM Use?](../40-inquiries/which-host-implementation-approach-should-agent-wasm-use.md)
-  — compares Rust, Go, Elixir, and Elixir/Rustler and tests the proposed split
-  between an OTP control plane, isolated Rust execution, and Go conformance.
 - [How Should Agent WASM Assure a Jido-Like Extism Runtime?](../40-inquiries/how-should-agent-wasm-assure-a-jido-like-extism-runtime.md)
   — defines the profiles, equivalence rules, state/effect invariants, fault
   boundaries, isolation matrix, replay records, and evidence needed before
@@ -43,8 +47,8 @@ This is the selective entry point to the archive. See the
 ## Topic maps
 
 - [Agent WASM Host Implementation Language](agent-wasm-host-implementation-language.md)
-  — routes through control-plane semantics, Extism engine families, NIF/Port
-  failure boundaries, native packaging, and the language decision gates.
+  — routes from the selected Elixir/OTP product through its Port boundary,
+  target-native packaging, release evidence, and remaining qualification.
 - [Extism Plugin System](extism-plugin-system.md) — routes through Extism's
   ABI, kernel, manifest, capabilities, PDK/SDK tooling, Wasmtime, Wazero,
   JavaScript, native Java, and Chicory stacks.
@@ -60,10 +64,12 @@ This is the selective entry point to the archive. See the
 
 ## Recently developed
 
+- [Elixir/OTP Port Finished-Product Packaging and Release Pipeline](../20-notes/elixir-otp-port-finished-product-packaging-and-release-pipeline.md)
+  — turns the Elixir/OTP selection into a finished-product architecture and a
+  locally exercised release/container pipeline.
 - [Agent WASM Host Implementation Language and Runtime Boundary](../20-notes/agent-wasm-host-implementation-language-and-runtime-boundary.md)
-  — recommends Elixir/OTP for host semantics, a process-isolated Rust
-  Extism/Wasmtime worker by default, a gated Rustler optimization, and
-  Go/Wazero as the independent conformance path.
+  — preserves the comparison that led to Elixir/OTP; alternate implementations
+  are research evidence rather than public product platforms.
 - [WebAssembly Testing, Verification, and Agent Runtime Assurance](../20-notes/webassembly-testing-verification-and-agent-runtime-assurance.md)
   — separates standards, engine, plug-in, reducer, host-state, isolation, and
   operational evidence, then designs a non-normative assurance stack around the
@@ -86,9 +92,9 @@ This is the selective entry point to the archive. See the
 
 ## Unsettled threads
 
-- Prototype the Rust, Go, Elixir/Port, and Elixir/Rustler boundaries and decide
-  whether scheduler, crash-scope, packaging, performance, and team evidence
-  supports the provisional Elixir control-plane recommendation.
+- Complete the selected Elixir/OTP Port adapter and qualify its bounded pool,
+  cancellation, crash recovery, release targets, installer, performance, and
+  provenance under representative load.
 - Freeze the first Core/WASI/Extism/PDK profile and define semantic equivalence
   for cross-runtime `TurnResult` values before selecting an executable harness.
 - Determine whether a host-owned, revisioned actor cell with disposable Extism
