@@ -551,7 +551,7 @@ Cache hits MUST be verified against the current validation policy before use.
 | Artifact dependency resolution | Milestone 5 | Requires capability and plugin system |
 | Registry access control | Milestone 5 | Requires security and tenancy model |
 | Schema evolution tooling | Milestone 7 | Requires AI tools and memory |
-| Artifact compression | Milestone 8 | Requires portability and performance |
+| Artifact compression | Milestone 8 | Requires portability and performance; complements compression for large payloads in [Turn Lifecycle](04-turn-lifecycle-protocols-and-canonical-encoding.md) and large-state runtime memory in [Memory64 support](01-profile-vocabulary-and-architectural-boundaries.md) |
 
 ### Potential invalidation of earlier assumptions
 
@@ -559,13 +559,23 @@ The following results from later phases would invalidate an assumption in
 this chapter:
 
 1. Canonical JSON representation is insufficient for large schemas; binary
-   encoding is required for performance.
+    encoding is required for performance; addressed by Binary encoding deferred to
+    [Milestone 8](04-turn-lifecycle-protocols-and-canonical-encoding.md) (Binary encoding row).
 2. SHA-256 digest collisions are demonstrated at scale; stronger hash required.
 3. Signature verification is essential for security; cannot be deferred to
    Milestone 5.
 4. Alias resolution introduces ambiguity; digest-only lookup is required.
 5. Schema migration execution is too complex for host; requires guest
-   cooperation.
+    cooperation.
+
+> **Non-normative note.**
+> All items deferred to Milestone 8 fall under
+> Milestone 8 - Portability, Verification, And Performance
+> (planning document at `.spec/planning/agentic-system/milestone-08-portability-verification-and-performance/README.md`).
+> The Milestone 8 boundary principle: Milestone 8 addresses portability,
+> verification, and performance of the system as built by Milestones 1-7.
+> Milestone 9 addresses production platform, developer experience, and
+> operational tooling built on top of that verified system.
 
 ## Integration Test Expectations
 

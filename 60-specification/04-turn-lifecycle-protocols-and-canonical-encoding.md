@@ -690,11 +690,11 @@ The canonical encoder MUST:
 
 | Item | Target | Reason |
 | --- | --- | --- |
-| Binary encoding (MessagePack, CBOR) | Milestone 8 | Performance optimization |
-| Streaming for large outputs | Milestone 8 | Large-state agents |
+| Binary encoding (MessagePack, CBOR) | Milestone 8 | Performance optimization; complements artifact compression in [Agent Manifests](03-agent-manifests-artifacts-schemas-and-registries.md) |
+| Streaming for large outputs | Milestone 8 | Large-state agents; relates to Memory64 large-state runtime memory in [Profile Vocabulary](01-profile-vocabulary-and-architectural-boundaries.md) |
 | Async protocol support | Milestone 6 | Multi-agent coordination |
 | Protocol version negotiation | Milestone 5 | Dynamic capability discovery |
-| Compression for large payloads | Milestone 8 | Bandwidth optimization |
+| Compression for large payloads | Milestone 8 | Bandwidth optimization; relates to artifact compression in [Agent Manifests](03-agent-manifests-artifacts-schemas-and-registries.md) |
 | Protocol fuzzing corpus | Milestone 8 | Robustness testing |
 
 ### Potential invalidation of earlier assumptions
@@ -711,7 +711,17 @@ this chapter:
 4. State patch merge is ambiguous for nested structures; explicit merge
    strategy is required.
 5. Output buffer limits are too restrictive for large agent states;
-   streaming is required.
+    streaming is required; addressed by Streaming for large outputs and Compression for large payloads, both deferred to
+    [Milestone 8](#deferred-work) in this file.
+
+> **Non-normative note.**
+> All items deferred to Milestone 8 fall under
+> Milestone 8 - Portability, Verification, And Performance
+> (planning document at `.spec/planning/agentic-system/milestone-08-portability-verification-and-performance/README.md`).
+> The Milestone 8 boundary principle: Milestone 8 addresses portability,
+> verification, and performance of the system as built by Milestones 1-7.
+> Milestone 9 addresses production platform, developer experience, and
+> operational tooling built on top of that verified system.
 
 ## Integration Test Expectations
 

@@ -514,16 +514,25 @@ The following items are explicitly deferred to later phases or milestones:
 
 | Item | Target | Reason |
 | --- | --- | --- |
-| Component Model / WIT interface adoption | Milestone 8 | Requires stable phase-2 specification |
+| Component Model / WIT interface adoption | Milestone 8 | Requires Phase 2 of Milestone 8 (Core WASI/Extism/Plugin Contract Conformance) to be stable |
 | WASI 0.3 interface selection | Milestone 5 | Requires capability model to be defined first |
-| JavaScript runtime conformance | Milestone 8 | Environment variability requires later testing |
+| JavaScript runtime conformance | Milestone 8 | Environment variability requires later testing; see also [Cross-runtime identity equivalence](02-stable-identities-versions-errors-and-limits.md) and [Chicory runtime conformance](01-profile-vocabulary-and-architectural-boundaries.md) (same file) |
 | Chicory runtime conformance | Milestone 8 | Experimental parity; incomplete |
 | Multi-memory profiling and optimization | Milestone 4 | Requires durable state model first |
-| Memory64 large-state agent support | Milestone 4 | Requires state model and pagination policy |
+| Memory64 large-state agent support | Milestone 4 | Requires state model and pagination policy; large-state runtime memory |
 | Thread-based parallel turns | Milestone 6 | Requires multi-agent coordination model |
 | Synchronous host function catalog | Milestone 5 | Requires capability and security model |
 | Artifact signing and provenance chain | Milestone 5 | Requires trust model and plugin system |
 | Instance pooling state-erasure proof | Milestone 5 | Requires tenancy and security model |
+
+> **Non-normative note.**
+> All items deferred to Milestone 8 fall under
+> Milestone 8 - Portability, Verification, And Performance
+> (planning document at `.spec/planning/agentic-system/milestone-08-portability-verification-and-performance/README.md`).
+> The Milestone 8 boundary principle: Milestone 8 addresses portability,
+> verification, and performance of the system as built by Milestones 1-7.
+> Milestone 9 addresses production platform, developer experience, and
+> operational tooling built on top of that verified system.
 
 ### Potential invalidation of earlier assumptions
 
@@ -537,10 +546,15 @@ this chapter and would require normative revision:
 3. Common agent strategies require so many synchronous host calls that the
    directive continuation model becomes unusable.
 4. Snapshot-plus-patch transfer cannot support the required state scale
-   without unsafe shared mutable memory.
+    without unsafe shared mutable memory; this is the large-state runtime
+    concern also addressed by Memory64 support deferred to Milestone 4
+    and compression deferred to Milestone 8 (artifact compression in
+    [Agent Manifests](03-agent-manifests-artifacts-schemas-and-registries.md),
+    compression for large payloads in [Turn Lifecycle](04-turn-lifecycle-protocols-and-canonical-encoding.md)).
 5. A stable Component Model interface provides materially stronger
-   portability with less application protocol than Extism for the target
-   deployment.
+    portability with less application protocol than Extism for the target
+    deployment; addressed by Component Model / WIT interface adoption
+    deferred to Milestone 8.
 
 ## Integration Test Expectations
 

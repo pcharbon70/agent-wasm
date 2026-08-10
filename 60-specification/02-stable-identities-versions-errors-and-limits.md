@@ -393,7 +393,16 @@ Hosts SHOULD notify artifact publishers of upcoming deprecations.
 | Limit override via policy | Milestone 5 | Requires capability and policy model |
 | Deprecation lifecycle automation | Milestone 9 | Requires production platform and tooling |
 | Identity revocation | Milestone 5 | Requires security and tenancy model |
-| Cross-runtime identity equivalence | Milestone 8 | Requires portability and verification |
+| Cross-runtime identity equivalence | Milestone 8 | Requires portability and verification; depends on JavaScript and Chicory runtime conformance deferred in [Profile Vocabulary](01-profile-vocabulary-and-architectural-boundaries.md) |
+
+> **Non-normative note.**
+> All items deferred to Milestone 8 fall under
+> Milestone 8 - Portability, Verification, And Performance
+> (planning document at `.spec/planning/agentic-system/milestone-08-portability-verification-and-performance/README.md`).
+> The Milestone 8 boundary principle: Milestone 8 addresses portability,
+> verification, and performance of the system as built by Milestones 1-7.
+> Milestone 9 addresses production platform, developer experience, and
+> operational tooling built on top of that verified system.
 
 ### Potential invalidation of earlier assumptions
 
