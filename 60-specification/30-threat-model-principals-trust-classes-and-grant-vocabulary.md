@@ -35,6 +35,28 @@ obligations.
 Promotion to `status: normative` requires evidence from the Phase 1
 integration tests and a passing cross-milestone fixture run.
 
+### Milestone acceptance criteria
+
+> **Normative definition.**
+Phase 1 MILESTONE ACCEPTANCE requires:
+
+1. **Integration test pass**: 100% of Phase 1 integration tests MUST pass.
+2. **Cross-milestone fixture**: A passing cross-milestone fixture run that
+   exercises the threat model and grant system in conjunction with other
+   milestone capabilities.
+3. **Adversarial scenarios**: All simulated malicious guest scenarios MUST
+   be detected and rejected.
+4. **Evidence recording**: All integration test evidence MUST be recorded
+   as machine-readable YAML reports in the `50-journal/` directory.
+5. **Conformance profile**: The conformance profile MUST document all
+   implementation-defined choices listed in this chapter.
+
+> **Normative definition.**
+Phase 1 FAILS MILESTONE ACCEPTANCE if:
+- Any integration test fails, OR
+- Any adversarial scenario is NOT detected and rejected, OR
+- The conformance profile is incomplete.
+
 Governing policies:
 [Specification Authority](../SPECIFICATION-AUTHORITY.md)
 and
@@ -132,8 +154,26 @@ TenantId = Defined in [Revisioned Snapshots Journals History And Storage Contrac
 > **Normative definition.**
 The `tenant_id` field is optional and is only set for principals that are
 scoped to a specific tenant.
-The `metadata` field is implementation-defined and MUST NOT be used for
-authorization decisions.
+The `tenant_id` MUST be validated at load time (when the artifact or principal
+is registered) and MUST NOT be validated per-invocation for baseline conformance.
+Conformance profiles MAY add per-invocation validation for specific deployment
+models.
+
+> **Normative definition.**
+The `metadata` field is implementation-defined and MAY be indexed for
+observability, search, or filtering in the audit log, provided it MUST NOT
+be used for authorization decisions.
+Implementation-defined uses of metadata for observability MUST be documented
+in the conformance profile.
+
+> **Normative definition.**
+The `PrincipalKind` set is closed for Milestone 5.
+New principal kinds MAY be added in later milestones through a formal
+specification change with version bump.
+The extension procedure requires:
+1. A design document explaining the new kind and its authorization semantics.
+2. Review by the specification authority.
+3. A normative change to this chapter and the conformance profile.
 
 ## 1.2 Behavior And Integration
 
@@ -186,6 +226,22 @@ The host MUST support the following grant dimensions:
 7. **Expiry**: The grant expiry time.
 8. **Delegating authority**: Whether the grant can be delegated to other principals.
 
+### 1.2.1 Grant Revocation Behavior
+
+> **Normative definition.**
+When a grant is revoked, the host MUST allow in-flight invocations to complete
+or be rolled back, whichever preserves system invariants.
+The host MUST NOT immediately roll back in-flight invocations unless doing so
+would leave unauthorized or corrupt state.
+Conformance profiles MAY specify additional revocation behavior for specific
+trust classes or deployment models.
+
+> **Normative definition.**
+Grant revocation MUST propagate to all caches immediately.
+The host MUST use a push-based invalidation mechanism to ensure all cached
+grant decisions are invalidated before the next authorization check.
+Pull-based or TTL-based invalidation is NOT permitted for baseline conformance.
+
 > **Normative definition.**
 
 ```
@@ -204,12 +260,34 @@ Grant {
 }
 
 GrantId = string
-Capability = Defined in [Effect Handlers Attempts Idempotency And Result Signals](27-effect-handlers-attempts-idempotency-and-result-signals.md).
+Capability = Enumerated in section 1.2.1 of this chapter.
 Resource = string
 Purpose = "production" | "development" | "testing"
 Operation = "read" | "write" | "delete" | "execute"
 GrantConstraints = JsonObject
 ```
+
+### 1.1.1 Capability Values
+
+> **Normative definition.**
+The following capability values are enumerated for Milestone 5.
+Later milestones MAY add new capability values through formal specification change.
+The host MUST enforce each capability independently.
+A principal MUST present a valid grant for every capability it exercises.
+
+> **Normative conformance example.**
+
+```
+Capability = Effects | Signals | Timers | ChildLifecycle | ModelAccess | ToolUse |
+             Retrieval | CodeExecution | SecretRead | SecretWrite |
+             StateRead | StateWrite | DirectiveWrite | ScheduleWrite |
+             AgentActivate | AgentDeactivate | AgentCancel | TenantRead | TenantWrite
+```
+
+> **Normative definition.**
+Each capability value binds a specific authorization dimension.
+The host MUST enforce each capability independently.
+A principal MUST present a valid grant for every capability it exercises.
 
 > **Normative definition.**
 The `tenant_id` field is optional and is only set for grants that are scoped
@@ -308,7 +386,16 @@ The diagnostics MUST include:
 3. **Entity identifiers**: The tenant ID, agent ID, or principal ID involved
    (without exposing sensitive data).
 4. **Timestamp**: The time the error occurred.
-5. **Retryable**: Whether the operation can be retried.
+5. **Severity**: The severity level of the diagnostic (info, warning, error,
+   critical).
+6. **Retryable**: Whether the operation can be retried.
+
+> **Normative definition.**
+The severity level MUST be one of:
+- **info**: Informational, no operator action required.
+- **warning**: Operator should review but no immediate action required.
+- **error**: Operator action required to resolve.
+- **critical**: System stability or security at risk; immediate action required.
 
 > **Normative definition.**
 The host MUST NOT expose internal implementation details, secrets, or
@@ -322,9 +409,23 @@ conformance profile:
 
 1. **Authentication mechanism**: The mechanism used for principal authentication
    (e.g., API keys, OAuth, mTLS).
+   Baseline conformance REQUIRES support for both mTLS and API keys.
+   Conformance profiles MAY specify which mechanism is mandatory for specific
+   principal kinds (e.g., mTLS for operators, API keys for services).
+
 2. **Grant storage**: The grant storage implementation (in-memory, database, etc.).
+
 3. **Grant caching**: The grant caching strategy.
+   Baseline conformance REQUIRES push-based invalidation on revocation.
+   Pull-based or TTL-based invalidation is NOT permitted for baseline conformance.
+
 4. **Audit log retention**: The audit log retention policy.
+   Baseline conformance REQUIRES normative minimum retention periods aligned with
+   common regulations (e.g., GDPR, SOC2).
+   Conformance profiles MAY define longer retention for specific principal kinds
+   (e.g., operators and high-trust principals have longer retention than agents
+   and low-trust principals).
+
 5. **Trust class assignment**: The policy for assigning trust classes to artifacts.
 
 ### Deferred work
@@ -366,12 +467,23 @@ The Phase 1 integration tests MUST verify the following objectives:
    duplicate, and boundary-limit inputs correctly.
 3. **Security enforcement**: The host enforces tenant isolation, grant
    constraints, and trust classes without leaving unauthorized state.
-4. **Cross-milestone compatibility**: The phase does not introduce regressions
+4. **Adversarial scenarios**: The host detects and rejects simulated malicious
+   guest scenarios that violate the threat model.
+5. **Cross-milestone compatibility**: The phase does not introduce regressions
    in earlier milestones.
 
 > **Normative definition.**
 Each integration test MUST exercise observable contracts rather than private
 implementation structure.
+
+> **Normative definition.**
+Phase 1 integration tests MUST include simulated malicious guest scenarios
+to verify threat model defenses.
+Adversarial scenarios include but are not limited to:
+- Malicious principal attempting unauthorized access.
+- Compromised artifact attempting to escalate privileges.
+- Cross-tenant attack attempts.
+- Grant tampering or forgery attempts.
 
 ### Successful flow tests
 
@@ -411,6 +523,29 @@ The following tests MUST verify failure handling:
    error code.
 6. **Grant revocation**: Present a revoked grant and verify the `auth.grant_revocation`
    error code.
+
+### Cross-milestone fixture recording
+
+> **Normative definition.**
+Cross-milestone fixture results MUST be recorded as machine-readable YAML
+reports in the `50-journal/` directory.
+Each report MUST include:
+- Test name and identifier
+- Input data
+- Expected output
+- Actual output
+- Pass/fail status
+- Timestamp
+- Regressions or approved variability (if applicable)
+
+### Test execution
+
+> **Normative definition.**
+Integration tests MAY be run incrementally (individual tests or test sections)
+for fast feedback during development.
+The full test suite MUST be run for milestone acceptance.
+Incremental test runs MUST preserve the ability to run the full suite
+without modification.
 7. **Untrusted publisher**: Attempt to load an artifact from an untrusted publisher
    and verify the `auth.untrusted_publisher` error code.
 8. **Untrusted guest**: Attempt to run an untrusted guest and verify the

@@ -2,7 +2,7 @@
 
 Implement the portable Jido-inspired decision vocabulary and deterministic reducer semantics independently of host scheduling and external effects.
 
-Current status: planned; all phases and tasks are unchecked.
+Current status: phase 1-5 complete; milestone 2 complete.
 
 ## Purpose
 

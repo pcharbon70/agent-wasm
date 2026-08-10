@@ -34,6 +34,29 @@ obligations.
 Promotion to `status: normative` requires evidence from the Phase 2
 integration tests and a passing cross-milestone fixture run.
 
+### Milestone acceptance criteria
+
+> **Normative definition.**
+Phase 2 MILESTONE ACCEPTANCE requires:
+
+1. **Integration test pass**: 100% of Phase 2 integration tests MUST pass.
+2. **Cross-milestone fixture**: A passing cross-milestone fixture run that
+   exercises the policy and attenuation system in conjunction with other
+   milestone capabilities.
+3. **Performance bounds**: Policy evaluation latency and attenuation
+   enforcement overhead MUST meet normative bounds defined in the
+   conformance profile.
+4. **Evidence recording**: All integration test evidence MUST be recorded
+   as machine-readable YAML reports in the `50-journal/` directory.
+5. **Conformance profile**: The conformance profile MUST document all
+   implementation-defined choices listed in this chapter.
+
+> **Normative definition.**
+Phase 2 FAILS MILESTONE ACCEPTANCE if:
+- Any integration test fails, OR
+- Normative performance bounds are exceeded, OR
+- The conformance profile is incomplete.
+
 Governing policies:
 [Specification Authority](../SPECIFICATION-AUTHORITY.md)
 and
@@ -247,6 +270,70 @@ Attenuation MAY restrict the following dimensions:
 7. **byte counts**: Maximum byte counts for input or output.
 8. **durations**: Maximum duration for the capability execution.
 9. **invocation budgets**: Maximum number of invocations within a time window.
+
+> **Normative definition.**
+Attenuation is evaluated at policy evaluation time and is STATIC for the
+duration of the invocation.
+Runtime policy adjustment based on observed behavior is NOT permitted for
+baseline conformance.
+Conformance profiles MAY define mechanisms for policy re-evaluation triggered
+by specific events (e.g., resource threshold crossing).
+
+> **Normative definition.**
+When multiple attenuation dimensions conflict, the DENY outcome takes precedence.
+If any dimension denies an action, the entire action is denied regardless of
+other dimensions allowing it.
+Conformance profiles MAY define priority between dimension types for
+diagnostic purposes, but the normative behavior is deny-on-conflict.
+
+> **Normative definition.**
+Approval deadlines MUST be bounded by the turn timeout.
+If an approval deadline exceeds the turn timeout, the turn MUST timeout
+before approval is received.
+The host MUST reject approval configurations where the deadline exceeds the
+turn timeout with the diagnostic `policy.approval-deadline-exceeds-turn-timeout`.
+
+> **Normative definition.**
+Approval workflows MAY be nested with a maximum depth of 3 levels for
+baseline conformance.
+Nested approvals deeper than 3 levels MUST be rejected with the diagnostic
+`policy.approval-nesting-depth-exceeded`.
+Conformance profiles MAY allow deeper nesting for specific deployment models.
+
+### Policy Evaluation
+
+> **Normative definition.**
+Policy evaluations at independent boundaries MUST be executed sequentially
+for baseline conformance.
+Parallel policy evaluation is NOT permitted for baseline conformance.
+Conformance profiles MAY define conditions under which parallel evaluation is
+permitted, provided consistency guarantees are preserved.
+
+### Policy Audit
+
+> **Normative definition.**
+Policy decisions MUST be auditable by a compliance audit role.
+The compliance audit role has read-only access to policy decision logs and
+MUST NOT have authority to modify or delete audit records.
+Conformance profiles MAY define additional audit roles or access controls.
+
+### Rule Versioning
+
+> **Normative definition.**
+Policy rules CANNOT be versioned independently.
+Policies are versioned as a whole through the policy versioning mechanism
+defined in this chapter.
+Rule-level versioning is NOT supported for baseline conformance.
+Conformance profiles MAY define bundle-level versioning as an extension.
+
+### Attenuation Overhead Measurement
+
+> **Normative definition.**
+Attenuation enforcement overhead measurement is implementation-defined.
+Implementations MUST document their own metrics for policy evaluation latency
+and attenuation enforcement overhead in the conformance profile.
+Normative latency bounds for policy evaluation are NOT defined for baseline
+conformance.
 
 > **Normative definition.**
 
@@ -590,11 +677,22 @@ The following choices are implementation-defined and MUST be documented in the
 conformance profile:
 
 1. **Policy engine**: The policy engine implementation (e.g., OPA, custom).
+
 2. **Grant storage**: The grant storage implementation (in-memory, database, etc.).
+
 3. **Policy caching**: The policy decision caching strategy.
+   Baseline conformance REQUIRES cache invalidation on policy changes.
+   Cached policy decisions MUST be invalidated when the policy version changes.
+   Implementations MAY cache policy decisions for repeated inputs with the same
+   context, provided cache invalidation is triggered on policy changes.
+
 4. **Audit log retention**: The audit log retention policy.
+   Baseline conformance REQUIRES normative minimum retention periods aligned with
+   common regulations (e.g., GDPR, SOC2).
+
 5. **Approval notification mechanism**: The mechanism used to notify approvers
    (e.g., email, webhook, in-app notification).
+
 6. **Attenuation enforcement mechanism**: The mechanism used to enforce
    attenuation restrictions at runtime (e.g., proxy, wrapper, native enforcement).
 
@@ -633,6 +731,47 @@ The Phase 2 integration tests MUST verify the following objectives:
 
 1. **Canonical successful flow**: The host evaluates policy, grants capabilities,
    applies attenuation, and enforces limits successfully.
+2. **Performance**: Policy evaluation latency and attenuation enforcement
+   overhead meet normative latency bounds defined in the conformance profile.
+3. **Failure handling**: The host handles malformed, incompatible, stale,
+   duplicate, and boundary-limit inputs correctly.
+4. **Security enforcement**: The host enforces policy decisions, attenuation
+   restrictions, and limits without leaving unauthorized state.
+5. **Cross-milestone compatibility**: The phase does not introduce regressions
+   in earlier milestones.
+
+### Test evidence recording
+
+> **Normative definition.**
+Phase 2 integration test evidence MUST be recorded as machine-readable YAML
+reports in the `50-journal/` directory.
+Each report MUST include:
+- Test name and identifier
+- Input data
+- Expected output
+- Actual output
+- Pass/fail status
+- Timestamp
+- Performance metrics (latency, overhead) where applicable
+
+### Test execution
+
+> **Normative definition.**
+Integration tests MAY be run in parallel if each test has isolated state.
+Tests that share state MUST be run sequentially.
+Conformance profiles MUST document which tests can be run in parallel and
+which require sequential execution.
+
+### Normative latency bounds
+
+> **Normative definition.**
+The conformance profile MUST define normative latency bounds for:
+- Policy evaluation latency (microseconds per evaluation).
+- Attenuation enforcement overhead (microseconds per restriction).
+- Grant validation latency (microseconds per validation).
+
+Tests MUST verify that implementations meet these bounds under representative
+workloads.
 2. **Failure handling**: The host handles malformed, incompatible, stale,
    duplicate, and boundary-limit inputs correctly.
 3. **Security enforcement**: The host enforces policy decisions, attenuation
