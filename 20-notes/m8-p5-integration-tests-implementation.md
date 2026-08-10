@@ -164,15 +164,6 @@ EarlierMilestoneFixtures = {
 
 ## Implementation Notes
 
-### File Structure
-
-The following files are created:
-
-```
-20-notes/
-  m8-p5-integration-tests-implementation.md  (this file)
-```
-
 ### Key Behaviors
 
 1. **Canonical Flow**: The complete fault injection, security testing, performance measurement, formal modeling, and release acceptance workflow is exercised.

@@ -146,15 +146,6 @@ PerformanceMeasurement = {
 
 ## Implementation Notes
 
-### File Structure
-
-The following files are created:
-
-```
-20-notes/
-  m8-p5-contract-and-data-model-implementation.md  (this file)
-```
-
 ### Key Invariants
 
 1. **Crash Tolerance**: The system must tolerate crashes at any injection point without leaving partial state.

@@ -134,15 +134,6 @@ ReleaseAcceptance = {
 
 ## Implementation Notes
 
-### File Structure
-
-The following files are created:
-
-```
-20-notes/
-  m8-p5-behavior-and-integration-implementation.md  (this file)
-```
-
 ### Key Behaviors
 
 1. **Timing Analysis**: Runtime timing ratios are compared against baselines with full environmental context for accurate triage.

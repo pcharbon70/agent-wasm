@@ -30,7 +30,7 @@ Establish failure evidence and operational notes for fault injection, security t
 Malformed, incompatible, conflicting, unauthorized, exhausted, and unavailable outcomes MUST be defined for fault security performance formal model and release acceptance. The failure outcomes are:
 
 ```yaml
-FailureOutcome = "malformed" | "incompatible" | "conflicting" | "unauthorized" | "exhausted" | "unavailable"
+FailureOutcome = "malformed" | "incompatible" | "stale" | "conflicting" | "unauthorized" | "exhausted" | "unavailable" | "duplicate" | "boundary-exceeded"
 ```
 
 | Outcome | Definition | Trigger Condition |
@@ -41,8 +41,11 @@ FailureOutcome = "malformed" | "incompatible" | "conflicting" | "unauthorized" |
 | **unauthorized** | The fault injection or test is unauthorized | Unauthenticated testing, unauthorized access to sensitive tests |
 | **exhausted** | The resource limit is exhausted | Test budget exceeded, measurement timeout exceeded, memory limit exceeded |
 | **unavailable** | A required dependency is unavailable | Fault injection tool unavailable, adversarial test suite unavailable, performance measurement tool unavailable |
+| **stale** | The input is valid but has exceeded the retention period | Artifact version older than retention period |
+| **duplicate** | The input is an exact duplicate of a previously processed input | Same normalized signature as an existing failure |
+| **boundary-exceeded** | The input exceeds a defined boundary limit | Input size or count exceeds configured maximum |
 
-**Decision**: These outcomes cover the failure modes specific to fault injection, security testing, performance measurement, formal modeling, and release acceptance. Additional outcomes (e.g., "stale" from Phase 3) may be added if they apply.
+**Decision**: These outcomes cover the failure modes specific to fault injection, security testing, performance measurement, formal modeling, and release acceptance, as well as the cross-cutting outcomes "stale", "duplicate", and "boundary-exceeded" defined in Phase 3 Section 3.3.
 
 ### Subtask 5.3.1.2: Diagnostic Emission
 
@@ -102,15 +105,6 @@ ImplementationDocumentation = {
 **Decision**: Implementation-defined choices are documented for transparency. Deferred work is tracked for future planning. Invalidating results are flagged for review.
 
 ## Implementation Notes
-
-### File Structure
-
-The following files are created:
-
-```
-20-notes/
-  m8-p5-failure-evidence-and-operational-notes-implementation.md  (this file)
-```
 
 ### Key Behaviors
 
