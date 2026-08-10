@@ -316,26 +316,28 @@ profile so that operators can understand the system's behavior.
 
 ### Deferred work
 
-> **Normative definition.**
-The following work is deferred to future phases or milestones:
-
-1. **Tool composition**: Composing multiple tools into a single compound
-   tool is deferred to Milestone 8.
-2. **Tool versioning**: Automatic tool version upgrades and rollback is
-   deferred to Milestone 8.
-3. **Tool marketplace**: A marketplace for third-party tools is deferred
-   to Milestone 9.
-4. **Tool analytics**: Analytics and metrics for tool usage is deferred
-   to Milestone 9.
-5. **Multi-custodian connector failover**: Explicit user-approved failover
-   without runtime credential or resource substitution is deferred to
-   Milestone 8.
+| Item | Target | Reason |
+| --- | --- | --- |
+| Tool composition | Milestone 8 | Multi-tool composition requires portability and verification of compound tool boundaries; scoped to Milestone 8 (not 9) because it addresses runtime behavior of composed tool execution, not marketplace or analytics |
+| Tool versioning | Milestone 8 | Automatic version upgrades and rollback require portability and verification of version negotiation across runtimes; scoped to Milestone 8 (not 9) because it addresses runtime behavior, not developer tooling |
+| Tool marketplace | Milestone 9 | Third-party tool marketplace requires production platform and developer experience |
+| Tool analytics | Milestone 9 | Usage analytics and metrics require production platform and developer experience |
+| Multi-custodian connector failover | Milestone 8 | Explicit user-approved failover without runtime credential or resource substitution requires portability and verification |
 
 > **Non-normative note.**
 The deferred work items are not within the scope of Phase 2 but may
 be addressed in future phases.
 Implementations MUST NOT implement deferred work without evidence from
 the corresponding future phase.
+
+> **Non-normative note.**
+All items deferred to Milestone 8 fall under
+Milestone 8 - Portability, Verification, And Performance
+(planning document at `.spec/planning/agentic-system/milestone-08-portability-verification-and-performance/README.md`).
+The Milestone 8 boundary principle: Milestone 8 addresses portability,
+verification, and performance of the system as built by Milestones 1-7.
+Milestone 9 addresses production platform, developer experience, and
+operational tooling built on top of that verified system.
 
 ### Results that would invalidate an earlier milestone assumption
 
