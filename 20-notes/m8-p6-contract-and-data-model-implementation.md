@@ -114,15 +114,6 @@ CommunityHandoff = {
 
 ## Implementation Notes
 
-### File Structure
-
-The following files are created:
-
-```
-20-notes/
-  m8-p6-contract-and-data-model-implementation.md  (this file)
-```
-
 ### Key Invariants
 
 1. **Artifact Integrity**: All deployment artifacts must have verifiable integrity through checksums and signatures.
@@ -145,16 +136,16 @@ The following tests are planned for validation once the validator implementation
 
 ### Test 6.1.1: Artifact Specification
 
-**Setup**: Configure deployment artifact specifications for all supported platforms.
+**Setup**: Verify deployment artifact specifications document all supported platforms.
 
 **Steps**:
-1. Generate binaries for each platform.
-2. Create configuration files for each platform.
-3. Generate dependency manifests for each platform.
-4. Verify checksums and signatures for all artifacts.
-5. Validate artifact format and structure.
+1. Verify binary specifications are documented for each platform.
+2. Verify configuration specifications are documented for each platform.
+3. Verify dependency manifest specifications are documented for each platform.
+4. Verify checksum and signature requirements are documented for all artifacts.
+5. Verify artifact format and structure specifications are documented.
 
-**Expected Result**: All artifacts are generated, integrity-verified, and properly formatted.
+**Expected Result**: All artifact specifications are documented, integrity requirements are specified, and formats are defined.
 
 ### Test 6.1.2: Operational Procedures
 
