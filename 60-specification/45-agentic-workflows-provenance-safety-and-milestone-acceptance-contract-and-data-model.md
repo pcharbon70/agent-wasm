@@ -3,7 +3,7 @@ title: "Agentic Workflows Provenance Safety And Milestone Acceptance Contract An
 kind: specification
 created: "2026-08-09"
 status: draft
-spec_version: "0.1.0"
+spec_version: "0.2.0"
 tags:
   - milestone-07
   - phase-05
@@ -13,6 +13,8 @@ tags:
   - milestone-acceptance
   - contract
   - data-model
+  - model-bindings
+  - credential-custody
 aliases:
   - "M7-P5 Contract And Data Model"
 ---
@@ -31,9 +33,13 @@ It establishes the contract and data model for agentic workflows, provenance,
 safety, and milestone acceptance, including workflow types (direct model
 response, structured response, model-to-tool continuation, retrieval-grounded
 answer, code execution, multi-agent delegation), approval outcomes
-(approval-required, denied, expired), quota exhaustion, revoked secret,
+(approval-required, denied, expired), quota exhaustion, revoked credential use,
 cancelled model stream, and provenance references (model, tool, retrieval,
 state revision, directive, attempt, policy).
+
+Version `0.2.0` replaces direct provider/model request fields and
+host-accessible revoked-secret semantics with logical model slots, pinned
+binding references, and use-only credential lease outcomes.
 
 This chapter is normative by default within its stated scope.
 Material visibly marked non-normative does not create conformance
@@ -142,8 +148,10 @@ A direct model response workflow includes the following fields:
 
 | Field | Content | Source |
 |-------|---------|--------|
-| `model_address` | The `TenantQualifiedAgentAddress` of the model. | Host runtime |
-| `request` | The model request (prompt, parameters). | Host runtime |
+| `model_slot` | Logical model requirement used by the workflow. | Host runtime |
+| `binding_id` | User-approved model binding identity. | Host runtime |
+| `binding_revision` | Pinned model binding revision. | Host runtime |
+| `request_id` | Durable materialized model request reference. | Host runtime |
 | `response` | The model response. | Host runtime |
 | `usage` | The model usage (tokens, cost). | Host runtime |
 
@@ -255,15 +263,21 @@ Quota exhaustion includes the following fields:
 | `exhausted_at` | The ISO 8601 timestamp of exhaustion. | Host clock |
 
 > **Normative definition.**
-Revoked secret includes the following fields:
+Revoked credential use includes the following fields:
 
 | Field | Content | Source |
 |-------|---------|--------|
-| `lease_id` | The `LeaseId` of the revoked secret lease. | Host runtime |
+| `lease_fingerprint` | Non-authority-bearing fingerprint of the revoked credential lease. | Host runtime |
+| `custodian_id` | Registered credential custodian identity. | Host runtime |
 | `principal` | The `TenantQualifiedAgentAddress` of the principal. | Host runtime |
 | `resource` | The resource that was revoked. | Host runtime |
+| `model_binding_id` | Associated model binding identity, if applicable. | Host runtime |
+| `model_binding_revision` | Associated model binding revision, if applicable. | Host runtime |
 | `revoked_at` | The ISO 8601 timestamp of revocation. | Host clock |
 | `revoked_by` | The `TenantQualifiedAgentAddress` that revoked the lease. | Host runtime |
+
+The record MUST NOT contain a credential, authentication header, opaque handle
+reference, custodian endpoint, or provider request body.
 
 > **Normative definition.**
 Cancelled model stream includes the following fields:
@@ -272,7 +286,9 @@ Cancelled model stream includes the following fields:
 |-------|---------|--------|
 | `stream_id` | The `StreamId` of the cancelled model stream. | Host runtime |
 | `agent_address` | The `TenantQualifiedAgentAddress` of the agent. | Host runtime |
-| `model_address` | The `TenantQualifiedAgentAddress` of the model. | Host runtime |
+| `model_slot` | Logical model slot used by the stream. | Host runtime |
+| `binding_id` | Pinned user-approved model binding. | Host runtime |
+| `binding_revision` | Pinned binding revision. | Host runtime |
 | `cancelled_at` | The ISO 8601 timestamp of cancellation. | Host clock |
 | `cancelled_by` | The `TenantQualifiedAgentAddress` that cancelled the stream. | Host runtime |
 

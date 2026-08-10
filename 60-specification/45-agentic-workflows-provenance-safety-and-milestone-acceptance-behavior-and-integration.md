@@ -3,7 +3,7 @@ title: "Agentic Workflows Provenance Safety And Milestone Acceptance Behavior An
 kind: specification
 created: "2026-08-09"
 status: draft
-spec_version: "0.1.0"
+spec_version: "0.2.0"
 tags:
   - milestone-07
   - phase-05
@@ -13,6 +13,8 @@ tags:
   - milestone-acceptance
   - behavior
   - integration
+  - model-bindings
+  - credential-custody
 aliases:
   - "M7-P5 Behavior And Integration"
 ---
@@ -32,6 +34,10 @@ provenance, safety, and milestone acceptance, including hostile output
 validation, loop termination under budgets, deterministic resume from
 snapshots, and the Milestone 7 workflow corpus with provenance coverage,
 safety boundaries, cost evidence, and residual model-quality limitations.
+
+Version `0.2.0` aligns workflow safety with user-selected model bindings and
+use-only credential custody. Workflow execution cannot change a pinned model
+selection or obtain raw provider credentials.
 
 This chapter is normative by default within its stated scope.
 Material visibly marked non-normative does not create conformance
@@ -245,9 +251,15 @@ Safety boundaries include the following:
 |----------|-------------|-------------|
 | `quotas` | Enforce tenant/agent/model/tool quotas. | Host enforces at reservation, consumption, release, reconciliation. |
 | `approvals` | Require approval for sensitive operations. | Host enforces approval workflow with eligible approvers, decision options, expiry, escalation. |
-| `secrets` | Protect secrets with non-exportability and audit logging. | Host enforces secret lease lifecycle with creation, access, renewal, expiry, revocation, deletion. |
+| `credentials` | Keep authenticated provider authority use-only and auditable. | User-controlled custodian enforces typed operations, scope, nonce, budget, revocation, and receipts; separated-custody host and Port processes never receive raw credentials. |
 | `hostile output` | Validate and filter hostile output. | Host enforces validation at state, model context, downstream tool, and user-facing admission points. |
 | `budgets` | Enforce workflow budgets (iterations, tools, time, cost, tokens). | Host enforces at workflow execution with deterministic resume from snapshots. |
+
+Every model step MUST use the `model_slot` and binding revision recorded by
+the durable model request. Resume, retry, tool continuation, and delegation
+MUST NOT select a different provider, model, connection, or credential
+custodian. A binding change applies only to a new model intent after user
+approval.
 
 > **Normative definition.**
 Cost evidence includes the following metrics:

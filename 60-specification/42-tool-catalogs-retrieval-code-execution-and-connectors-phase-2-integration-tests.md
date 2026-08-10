@@ -3,7 +3,7 @@ title: "Tool Catalogs Retrieval Code Execution And Connectors Phase 2 Integratio
 kind: specification
 created: "2026-08-09"
 status: draft
-spec_version: "0.1.0"
+spec_version: "0.2.0"
 tags:
   - milestone-07
   - phase-02
@@ -12,6 +12,7 @@ tags:
   - code-execution
   - connectors
   - integration-tests
+  - credential-custody
 aliases:
   - "M7-P2 Phase 2 Integration Tests"
 ---
@@ -28,6 +29,10 @@ of
 AI, Tools, Memory, And Human Control.
 It defines the integration tests that verify tool catalogs, retrieval,
 code execution, and connectors across their real dependency boundaries.
+
+Version `0.2.0` adds authenticated-connector fixtures proving that the same
+use-only custodian boundary applies to connector credentials and refresh
+tokens, not only model-provider credentials.
 
 This chapter is normative by default within its stated scope.
 Material visibly marked non-normative does not create conformance
@@ -77,11 +82,19 @@ Related chapters:
 [Provider-Neutral Model Requests Responses Streaming And Usage Behavior And Integration](41-provider-neutral-model-requests-responses-streaming-and-usage-behavior-and-integration.md),
 [Provider-Neutral Model Requests Responses Streaming And Usage Failure Evidence And Operational Notes](41-provider-neutral-model-requests-responses-streaming-and-usage-failure-evidence-and-operational-notes.md),
 [Provider-Neutral Model Requests Responses Streaming And Usage Phase 1 Integration Tests](41-provider-neutral-model-requests-responses-streaming-and-usage-phase-1-integration-tests.md),
+[Threads Checkpoints Memory Approvals Quotas And Secret Leases Phase 4 Integration Tests](44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-phase-4-integration-tests.md),
 [Tool Catalogs Retrieval Code Execution And Connectors Contract And Data Model](42-tool-catalogs-retrieval-code-execution-and-connectors-contract-and-data-model.md),
 [Tool Catalogs Retrieval Code Execution And Connectors Behavior And Integration](42-tool-catalogs-retrieval-code-execution-and-connectors-behavior-and-integration.md),
 [Tool Catalogs Retrieval Code Execution And Connectors Failure Evidence And Operational Notes](42-tool-catalogs-retrieval-code-execution-and-connectors-failure-evidence-and-operational-notes.md).
 
 ## 42.4 Phase 2 Integration Tests
+
+The harness MUST include an authenticated connector, a user-controlled
+custodian containing a unique sentinel credential and refresh token, a fake
+external service, and inspection of guest I/O, host and Port memory, durable
+stores, journals, logs, traces, diagnostics, evidence, crash artifacts,
+network destinations, and support bundles. The sentinel values MUST exist only
+inside the custodian fixture.
 
 ### 42.4.1 Successful flow tests
 
@@ -148,6 +161,14 @@ Tests `P2-SF-019` through `P2-SF-026` validate the full code execution
 flow defined in section 42.2.
 Each test validates one of the eight code execution operations and verifies
 that the host behaves correctly according to the operation.
+
+#### Connector flow tests
+
+| Test ID | Description |
+| --- | --- |
+| `P2-SF-027` | User binds an authenticated connector to a registered custodian and executes one typed tool operation; verify a valid result and receipt. |
+| `P2-SF-028` | Rotate or refresh connector authority inside the custodian and execute again; verify no plugin, host, or Port configuration receives a token. |
+| `P2-SF-029` | Execute an unauthenticated connector through its approved direct handler; verify that no credential-use request is created. |
 
 ### 42.4.2 Failure handling tests
 
@@ -255,6 +276,33 @@ lookup layers that guard the atomic commit protocol.
 Without these tests, unavailable requests could bypass the registries
 and compromise system consistency.
 
+#### Credential custody tests
+
+| Test ID | Description | Expected diagnostic or invariant |
+| --- | --- | --- |
+| `P2-FH-025` | Agent has connector capability but effect worker lacks `CredentialUse`. | `credential.use.unauthorized` |
+| `P2-FH-026` | Typed request changes binding, operation, resource, digest, deadline, nonce, or budget. | `credential.use.scope_mismatch` |
+| `P2-FH-027` | Connector asks for a credential, refresh token, authentication header, or bearer token. | `credential.use.export_forbidden` |
+| `P2-FH-028` | Accepted connector-use nonce is replayed. | `credential.use.replay` |
+| `P2-FH-029` | Pinned connector custodian is unavailable. | `credential.custodian.unavailable` |
+| `P2-FH-030` | Connector receipt has invalid correlation, digest, signature, or transport proof. | `credential.receipt.invalid`; result is not admitted |
+| `P2-FH-031` | Connector binding is absent, stale, cross-tenant, or unapproved. | Operation is rejected before custodian or external-service contact |
+
+#### Credential non-exposure and egress tests
+
+| Test ID | Security scenario | Expected invariant |
+| --- | --- | --- |
+| `P2-SEC-001` | Complete successful, denied, failed, cancelled, and crashed connector uses. | Sentinel credential and refresh token, including common encodings, are absent from every inspected product boundary. |
+| `P2-SEC-002` | Inspect guest, connector adapter, operator, audit, and support interfaces. | No opaque handle or authentication header is observable. |
+| `P2-SEC-003` | Compromised connector changes origin, method, headers, operation, resource, or payload digest. | Custodian rejects the request and the external service is not contacted. |
+| `P2-SEC-004` | Host or Port attempts direct authenticated external-service egress. | Network policy denies the operation and emits `credential.egress.bypass`. |
+| `P2-SEC-005` | Reuse a connector binding or handle reference across tenant, agent, artifact, or operation. | Sender and scope validation reject the use. |
+| `P2-SEC-006` | Retry after an uncertain outcome. | Status is reconciled; binding, custodian, operation, resource, digest, and budget stay pinned; nonce is fresh. |
+| `P2-SEC-007` | Enable host-local connector authentication without warning and approval. | Activation fails and separated-custody conformance is not claimed. |
+
+The harness MUST prove both non-transmission and zero sentinel occurrences.
+Redaction-only evidence is insufficient.
+
 ### 42.4.3 Timeout and cancellation tests
 
 > **Normative definition.**
@@ -350,6 +398,7 @@ testing.
 |-----------|--------------|-------------------|
 | Milestone 7 Phase 1 | Model requests, responses, streaming, and usage | All fixtures continue to pass; model requests can call tools. |
 | Milestone 7 Phase 2 | Tool catalogs, retrieval, code execution, and connectors | All fixtures continue to pass; tools are correctly resolved and executed. |
+| Milestone 7 Phase 4 | Credential custodians, leases, handles, and receipts | Authenticated connector use preserves typed scope, non-exposure, revocation, and receipt semantics. |
 | Milestone 6 Phase 1 | Signal envelopes, causality routing, and delivery | All fixtures continue to pass; tool execution signals are correctly routed. |
 | Milestone 6 Phase 2 | Actions, instructions, validation, plans, and results | All fixtures continue to pass; tool execution results are consistent with action results. |
 | Milestone 6 Phase 3 | State operations, patches, revisions, and conflicts | All fixtures continue to pass; tool execution state is correctly managed. |
@@ -372,12 +421,10 @@ revision protocol defined in
 [Specification Authority](../SPECIFICATION-AUTHORITY.md).
 
 > **Non-normative note.**
-The table above lists 12 fixture scopes from 6 milestones that are affected
-by the Phase 2 contracts.
-This is consistent with the cross-reference summary in section 42.1, which
-identifies 6 direct integration points with earlier chapters.
-The broader fixture scope accounts for indirect effects through shared
-subsystems (such as the agent registry, mailboxes, and durable journal).
+The table above includes direct model, connector-custody, policy, plugin,
+isolation, provenance, and durable-execution boundaries. Its broader fixture
+scope also covers indirect effects through shared subsystems such as the agent
+registry, mailboxes, and durable journal.
 
 ### 42.4.5 Integration test evidence requirements
 
@@ -403,6 +450,10 @@ defined in sections 42.4.1 through 42.4.4:
 | `timestamp` | The ISO 8601 timestamp of test execution. | ISO 8601 string |
 | `regression` | For cross-milestone tests, whether the test previously passed. | Boolean |
 | `approved_variability` | For cross-milestone tests, any approved variability from the baseline. | Structured text |
+| `connector_binding_revision` | Pinned authentication binding revision, if applicable. | Integer or null |
+| `credential_use_count` | Number of custodian use requests. | Integer |
+| `external_call_count` | Number of fake external-service operations. | Integer |
+| `sentinel_scan_result` | Non-exposure scan result, if applicable. | Structured text or null |
 
 > **Non-normative note.**
 The evidence format above is consistent with the evidence record format
@@ -486,3 +537,5 @@ chapter.
 | Cross-milestone fixture execution order | Section 42.4 | MAY | Must include all fixtures listed in section 42.4.4. Order is informational. |
 | Approved variability documentation format | Section 42.4 | MAY | Must include scenario, deviation, rationale. Format is informational. |
 | Regression baseline selection | Section 42.4 | MAY | Must use most recent normative baseline. Documented in conformance profile. |
+| Custodian fixture transport | Section 42.4 | MAY | Must exercise the product's real authenticated custody boundary. |
+| Sentinel encoding scan | Section 42.4 | MUST | Must cover raw, base64, hex, URL-encoded, and structured forms and accompany the non-transmission proof. |

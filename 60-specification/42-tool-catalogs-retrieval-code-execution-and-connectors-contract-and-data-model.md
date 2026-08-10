@@ -3,7 +3,7 @@ title: "Tool Catalogs Retrieval Code Execution And Connectors Contract And Data 
 kind: specification
 created: "2026-08-09"
 status: draft
-spec_version: "0.1.0"
+spec_version: "0.2.0"
 tags:
   - milestone-07
   - phase-02
@@ -12,6 +12,7 @@ tags:
   - code-execution
   - connectors
   - capabilities
+  - credential-custody
 aliases:
   - "M7-P2 Contract And Data Model"
 ---
@@ -30,6 +31,12 @@ It establishes the contract and data model for tool catalogs, retrieval,
 code execution, and connectors, including tool descriptors, retrieval
 requests, code-execution requests, and the capability policy that binds
 them.
+
+Version `0.2.0` replaces connector-owned authentication and token-refresh
+semantics with user-controlled authentication bindings and use-only
+credential custody. A connector plugin may describe and prepare a typed
+operation, but it does not receive provider credentials, authentication
+headers, refresh tokens, or opaque credential handles.
 
 This chapter is normative by default within its stated scope.
 Material visibly marked non-normative does not create conformance
@@ -79,6 +86,7 @@ Related chapters:
 [Provider-Neutral Model Requests Responses Streaming And Usage Behavior And Integration](41-provider-neutral-model-requests-responses-streaming-and-usage-behavior-and-integration.md),
 [Provider-Neutral Model Requests Responses Streaming And Usage Failure Evidence And Operational Notes](41-provider-neutral-model-requests-responses-streaming-and-usage-failure-evidence-and-operational-notes.md),
 [Provider-Neutral Model Requests Responses Streaming And Usage Phase 1 Integration Tests](41-provider-neutral-model-requests-responses-streaming-and-usage-phase-1-integration-tests.md),
+[Threads Checkpoints Memory Approvals Quotas And Secret Leases Contract And Data Model](44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md),
 [Tool Catalogs Retrieval Code Execution And Connectors Behavior And Integration](42-tool-catalogs-retrieval-code-execution-and-connectors-behavior-and-integration.md),
 [Tool Catalogs Retrieval Code Execution And Connectors Failure Evidence And Operational Notes](42-tool-catalogs-retrieval-code-execution-and-connectors-failure-evidence-and-operational-notes.md),
 [Tool Catalogs Retrieval Code Execution And Connectors Phase 2 Integration Tests](42-tool-catalogs-retrieval-code-execution-and-connectors-phase-2-integration-tests.md).
@@ -251,14 +259,50 @@ The host discovers available connectors from approved framework plugins
 and presents them to agents through the tool catalog.
 
 > **Normative definition.**
-Every connector MUST include the following capabilities:
+Every connector MUST include the following plugin-facing capabilities:
 
 | Capability | Description |
 |------------|-------------|
 | `list_tools` | List the tools provided by this connector. |
-| `execute_tool` | Execute a tool provided by this connector. |
-| `authenticate` | Authenticate with the external service (if required). |
-| `refresh_token` | Refresh the authentication token (if required). |
+| `prepare_tool_operation` | Validate tool input and prepare a bounded typed operation without authentication material. |
+| `normalize_tool_result` | Validate and normalize bounded external results. |
+
+An unauthenticated connector MAY also execute its approved operation directly.
+An authenticated connector MUST use a user-controlled
+`ConnectorAuthenticationBinding`:
+
+> **Normative definition.**
+
+```
+ConnectorAuthenticationBinding {
+  binding_id: string,
+  revision: u64,
+  tenant_id: TenantId,
+  connector_id: string,
+  custodian_id: string,
+  credential_lease_id: string,
+  allowed_operations: string[],
+  allowed_resources: string[],
+  configured_by: PrincipalId,
+  policy_version: Version,
+  status: "active" | "pending-approval" | "stale" | "revoked" | "unavailable"
+}
+```
+
+The user or an authorized tenant operator MUST create, approve, change, and
+revoke this binding outside the plugin artifact. The plugin, guest, agent, and
+connector adapter MUST NOT create or alter it. The binding MUST NOT contain a
+raw credential, authentication header, refresh token, arbitrary endpoint, or
+opaque credential handle. It references the use-only lease defined in Section
+44; protected handle resolution remains inside the credential-use boundary.
+
+In the `separated-credential-custody` profile, authentication, token refresh,
+and the authenticated external operation MUST execute inside the registered
+custodian. `authenticate` and `refresh_token` MUST NOT be callable plugin or
+guest operations. The plugin, native Port adapter, and guest receive only
+bounded results and verified receipt correlation. The host may retain only the
+protected sender-constrained handle reference needed by Section 44, never its
+underlying authentication material.
 
 > **Non-normative note.**
 Connectors are implemented as framework plugins as defined in
@@ -285,7 +329,10 @@ earlier chapters:
 4. For provenance: this section takes precedence over
    [Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md)
    for questions of tool-specific provenance requirements.
-5. Where both sections are applicable and agree, they are mutually
+5. For authenticated connector custody: the credential contract in
+   [Threads Checkpoints Memory Approvals Quotas And Secret Leases Contract And Data Model](44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md)
+   takes precedence for handle, lease, typed-use, and receipt semantics.
+6. Where both sections are applicable and agree, they are mutually
     reinforcing.
 
 ## Variability register
@@ -302,7 +349,9 @@ chapter.
 | Tool descriptor field order | Section 42.1 | SHOULD | Must include all required fields. Order is informational. |
 | Retrieval request field order | Section 42.1 | SHOULD | Must include all required fields. Order is informational. |
 | Code-execution request field order | Section 42.1 | SHOULD | Must include all required fields. Order is informational. |
-| Connector capability list | Section 42.1 | MAY | Must include at least `list_tools` and `execute_tool`. |
+| Connector capability list | Section 42.1 | MAY | Must include at least `list_tools`, `prepare_tool_operation`, and `normalize_tool_result`. |
+| Connector authentication binding | Section 42.1 | Required for authenticated connectors | User-controlled, versioned, and outside the plugin artifact; must contain no credential or opaque handle. |
+| Connector credential custody | Section 42.1 | Required for end-user distributions | Authenticated operations must use Section 44 custody; host-local compatibility cannot claim separated custody. |
 | Framework plugin query order | Section 42.2 | MAY | Must query all approved framework plugins. Order is informational. |
 | Tool execution timeout | Section 42.3 | MAY | Must be at least the minimum execution duration. Documented in conformance profile. |
 | Code execution timeout | Section 42.3 | MAY | Must be at least the minimum execution duration. Documented in conformance profile. |

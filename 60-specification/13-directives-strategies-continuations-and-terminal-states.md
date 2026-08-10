@@ -3,7 +3,7 @@ title: "Directives Strategies Continuations And Terminal States"
 kind: specification
 created: "2026-08-08"
 status: draft
-spec_version: "0.1.0"
+spec_version: "0.2.0"
 tags:
   - milestone-02
   - phase-04
@@ -11,6 +11,7 @@ tags:
   - strategy
   - continuation
   - terminal
+  - model-bindings
 aliases:
   - "M2-P4 Directives Strategies"
 ---
@@ -131,6 +132,9 @@ Each directive kind requires the capability listed in the action's
 A strategy descriptor defines a replaceable decision policy for an agent.
 Strategies are versioned, bounded, and serializable to enable hot-replacement
 without state corruption.
+Version `0.2.0` adds logical model-slot references and replaces any implied
+strategy authority to select a concrete provider, model, connection, endpoint,
+or credential.
 
 > **Normative definition.**
 
@@ -142,6 +146,7 @@ StrategyDescriptor {
   entry_state: string,
   transitions: TransitionRule[],
   state_schema: JsonSchema,
+  model_slots: string[],
   timeout_ms: int?,
   max_iterations: int?
 }
@@ -177,8 +182,15 @@ StateFilter {
 | `entry_state` | string | Yes | Initial state name |
 | `transitions` | TransitionRule[] | Yes | State transition rules |
 | `state_schema` | JsonSchema | Yes | State data schema |
+| `model_slots` | string[] | Yes | Logical model requirements this strategy may request |
 | `timeout_ms` | int? | No | Maximum strategy execution time |
 | `max_iterations` | int? | No | Maximum state transitions per turn |
+
+Every `model_slots` value MUST resolve to a model requirement in the effective
+agent definition. A strategy MUST NOT identify or override a provider, model,
+adapter, connection, endpoint, credential custodian, or credential handle.
+Concrete selection belongs to the user-approved binding defined in
+[Provider-Neutral Model Requests Responses Streaming And Usage Contract And Data Model](41-provider-neutral-model-requests-responses-streaming-and-usage-contract-and-data-model.md).
 
 ### StrategySnapshot
 
@@ -564,6 +576,20 @@ Expected behavior:
 - Expected output: null.
 - Expected error: `directive.missing.missing_capability`.
 
+### Strategy model-slot validation
+
+> **Normative test scenario.**
+The strategy model-slot integration test validates that a strategy references
+only logical requirements from the effective agent definition.
+
+Expected behavior:
+
+- Input: one strategy with a declared logical slot and one strategy that
+  attempts to embed a provider, model, endpoint, or credential reference.
+- Expected output: the logical-slot strategy is accepted.
+- Expected error: the concrete-selection strategy is rejected before
+  activation with a bounded manifest or strategy diagnostic.
+
 ### Cross-milestone fixture regression
 
 > **Normative test scenario.**
@@ -588,6 +614,7 @@ Any approved variability MUST be documented in the Milestone 2 exit report.
 |--------|------|-----------|
 | Directive kinds | Required | Six kinds fixed by this chapter |
 | Strategy descriptors | Required | Fields fixed by this chapter |
+| Strategy model slots | Required | Logical requirement references only; concrete selection prohibited |
 | Strategy snapshots | Required | Fields fixed by this chapter |
 | Strategy transitions | Required | Direct, FSM, bounded loop fixed by this chapter |
 | Domain states | Required | Six states fixed by this chapter |

@@ -3,15 +3,17 @@ title: "Provider-Neutral Model Requests Responses Streaming And Usage Behavior A
 kind: specification
 created: "2026-08-09"
 status: draft
-spec_version: "0.1.0"
+spec_version: "0.2.0"
 tags:
   - milestone-07
   - phase-01
   - model-requests
+  - model-bindings
   - responses
   - streaming
   - usage
   - provider-neutral
+  - credential-use
   - behavior
   - integration
 aliases:
@@ -25,18 +27,21 @@ aliases:
 This chapter is a draft specification produced by
 [Phase 1](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/phase-01-provider-neutral-model-requests-responses-streaming-and-usage.md)
 of
-[Milestone 7](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/README.md)
---
-AI, Tools, Memory, And Human Control.
-It establishes the behavior and integration rules for provider-neutral
-model requests, responses, streaming, and usage, including provider
-adapter behavior, signal conversion, and outcome definitions.
+[Milestone 7](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/README.md).
+It defines installation-time model binding, request materialization, use-only
+credential dispatch, response normalization, retry, cancellation, and signal
+integration.
+
+Version `0.2.0` replaces the `0.1.0` runtime resolution flow. The host no
+longer resolves agent-supplied provider or model fields and no longer retries
+through an automatically chosen adapter. It resolves a user-approved logical
+slot once, pins that binding to the durable request, and uses the credential
+custodian contract for authenticated dispatch.
 
 This chapter is normative by default within its stated scope.
 Material visibly marked non-normative does not create conformance
-obligations.
-Promotion to `status: normative` requires evidence from the Phase 1
-integration tests and a passing cross-milestone fixture run.
+obligations. Promotion to `status: normative` requires passing evidence from
+[Phase 1 Integration Tests](41-provider-neutral-model-requests-responses-streaming-and-usage-phase-1-integration-tests.md).
 
 Governing policies:
 [Specification Authority](../SPECIFICATION-AUTHORITY.md)
@@ -44,349 +49,238 @@ and
 [Conformance Vocabulary](../CONFORMANCE-VOCABULARY.md).
 
 Related chapters:
-[Signal Envelopes Causality Routing And Delivery](10-signals-causality-routing-and-delivery.md),
-[Actions Instructions Validation Plans And Results](11-actions-instructions-validation-plans-and-results.md),
-[State Operations Patches Revisions And Conflicts](12-state-operations-patches-revisions-and-conflicts.md),
-[Directives Strategies Continuations And Terminal States](13-directives-strategies-continuations-and-terminal-states.md),
-[Deterministic Reducer Semantics And Milestone Acceptance](14-deterministic-reducer-semantics-and-milestone-acceptance.md),
-[Extism Invocation Boundary Instances And Output Validation](20-extism-invocation-boundary-instances-and-output-validation.md),
-[Mailboxes Ordering Bounds Fairness And Turn Leases](21-mailboxes-ordering-bounds-fairness-and-turn-leases.md),
-[Agent Registry Activation Cancellation And Completion](22-agent-registry-activation-cancellation-and-completion.md),
-[Sensors Schedules Timers And External Signal Ingress](23-sensors-schedules-timers-and-external-signal-ingress.md),
-[Single-Agent Host Flow And Milestone Acceptance](24-single-agent-host-flow-and-milestone-acceptance.md),
-[Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md),
+[Provider-Neutral Model Requests Responses Streaming And Usage Contract And Data Model](41-provider-neutral-model-requests-responses-streaming-and-usage-contract-and-data-model.md),
+[Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md),
+[Framework Plugin Manifests Composition And Lifecycle Hooks](32-framework-plugin-manifests-composition-and-lifecycle-hooks.md),
 [Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md),
 [Effect Handlers Attempts Idempotency And Result Signals](27-effect-handlers-attempts-idempotency-and-result-signals.md),
 [Retry Timer Recovery Replay Hibernate And Migration](28-retry-timer-recovery-replay-hibernate-and-migration.md),
-[Crash Injection Durable Effects And Milestone Acceptance](29-crash-injection-durable-effects-and-milestone-acceptance.md),
-[Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md),
-[Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md),
-[Framework Plugin Manifests Composition And Lifecycle Hooks](32-framework-plugin-manifests-composition-and-lifecycle-hooks.md),
-[Synchronous Host Functions WASI Restrictions And Tenant Isolation](33-synchronous-host-functions-wasi-restrictions-and-tenant-isolation.md),
-[Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md),
-[Agent Identity Addressing Ownership And Dependency Relations](35-agent-identity-addressing-ownership-and-dependency-relations.md),
-[Child Lifecycle Cancellation Monitoring And Restart Policy Contract And Data Model](36-child-lifecycle-cancellation-monitoring-and-restart-policy.md),
-[Fan-Out Fan-In Delegation And Result Aggregation Contract And Data Model](37-fan-out-fan-in-delegation-and-result-aggregation-contract-and-data-model.md),
-[Fan-Out Fan-In Delegation And Result Aggregation Behavior And Integration](37-fan-out-fan-in-delegation-and-result-aggregation-behavior-and-integration.md),
-[Fan-Out Fan-In Delegation And Result Aggregation Failure Evidence And Operational Notes](37-fan-out-fan-in-delegation-and-result-aggregation-failure-evidence-and-operational-notes.md),
-[Pod Topology Placement Activation Leases And Reconciliation Contract And Data Model](38-pod-topology-placement-activation-leases-and-reconciliation-contract-and-data-model.md),
-[Pod Topology Placement Activation Leases And Reconciliation Behavior And Integration](38-pod-topology-placement-activation-leases-and-reconciliation-behavior-and-integration.md),
-[Pod Topology Placement Activation Leases And Reconciliation Failure Evidence And Operational Notes](38-pod-topology-placement-activation-leases-and-reconciliation-failure-evidence-and-operational-notes.md),
-[Multi-Agent Recovery Clustering Seams And Milestone Acceptance Contract And Data Model](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-contract-and-data-model.md),
-[Multi-Agent Recovery Clustering Seams And Milestone Acceptance Behavior And Integration](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-behavior-and-integration.md),
-[Multi-Agent Recovery Clustering Seams And Milestone Acceptance Failure Evidence And Operational Notes](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-failure-evidence-and-operational-notes.md),
-[Multi-Agent Recovery Clustering Seams And Milestone Acceptance Phase 5 Integration Tests](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-phase-5-integration-tests.md),
-[Provider-Neutral Model Requests Responses Streaming And Usage Contract And Data Model](41-provider-neutral-model-requests-responses-streaming-and-usage-contract-and-data-model.md).
+and
+[Threads Checkpoints Memory Approvals Quotas And Secret Leases Behavior And Integration](44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-behavior-and-integration.md).
 
 ## 41.2 Behavior And Integration
 
-### Provider adapter behavior
+### Installation and configuration
 
-> **Normative definition.**
-Provider adapters behave as framework plugins: they are isolated in
-their own tenant, subject to the capability policy, and communicate
-with the host through well-defined interfaces.
+When an installed agent definition declares model requirements, the host MUST:
 
-> **Normative definition.**
-When the host receives a model request, it MUST:
+1. Present every required logical slot and its feature and capacity
+   requirements to the installing user.
+2. Present compatible models only from registered, tenant-authorized
+   connections and approved catalog revisions.
+3. Require the user or an authorized tenant operator to choose the connection
+   and model for each required slot.
+4. Validate the selected model against every declared requirement.
+5. Create a versioned binding outside the immutable artifact.
+6. Obtain approval covering the binding, grant, policy, connection, and catalog
+   revisions before enabling the definition.
 
-1. **Validate the request**: The host MUST validate the request against
-   the schema defined in section 41.1. Invalid requests MUST be rejected
-   with the appropriate diagnostic.
-2. **Resolve the provider**: The host MUST resolve the `provider` field
-   to a registered adapter. Unregistered providers MUST be rejected with
-   `model.request.unavailable_provider`.
-3. **Check the budget**: The host MUST check that the agent's remaining
-   budget is sufficient to cover the request. Insufficient budget MUST
-   be rejected with `model.request.quota_exhausted`.
-4. **Create the adapter request**: The host MUST call the adapter's
-   `create_request` capability to create a provider-specific request.
-5. **Start streaming**: The host MUST call the adapter's `stream_response`
-   capability to start streaming the response.
-6. **Normalize events**: The host MUST normalize each streaming event
-   and emit a signal for each event.
-7. **Finalize the response**: When the adapter signals completion or
-   failure, the host MUST finalize the response and emit a signal.
-8. **Record usage**: The host MUST record usage for the request and
-   update the agent's budget.
+The configure operation MUST NOT ask a user to place a raw credential in a
+plugin manifest, agent state, BEAM environment variable, Port configuration,
+or Wasm guest input when the distribution uses
+`separated-credential-custody`. Credential enrollment is an independent
+connection workflow owned by the user and custodian.
 
-> **Non-normative note.**
-Provider adapter behavior is designed to be fault-tolerant: if an adapter
-crashes or becomes unresponsive, the host MUST cancel the in-flight
-request and retry with a different adapter if available.
-This is consistent with the retry mechanism defined in
-[Retry Timer Recovery Replay Hibernate And Migration](28-retry-timer-recovery-replay-hibernate-and-migration.md).
+An unattended installer MAY accept an explicitly supplied binding file or
+tenant policy object, but the authenticated user or tenant operator remains
+the selection authority. The file MUST identify logical slots and registered
+connections; it MUST NOT contain raw credentials.
 
-### Capability mapping
+### Binding revision behavior
 
-> **Normative definition.**
-Provider adapters are granted capabilities by the host based on the
-agent's grants and the request's `budget`.
-The host MUST map the agent's grants to adapter capabilities using the
-following rules:
+A binding change MUST create a new revision and invalidate approval tied to the
+previous revision. It MUST affect only intents materialized after approval of
+the new revision. A request already recorded in the durable outbox remains
+pinned to its original binding revision.
 
-| Agent Grant | Adapter Capability |
-|-------------|-------------------|
-| `model.request.create` | `create_request` |
-| `model.request.stream` | `stream_response` |
-| `model.request.cancel` | `cancel_request` |
-| `model.request.status` | `check_status` |
-| `model.usage.read` | `record_usage` |
+An agent-definition upgrade that adds a required slot or changes a slot's
+features or limits MUST return the installation to
+`configuration-required`. The host MUST NOT infer a replacement model from a
+tenant default, a publisher hint, pricing, availability, or prior use.
 
-> **Non-normative note.**
-Capability mapping ensures that adapters only have access to the
-resources that the agent has been granted.
-This is consistent with the capability policy defined in
-[Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md).
+Automatic model routing, quality optimization, provider failover, and
+speculative multi-model execution are deferred. A future version MAY add them
+only as an explicit user-approved policy with auditable selection evidence.
 
-### Model resolution
+### Request admission and materialization
 
-> **Normative definition.**
-The host MUST resolve the `model` field of a model request to a
-provider-specific model identifier.
-The resolution process is:
+When the host receives a model intent, it MUST execute this order:
 
-1. The host checks the adapter's registered models for a match.
-2. If no match is found, the host returns `model.request.unavailable_model`.
-3. If a match is found, the host returns the provider-specific model
-   identifier.
+1. Authenticate the originating agent and validate the intent schema and
+   bounds.
+2. Reject any concrete selection, endpoint, authentication, or credential
+   field.
+3. Resolve `model_slot` against the effective agent definition.
+4. Authorize the originating agent's `ModelAccess` for that slot, purpose,
+   tools, content classification, deadline, and budget.
+5. Load exactly one active approved binding revision for the slot.
+6. Validate the bound model against the recorded catalog revision and current
+   policy without changing the selection.
+7. Materialize the concrete request and deterministic request identity.
+8. Atomically commit the request, journal fact, quota reservation, and outbox
+   effect before dispatch.
+9. Dispatch the recorded outbox effect through the bound adapter and
+   credential custodian.
 
-> **Non-normative note.**
-Model resolution allows the host to abstract provider-specific model
-identifiers.
-Agents can use portable model names (e.g., `gpt-4o`, `claude-3-5-sonnet`)
-without knowing the provider-specific identifiers.
-This is consistent with the provider adapter model defined in section 41.1.
+Failure before step 8 MUST leave no request, quota reservation, or external
+effect. Failure after step 8 is recovered through the durable effect protocol
+and MUST NOT cause a new provider or model to be selected.
 
-### Streaming normalization
+### Dual authorization and credential dispatch
 
-> **Normative definition.**
-Streaming normalization converts provider-specific streaming events
-into a common format.
-The host MUST normalize the following event types:
+Authenticated model dispatch has two independent authority checks:
 
-| Provider Event | Normalized Event |
-|----------------|------------------|
-| `text_delta` | `text_delta` |
-| `tool_call_delta` | `tool_request_delta` |
-| `finish` | `finish` |
-| `error` | `finish` (with `finish_reason: error`) |
+| Principal | Capability | Scope |
+| --- | --- | --- |
+| Originating agent | `ModelAccess` | Logical slot, tools, content, deadline, and budget. |
+| Authenticated effect worker | `CredentialUse` | Custodian, handle fingerprint, binding revision, provider operation, resource, request digest, deadline, nonce, and budget. |
 
-> **Non-normative note.**
-Streaming normalization ensures that downstream components can work with
-provider-neutral streaming data.
-This is consistent with the response normalization defined in section 41.1.
+The host MUST deny dispatch unless both checks allow it. `ModelAccess` MUST
+NOT imply `CredentialUse`, and `CredentialUse` MUST NOT grant model choice,
+tool authority, credential read, or credential export.
 
-### Cancellation behavior
+For `separated-credential-custody`, the dispatch flow is:
 
-> **Normative definition.**
-When a model request is cancelled, the host MUST:
+1. The reviewed adapter converts the materialized request into a typed
+   provider operation without authentication material.
+2. The host derives the canonical request digest and a unique attempt nonce.
+3. Policy authorizes the effect worker's `CredentialUse`.
+4. The host sends the typed operation, binding context, digest, nonce, deadline,
+   and budget to the registered custodian over authenticated transport.
+5. The custodian independently validates caller identity, tenant, agent,
+   artifact digest, binding revision, provider, model, operation, resource,
+   deadline, nonce, and budget.
+6. The custodian executes the provider operation using its credential or
+   provider-native workload identity.
+7. The custodian streams bounded provider events and returns a verifiable
+   receipt.
+8. The host verifies the receipt before admitting the final response or usage.
 
-1. Call the adapter's `cancel_request` capability.
-2. Mark the request as `cancelled` in the durable journal.
-3. Emit a `model.request.cancelled` signal.
-4. Release any resources associated with the request.
+The custodian MUST reject arbitrary origins, methods, authentication headers,
+provider or model substitutions, reused nonces, and request-digest changes.
+The host MUST NOT have direct authenticated egress to the bound provider in
+this profile. Local unauthenticated models MAY use a connection that declares
+no credential custodian, subject to normal network and tenant policy.
 
-> **Non-normative note.**
-Cancellation is best-effort: if the adapter does not support cancellation,
-the host MUST wait for the request to complete or timeout.
-This is consistent with the cancellation behavior defined in
-[Agent Registry Activation Cancellation And Completion](22-agent-registry-activation-cancellation-and-completion.md).
+### Adapter and stream behavior
 
-### Retry classification
+After dispatch begins, the adapter MUST normalize monotonically ordered events.
+The host MUST validate event identity, sequence, size, request correlation,
+tool deltas, and cumulative usage before emission.
 
-> **Normative definition.**
-The host MUST classify failures into retryable and non-retryable categories:
+The host MAY expose bounded text and tool-request deltas as causally linked
+signals. These deltas are observations and MUST NOT directly commit agent
+state. On completion, the host MUST validate tool requests, structured output,
+finish reason, usage, safety metadata, and the custodian receipt before
+atomically recording the final result.
 
-| Failure Type | Retryable |
-|--------------|-----------|
-| `model.request.unavailable_provider` | No |
-| `model.request.unavailable_model` | No |
-| `model.request.quota_exhausted` | No |
-| `model.request.tool_call_mismatch` | Yes (after agent updates tool definitions) |
-| `model.request.invalid_structured_output` | Yes (after agent updates schema) |
-| `model.request.safety_refused` | No |
-| `model.request.timeout` | Yes |
-| `model.request.late_response` | Yes |
-| `adapter.error` | Yes |
-| `network.error` | Yes |
-
-> **Non-normative note.**
-Retry classification ensures that the host does not retry failures
-that are unlikely to succeed.
-This is consistent with the retry mechanism defined in
-[Retry Timer Recovery Replay Hibernate And Migration](28-retry-timer-recovery-replay-hibernate-and-migration.md).
-
-### Signal conversion
-
-> **Normative definition.**
-The host MUST convert final success or failure into causally linked
-signals.
-Partial stream events are treated as bounded observations and do NOT
-create durable effects until the response is finalized.
-
-> **Normative definition.**
-The host MUST emit the following signals:
+The host MUST emit:
 
 | Event | Signal |
-|-------|--------|
-| Request created | `model.request.created` |
-| Streaming started | `model.request.streaming` |
-| Text delta received | `model.response.text_delta` |
-| Tool request delta received | `model.response.tool_request_delta` |
-| Response finalized (success) | `model.response.completed` |
-| Response finalized (failure) | `model.response.failed` |
-| Request cancelled | `model.request.cancelled` |
-| Usage recorded | `model.usage.recorded` |
+| --- | --- |
+| Intent admitted and request committed | `model.request.created` |
+| Custodian dispatch accepted | `model.request.dispatching` |
+| First valid delta | `model.request.streaming` |
+| Valid text delta | `model.response.text_delta` |
+| Valid tool delta | `model.response.tool_request_delta` |
+| Final response admitted | `model.response.completed` |
+| Final failure recorded | `model.response.failed` |
+| Cancellation recorded | `model.request.cancelled` |
+| Verified usage recorded | `model.usage.recorded` |
 
-> **Non-normative note.**
-Signal conversion ensures that downstream components can react to model
-requests and responses through the signal envelope mechanism defined in
-[Signal Envelopes Causality Routing And Delivery](10-signals-causality-routing-and-delivery.md).
+Every signal MUST preserve request causation and MUST NOT expose prompt
+content beyond its policy classification, credential handles, authentication
+headers, arbitrary endpoints, raw provider errors, or custodian internals.
+
+### Cancellation
+
+On cancellation, the host MUST:
+
+1. Mark the durable request cancellation as requested.
+2. Send cancellation through the same pinned connection and custodian.
+3. Stop admitting new deltas.
+4. Record whether the custodian confirmed cancellation.
+5. Release unused quota and retain usage already confirmed.
+6. Emit `model.request.cancelled` exactly once.
+
+Cancellation is bounded best effort after provider dispatch. A late final
+response MUST NOT advance agent state after cancellation, but its bounded
+usage and reconciliation receipt MUST be retained when required for billing.
+
+### Retry, recovery, and replay
+
+A retry MUST use the recorded request identity, binding id and revision,
+connection revision, provider, model, canonical request digest, and provider
+idempotency identity. Each dispatch attempt MUST use a fresh nonce linked to
+the same request.
+
+The host MUST NOT retry with a different model, provider, adapter, connection,
+credential handle, or custodian. If the recorded dependency is revoked,
+missing, or incompatible, the request fails and awaits explicit user
+reconfiguration. Reconfiguration applies to a new intent, not to mutation of
+the old durable request.
+
+The host MAY retry transport and adapter failures only when the adapter and
+custodian declare the operation idempotent or support status reconciliation.
+A retry after an uncertain outcome MUST reconcile by request identity before
+creating another provider operation.
 
 ### Outcome definitions
 
-> **Normative definition.**
-The following outcomes are defined for provider-neutral model requests:
+| Outcome | Diagnostic | Required behavior |
+| --- | --- | --- |
+| Missing binding | `model.binding.missing` | Reject before durable request creation. |
+| Stale or unapproved binding | `model.binding.stale` | Reject and require user review. |
+| Incompatible binding | `model.binding.incompatible` | Reject without selecting an alternative. |
+| Provider unavailable | `model.request.unavailable_provider` | Record failure for the pinned request; no fallback. |
+| Model unavailable | `model.request.unavailable_model` | Record failure for the pinned request; no fallback. |
+| Custodian unavailable | `credential.custodian.unavailable` | Preserve outbox request for bounded retry or fail by policy. |
+| Credential use denied | `credential.use.unauthorized` | Record non-retryable authorization failure. |
+| Quota exhausted | `model.request.quota_exhausted` | Reject before provider dispatch. |
+| Invalid structured output | `model.request.invalid_structured_output` | Reject final response and emit failure. |
+| Tool-call mismatch | `model.request.tool_call_mismatch` | Reject final response and emit failure. |
+| Safety refusal | `model.request.safety_refused` | Record bounded safety metadata and emit failure. |
+| Timeout | `model.request.timeout` | Cancel, reconcile, and emit failure. |
+| Late response | `model.request.late_response` | Do not advance cancelled or expired work; retain bounded reconciliation evidence. |
+| Ambiguous billing | `model.request.ambiguous_billing` | Preserve provider and host calculations; enforce the more conservative authorized budget. |
+| Invalid custodian receipt | `credential.receipt.invalid` | Reject result admission and open reconciliation. |
 
-#### Unavailable model
+### Security invariants
 
-| Diagnostic | Cause | Host behavior |
-|------------|-------|---------------|
-| `model.request.unavailable_model` | The requested model is not available from the provider. | Reject request; do NOT create partial request state. |
+The following invariants apply to every model request:
 
-> **Non-normative note.**
-Unavailable model is caused by the provider not supporting the requested
-model.
-The agent MUST update the request to use an available model and retry.
+1. A guest cannot select or discover a credential-bearing connection through
+   model-intent fields.
+2. A publisher cannot bind its plugin to a provider account.
+3. Raw credential bytes do not enter the host, Port worker, guest, journal,
+   evidence, diagnostic, trace, crash dump, or support bundle under separated
+   custody.
+4. A credential handle is never returned to a guest or provider adapter and is
+   never logged.
+5. A custodian accepts only the provider, model, resource, digest, deadline,
+   nonce, and budget authorized for the binding revision.
+6. A retry does not change the user's model choice.
+7. A response is not admitted without valid correlation, policy, quota, and
+   receipt evidence.
 
-#### Quota exhaustion
+## Variability register
 
-| Diagnostic | Cause | Host behavior |
-|------------|-------|---------------|
-| `model.request.quota_exhausted` | The agent's budget is insufficient to cover the request. | Reject request; do NOT create partial request state. |
+| Item | Permission | Recommendation | Constraint |
+| --- | --- | --- | --- |
+| Binding input presentation | Implementation-defined | Interactive installer or authenticated declarative configuration | User authority and full requirement visibility must be preserved |
+| Adapter concurrency | Implementation-defined | Bound per tenant and connection | Must preserve per-request ordering and quotas |
+| Stream buffering | Implementation-defined | Use bounded backpressure | Must not reorder accepted events |
+| Transport retry limit | Implementation-defined | Exponential backoff with jitter | Must preserve binding and idempotency identity |
+| Request timeout | Implementation-defined | Shorter of request deadline and policy limit | Must be documented and enforced |
+| Local unauthenticated models | Optional | Register as explicit no-credential connections | Must still satisfy tenant, endpoint, model, and budget policy |
+| Streaming signals | Optional | Emit bounded deltas | Deltas must not mutate authoritative state directly |
+| Automatic provider/model fallback | Deferred | Fail closed and request user reconfiguration | Runtime substitution is prohibited |
 
-> **Non-normative note.**
-Quota exhaustion is caused by the agent exceeding its budget.
-The agent MUST request additional budget from the topology owner and
-retry.
+## Rationale and evidence (non-normative)
 
-#### Malformed structured output
-
-| Diagnostic | Cause | Host behavior |
-|------------|-------|---------------|
-| `model.request.invalid_structured_output` | The response's structured value does not conform to the `structured_output_schema`. | Reject response; emit `model.response.failed` signal. |
-
-> **Non-normative note.**
-Malformed structured output is caused by the model returning invalid
-JSON or values that do not match the schema.
-The agent MUST update the schema or sampling and retry.
-
-#### Tool-call mismatch
-
-| Diagnostic | Cause | Host behavior |
-|------------|-------|---------------|
-| `model.request.tool_call_mismatch` | The model returns tool requests that do not match the `tool_definitions`. | Reject response; emit `model.response.failed` signal. |
-
-> **Non-normative note.**
-Tool-call mismatch is caused by the model using tools that were not
-explicitly granted.
-The agent MUST update the tool definitions and retry.
-
-#### Safety refusal
-
-| Diagnostic | Cause | Host behavior |
-|------------|-------|---------------|
-| `model.request.safety_refused` | The provider refused the request due to safety filters. | Reject response; emit `model.response.failed` signal with safety metadata. |
-
-> **Non-normative note.**
-Safety refusal is caused by the provider's content filters.
-The agent MUST update the prompt to avoid triggering the filters.
-
-#### Timeout
-
-| Diagnostic | Cause | Host behavior |
-|------------|-------|---------------|
-| `model.request.timeout` | The request exceeded the implementation-defined timeout. | Cancel the request; emit `model.response.failed` signal. |
-
-> **Non-normative note.**
-Timeout is caused by the request taking longer than expected.
-The agent MAY retry with different sampling or a simpler prompt.
-
-#### Late response
-
-| Diagnostic | Cause | Host behavior |
-|------------|-------|---------------|
-| `model.request.late_response` | The response arrived after the `deadline`. | Accept the response but mark it as late in diagnostics. |
-
-> **Non-normative note.**
-Late response is caused by the provider being slow.
-The host MUST accept the response but emit a warning in diagnostics.
-
-#### Ambiguous billing
-
-| Diagnostic | Cause | Host behavior |
-|------------|-------|---------------|
-| `model.request.ambiguous_billing` | The provider's usage report is inconsistent with the host's calculation. | Accept the response but use the host's calculation for budget enforcement. |
-
-> **Non-normative note.**
-Ambiguous billing is caused by discrepancies between the provider's
-and host's usage tracking.
-The host MUST use its own calculation for budget enforcement to ensure
-consistency.
-
-### Results that would invalidate an earlier milestone assumption
-
-> **Non-normative note.**
-The following results from Phase 1 behavior and integration would invalidate
-an earlier milestone assumption:
-
-1. **Model requests bypass the durable journal**: If model requests
-   bypass the durable journal, this would invalidate the assumption
-   defined in
-   [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md)
-   that all state transitions are durable across host restarts.
-2. **Model requests bypass the atomic commit protocol**: If model requests
-   bypass the atomic commit protocol, this would invalidate the assumption
-   defined in
-   [Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md)
-   that all state transitions are atomic.
-3. **Model requests allow cross-tenant authority leaks**: If model requests
-   allow cross-tenant tool access or result sharing, this would invalidate
-   the assumption defined in
-   [Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md)
-   that all principals are isolated by tenant.
-4. **Model requests require shared mutable guest state**: If model requests
-   require shared mutable guest state, this would invalidate the assumption
-   defined in
-   [Deterministic Reducer Semantics And Milestone Acceptance](14-deterministic-reducer-semantics-and-milestone-acceptance.md)
-   that all state transitions are deterministic and replayable.
-
-> **Non-normative note.**
-These results would indicate a design flaw in Phase 1 and would require
-a revision of the Phase 1 contracts before promotion to `status:
-normative`.
-
-### Cross-references and precedence
-
-> **Non-normative note.**
-This section's behavior and integration integrate with the following
-earlier chapters:
-
-1. For provider adapter behavior: this section takes precedence over
-   [Framework Plugin Manifests Composition And Lifecycle Hooks](32-framework-plugin-manifests-composition-and-lifecycle-hooks.md)
-   for questions of model-specific adapter behavior.
-2. For streaming normalization: this section takes precedence over
-   [Signal Envelopes Causality Routing And Delivery](10-signals-causality-routing-and-delivery.md)
-   for questions of model-specific signal conversion.
-3. For cancellation: this section takes precedence over
-   [Agent Registry Activation Cancellation And Completion](22-agent-registry-activation-cancellation-and-completion.md)
-   for questions of model-specific cancellation.
-4. For retry: this section takes precedence over
-   [Retry Timer Recovery Replay Hibernate And Migration](28-retry-timer-recovery-replay-hibernate-and-migration.md)
-   for questions of model-specific retry classification.
-5. For capability enforcement: this section takes precedence over
-   [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md)
-   for questions of model-specific capability mapping.
-6. Where both sections are applicable and agree, they are mutually
-   reinforcing.
+This flow keeps the model choice where users expect it: installation and
+configuration. Pinning the selected revision to a durable effect makes retry
+and audit deterministic. The custodian performs the only operation that needs
+provider authentication, so an Elixir/OTP control plane and its native Port
+can supervise the workflow without becoming the store for end-user provider
+keys.

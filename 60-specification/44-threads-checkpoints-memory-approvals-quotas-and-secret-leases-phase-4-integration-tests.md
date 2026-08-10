@@ -3,7 +3,7 @@ title: "Threads Checkpoints Memory Approvals Quotas And Secret Leases Phase 4 In
 kind: specification
 created: "2026-08-09"
 status: draft
-spec_version: "0.1.0"
+spec_version: "0.2.0"
 tags:
   - milestone-07
   - phase-04
@@ -14,6 +14,7 @@ tags:
   - quotas
   - secret-leases
   - integration-tests
+  - credential-custody
 aliases:
   - "M7-P4 Integration Tests"
 ---
@@ -30,6 +31,10 @@ of
 AI, Tools, Memory, And Human Control.
 It defines the integration tests that verify threads, checkpoints, memory,
 approvals, quotas, and secret leases across their real dependency boundaries.
+
+Version `0.2.0` replaces host-held secret-access fixtures with use-only
+credential leases, external custodians, provider workload identity, receipt
+verification, egress enforcement, and credential non-exposure tests.
 
 This chapter is normative by default within its stated scope.
 Material visibly marked non-normative does not create conformance
@@ -113,7 +118,10 @@ memory, approvals, quotas, and secret leases:
 | `approval-request-success` | Request approval for an action. | Approval is requested with status `pending`. |
 | `approval-decide-success` | Decide an approval request. | Approval is decided with the specified decision. |
 | `quota-reserve-success` | Reserve quota. | Quota is reserved and usage is updated. |
-| `lease-create-success` | Create a secret lease. | Lease is created with status `active`. |
+| `lease-create-success` | Create a use-only lease from an external custodian handle. | Lease is `active`; host records only protected handle reference and fingerprint metadata. |
+| `credential-use-success` | Execute an allowed typed operation through an external broker. | Result and valid receipt are admitted; raw credential is never transferred. |
+| `credential-workload-identity-success` | Execute through a provider-workload-identity custodian. | Operation succeeds without a long-lived user provider key. |
+| `credential-rotation-success` | Rotate provider credential inside custodian. | Later use succeeds without host configuration or plugin artifact change. |
 
 > **Normative definition.**
 The following tests verify evidence retention:
@@ -133,8 +141,9 @@ The following tests verify evidence retention:
 | `evidence-quota-reserved` | Verify evidence is emitted when quota is reserved. | `quota.reserved` evidence is emitted. |
 | `evidence-quota-consumed` | Verify evidence is emitted when quota is consumed. | `quota.consumed` evidence is emitted. |
 | `evidence-quota-exhausted` | Verify evidence is emitted when quota is exhausted. | `quota.exhausted` evidence is emitted. |
-| `evidence-lease-created` | Verify evidence is emitted when a lease is created. | `lease.created` evidence is emitted. |
-| `evidence-lease-revoked` | Verify evidence is emitted when a lease is revoked. | `lease.revoked` evidence is emitted. |
+| `evidence-lease-created` | Verify evidence is emitted when a lease is created. | `credential.lease.created` evidence is emitted without opaque handle. |
+| `evidence-lease-revoked` | Verify evidence is emitted when a lease is revoked. | `credential.lease.revoked` evidence is emitted. |
+| `evidence-credential-use` | Verify request and completion evidence. | Correlated `credential.use.requested` and `credential.use.completed` entries contain bounded fingerprints only. |
 
 ### Failure handling tests
 
@@ -149,7 +158,8 @@ The following tests verify malformed input handling:
 | `malformed-memory-missing-type` | Create memory without a type. | `malformed_memory_input` diagnostic is emitted. |
 | `malformed-approval-missing-type` | Request approval without a type. | `malformed_approval_input` diagnostic is emitted. |
 | `malformed-quota-missing-limit` | Create a quota without a limit. | `malformed_quota_input` diagnostic is emitted. |
-| `malformed-lease-missing-principal` | Create a lease without a principal. | `malformed_lease_input` diagnostic is emitted. |
+| `malformed-lease-missing-principal` | Create a lease without a principal. | `credential.lease.malformed` diagnostic is emitted. |
+| `malformed-handle-reference` | Register malformed opaque handle metadata. | `credential.handle.malformed` diagnostic is emitted. |
 
 > **Normative definition.**
 The following tests verify incompatible input handling:
@@ -167,7 +177,7 @@ The following tests verify conflict handling:
 |---------|-------------|------------------|
 | `conflicting-thread-visibility` | Update a thread with conflicting visibility. | `conflicting_thread_visibility` diagnostic is emitted. |
 | `conflicting-quota-limit` | Update a quota with conflicting limit. | `conflicting_quota_limit` diagnostic is emitted. |
-| `conflicting-lease-expiry` | Update a lease with conflicting expiry. | `conflicting_lease_expiry` diagnostic is emitted. |
+| `conflicting-lease-expiry` | Update a lease with conflicting revision or expiry. | `credential.lease.conflicting_expiry` diagnostic is emitted. |
 
 > **Normative definition.**
 The following tests verify unauthorized access handling:
@@ -179,7 +189,10 @@ The following tests verify unauthorized access handling:
 | `unauthorized-memory-access` | Access memory without authorization. | `unauthorized_memory_access` diagnostic is emitted. |
 | `unauthorized-approval-access` | Access an approval without authorization. | `unauthorized_approval_access` diagnostic is emitted. |
 | `unauthorized-quota-access` | Access a quota without authorization. | `unauthorized_quota_access` diagnostic is emitted. |
-| `unauthorized-lease-access` | Access a lease without authorization. | `unauthorized_lease_access` diagnostic is emitted. |
+| `unauthorized-lease-access` | Request a credential use without agent domain authority or effect-worker `CredentialUse`. | `credential.use.unauthorized` diagnostic is emitted. |
+| `credential-scope-mismatch` | Change tenant, agent, artifact, binding, operation, resource, digest, deadline, or budget after authorization. | `credential.use.scope_mismatch` diagnostic is emitted; provider is not contacted. |
+| `credential-export-forbidden` | Request read, unwrap, export, bearer token, or authentication header. | `credential.use.export_forbidden` diagnostic is emitted. |
+| `credential-replay` | Reuse an accepted nonce. | `credential.use.replay` diagnostic is emitted. |
 
 > **Normative definition.**
 The following tests verify exhaustion handling:
@@ -188,7 +201,8 @@ The following tests verify exhaustion handling:
 |---------|-------------|------------------|
 | `quota-exhausted` | Exhaust a quota. | `quota_exhausted` diagnostic is emitted. |
 | `approval-expired` | Wait for an approval to expire. | `approval_expired` diagnostic is emitted. |
-| `lease-expired` | Wait for a lease to expire. | `lease_expired` diagnostic is emitted. |
+| `lease-expired` | Wait for a lease to expire. | `credential.handle.expired` diagnostic is emitted. |
+| `lease-revoked` | Revoke a lease before a new use. | `credential.handle.revoked` diagnostic is emitted. |
 
 > **Normative definition.**
 The following tests verify unavailable dependency handling:
@@ -200,7 +214,9 @@ The following tests verify unavailable dependency handling:
 | `memory-store-unavailable` | Simulate memory store unavailability. | `memory_store_unavailable` diagnostic is emitted. |
 | `approval-store-unavailable` | Simulate approval store unavailability. | `approval_store_unavailable` diagnostic is emitted. |
 | `quota-store-unavailable` | Simulate quota store unavailability. | `quota_store_unavailable` diagnostic is emitted. |
-| `lease-store-unavailable` | Simulate lease store unavailability. | `lease_store_unavailable` diagnostic is emitted. |
+| `lease-store-unavailable` | Simulate lease metadata store unavailability. | `credential.lease_store.unavailable` diagnostic is emitted. |
+| `custodian-unavailable` | Simulate registered custodian unavailability. | `credential.custodian.unavailable` diagnostic is emitted. |
+| `invalid-receipt` | Return a receipt with invalid digest, correlation, or signature. | `credential.receipt.invalid` diagnostic is emitted and result is not admitted. |
 
 ### Timeout and cancellation tests
 
@@ -212,7 +228,8 @@ The following tests verify timeout handling:
 | `thread-timeout` | Thread creation times out. | Thread is not created, no partial state. |
 | `checkpoint-timeout` | Checkpoint creation times out. | Checkpoint is not created, no partial state. |
 | `approval-timeout` | Approval decision times out. | Approval remains pending, no partial state. |
-| `lease-timeout` | Lease creation times out. | Lease is not created, no partial state. |
+| `lease-timeout` | Lease creation times out. | Lease is not created; no partial metadata or handle log remains. |
+| `credential-use-timeout` | Custodian call times out with uncertain outcome. | Durable use remains pinned and is reconciled before retry. |
 
 > **Normative definition.**
 The following tests verify cancellation handling:
@@ -222,7 +239,8 @@ The following tests verify cancellation handling:
 | `thread-cancel` | Cancel a thread creation. | Thread is not created, no partial state. |
 | `checkpoint-cancel` | Cancel a checkpoint creation. | Checkpoint is not created, no partial state. |
 | `approval-cancel` | Cancel an approval request. | Approval is cancelled with status `cancelled`. |
-| `lease-cancel` | Cancel a lease creation. | Lease is not created, no partial state. |
+| `lease-cancel` | Cancel a lease creation. | Lease is not created; no partial metadata remains. |
+| `credential-use-cancel` | Cancel an in-flight typed use. | Custodian cancellation is requested and bounded receipt evidence is retained. |
 
 > **Normative definition.**
 The following tests verify unavailable dependency handling with retry:
@@ -240,7 +258,28 @@ The following tests verify retry handling:
 |---------|-------------|------------------|
 | `thread-retry-success` | Thread creation fails, then succeeds on retry. | Thread is created successfully. |
 | `checkpoint-retry-success` | Checkpoint creation fails, then succeeds on retry. | Checkpoint is created successfully. |
-| `lease-retry-success` | Lease creation fails, then succeeds on retry. | Lease is created successfully. |
+| `lease-retry-success` | Lease metadata creation fails, then succeeds on retry. | One active lease exists. |
+| `credential-use-retry-success` | Transport fails before provider acceptance. | Retry preserves operation, resource, binding, handle, digest, and budget while using a fresh nonce. |
+
+### Credential non-exposure and egress tests
+
+> **Normative definition.**
+The following security tests MUST run with a unique sentinel credential stored
+only inside the external custodian fixture:
+
+| Test ID | Description | Expected outcome |
+| --- | --- | --- |
+| `credential-sentinel-non-exposure` | Complete successful, denied, failed, cancelled, and crashed uses. | Sentinel and common encodings are absent from host and Port memory snapshots, guest I/O, state, journal, outbox, logs, traces, diagnostics, evidence, crash artifacts, and support bundles. |
+| `credential-handle-non-exposure` | Inspect guest, adapter, operator, audit, and support interfaces. | Opaque handle reference is absent; only non-authority-bearing fingerprints appear where allowed. |
+| `credential-arbitrary-proxy-rejected` | Compromised caller changes origin, method, auth header, provider, model, or payload digest. | Custodian rejects scope mismatch and no provider request occurs. |
+| `credential-direct-egress-denied` | Host or Port attempts authenticated provider egress outside custodian. | Network policy denies the operation and emits `credential.egress.bypass`. |
+| `credential-cross-tenant-handle` | Reuse a handle reference from another tenant, agent, artifact, or binding. | Sender and scope validation reject the use. |
+| `credential-host-local-unapproved` | Activate host-local mode without explicit warning and approval. | Activation fails with `credential.mode.host_local_unapproved`. |
+| `credential-receipt-user-audit` | Authorized user reconciles bounded receipt with provider fixture. | Operation, resource, binding, usage, and outcome agree without exposing credential material. |
+
+The harness MUST establish both that the credential was never transmitted to
+the host and that inspection finds zero sentinel occurrences. Redaction-only
+tests are insufficient.
 
 ### Cross-milestone fixture scopes
 
@@ -259,8 +298,22 @@ The following earlier milestone fixtures are affected by this phase:
 | Phase 3 (Registry) | 22-agent-registry-activation-cancellation-and-completion | No regression |
 | Phase 3 (Sensors) | 23-sensors-schedules-timers-and-external-signal-ingress | No regression |
 | Phase 4 (Snapshots) | 25-revisioned-snapshots-journals-history-and-storage-contracts | No regression |
+| Phase 5 (Threat model) | 30-threat-model-principals-trust-classes-and-grant-vocabulary | `CredentialUse` remains independent from domain and secret capabilities |
+| Phase 5 (Policy) | 31-capability-policy-attenuation-limits-and-enforcement | Use context and attenuation agree with custodian checks |
+| Phase 5 (Plugin lifecycle) | 32-framework-plugin-manifests-composition-and-lifecycle-hooks | Plugin configuration references registered connections and never embeds credentials |
+| Phase 7 (Model requests) | 41-provider-neutral-model-requests-responses-streaming-and-usage-phase-1-integration-tests | Model binding, credential dispatch, retry, and receipt fixtures agree |
+| Phase 7 (Tools and connectors) | 42-tool-catalogs-retrieval-code-execution-and-connectors-phase-2-integration-tests | Connector bindings, typed credential use, token non-exposure, retry, and receipt fixtures agree |
 
 > **Normative definition.**
 No regressions are expected in earlier milestone fixtures.
 If any regression is identified, it MUST be documented and reported to the
 milestone maintainer.
+
+## Variability register
+
+| Item | Permission | Recommendation | Constraint |
+| --- | --- | --- | --- |
+| Custodian fixture transport | Implementation-defined | Exercise the product's real authenticated boundary | Credential must never be supplied to host process |
+| Host and Port memory inspection | Implementation-defined | Capture success and injected-crash artifacts | Must include every shipped process that could receive configuration or request data |
+| Sentinel encoding scan | Required | Raw, base64, hex, URL-encoded, and structured variants | Must accompany a non-transmission assertion |
+| Test parallelism | Optional | Parallelize isolated tenants only | Shared custodian, lease, nonce, and quota tests must serialize |
