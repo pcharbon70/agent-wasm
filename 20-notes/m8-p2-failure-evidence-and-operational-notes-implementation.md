@@ -32,6 +32,7 @@ The following failure outcomes are defined for Core WebAssembly, WASI, Extism, a
 |---------|------------|-------------------|
 | **malformed** | The input is invalid and cannot be processed. | Invalid binary, missing required exports, incompatible interface. |
 | **incompatible** | The input is valid but incompatible with the current configuration. | Unsupported engine version, missing required features, incompatible WASI version. |
+| **stale** | The input is valid but has exceeded the retention period. | Artifact version older than retention period, divergence record older than review period. |
 | **conflicting** | The input conflicts with existing evidence or configuration. | Duplicate test result with different outcome, conflicting feature profile. |
 | **unauthorized** | The input is valid but the actor lacks permission. | Missing authentication, insufficient privileges, unauthorized suite access. |
 | **exhausted** | The system is unable to process the input due to resource constraints. | Disk space full, memory limit exceeded, rate limit hit, timeout exceeded. |
@@ -57,7 +58,7 @@ Diagnostic = {
   correlation_id: UUID
 }
 
-FailureOutcome = "malformed" | "incompatible" | "conflicting" | "unauthorized" | "exhausted" | "unavailable"
+FailureOutcome = "malformed" | "incompatible" | "stale" | "conflicting" | "unauthorized" | "exhausted" | "unavailable"
 
 ErrorCode = string
 

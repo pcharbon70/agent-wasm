@@ -30,13 +30,14 @@ Establish failure evidence and operational notes for property fuzzing, replay, r
 Malformed, incompatible, conflicting, unauthorized, exhausted, and unavailable outcomes MUST be defined for property fuzz replay reduction pooling and isolation. The failure outcomes are:
 
 ```yaml
-FailureOutcome = "malformed" | "incompatible" | "conflicting" | "unauthorized" | "exhausted" | "unavailable"
+FailureOutcome = "malformed" | "incompatible" | "stale" | "conflicting" | "unauthorized" | "exhausted" | "unavailable"
 ```
 
 | Outcome | Definition | Trigger Condition |
 |---------|------------|-------------------|
 | **malformed** | The fuzz input is syntactically or semantically invalid | Invalid protocol value, invalid Wasm module, invalid event sequence |
 | **incompatible** | The fuzz input is incompatible with the reducer profile | Mutation violates profile constraints, unsupported feature requested |
+| **stale** | The fuzz input has exceeded the retention period | Artifact version older than retention period, divergence record older than review period |
 | **conflicting** | The fuzz input creates conflicting invariants | Multiple invariants violated simultaneously, contradictory state patches |
 | **unauthorized** | The fuzz input is unauthorized | Unauthenticated fuzzing, unauthorized access to sensitive inputs |
 | **exhausted** | The resource limit is exhausted | Memory limit exceeded, CPU time limit exceeded, fuzz budget exceeded |
