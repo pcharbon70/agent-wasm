@@ -27,6 +27,9 @@ and the open decision about its role in Agent WASM.
 - [Should Agent WASM Adopt Extism?](../40-inquiries/should-agent-wasm-adopt-extism.md)
   — converts the survey into a pinned profile, differential tests, benchmarks,
   threat-model work, and falsifiable adoption criteria.
+- [Agent WASM Host Implementation Language](agent-wasm-host-implementation-language.md)
+  — separates the host control plane from the Extism engine and compares the
+  Rust, Go, Elixir/Port, and Elixir/Rustler boundaries.
 - [WebAssembly Testing and Verification](webassembly-testing-and-verification.md)
   — locates XTP and native SDK tests inside the broader engine, protocol,
   state-machine, fault, and isolation assurance stack.
@@ -73,6 +76,9 @@ and the open decision about its role in Agent WASM.
 - [Reference Runtime](../30-sources/extism-project-2026-reference-runtime.md)
   — Rust, Wasmtime, `libextism`, fuel, epochs, WASI, pools, and the fullest
   implementation.
+- [Elixir SDK](../30-sources/extism-project-2026-elixir-sdk.md) — an official
+  but outdated Rustler binding to the Rust reference runtime whose current API,
+  scheduling, and native failure scope require redesign for Agent WASM.
 - [Go SDK](../30-sources/extism-project-2026-go-sdk.md) — independent pure-Go
   implementation over the [Wazero runtime](../30-sources/wazero-project-2026-runtime.md).
 - [JavaScript SDK](../30-sources/extism-project-2026-js-sdk.md) — browsers,
@@ -97,6 +103,11 @@ and the open decision about its role in Agent WASM.
   remain a thin layer, or do they favor WIT directly?
 - Which JavaScript and Chicory limitations are temporary implementation gaps
   versus architectural differences?
+- Should the Rust reference runtime execute inside the BEAM through Rustler or
+  behind a supervised Port, and what evidence would justify the wider NIF fault
+  domain?
 
 These remain tracked in the
-[Extism adoption inquiry](../40-inquiries/should-agent-wasm-adopt-extism.md).
+[Extism adoption inquiry](../40-inquiries/should-agent-wasm-adopt-extism.md)
+and the
+[host implementation inquiry](../40-inquiries/which-host-implementation-approach-should-agent-wasm-use.md).

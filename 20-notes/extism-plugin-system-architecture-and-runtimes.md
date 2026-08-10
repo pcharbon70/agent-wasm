@@ -349,6 +349,28 @@ Wasmtime-sized distribution, target-specific releases, C-ABI object lifetimes,
 and FFI error and callback translation. Conversely, this path concentrates
 feature completeness and fixes in one implementation.
 
+### Elixir route: Rustler binding to the reference runtime
+
+The official [Elixir SDK](../30-sources/extism-project-2026-elixir-sdk.md) is
+not another independent engine family and is not a binding to `libextism`. Its
+current Hex release compiles a Rustler NIF that embeds the Rust `extism` crate
+directly, so it places the reference Wasmtime implementation inside the BEAM
+address space.
+
+The inspected 1.0.0 release pins Extism 1.0.0 and Rustler 0.30.0, accepts UTF-8
+strings rather than arbitrary binary output, does not expose host functions,
+does not expose its native cancellation handle through the public plug-in API,
+and invokes creation and calls as normal NIFs without dirty-scheduler or
+asynchronous dispatch. It demonstrates a workable binding shape, but it trails
+the current reference runtime and does not satisfy Agent WASM's execution,
+scheduling, binary-codec, or capability requirements unchanged.
+
+A modern Elixir host must therefore make the native boundary explicit: update
+or replace this Rustler adapter and accept a BEAM-wide native failure domain,
+or put the Rust runtime in a supervised external process. The detailed
+[host-language comparison](agent-wasm-host-implementation-language-and-runtime-boundary.md)
+evaluates that choice.
+
 ### Go runtime: Wazero
 
 The [Go SDK](../30-sources/extism-project-2026-go-sdk.md) reimplements the host
@@ -420,6 +442,7 @@ target rather than a production-equivalent Java replacement without evidence.
 | --- | --- | --- | --- | --- |
 | Rust SDK | Wasmtime | Rust/native binary | fullest Extism feature set, fuel, epochs, pools | platform binaries and Wasmtime footprint |
 | C and FFI-backed SDKs | Wasmtime through `libextism` | shared library | shared mature implementation across host languages | FFI packaging/lifetimes; not independent conformance |
+| Elixir SDK 1.0.0 | Wasmtime through embedded Rust Extism | Rustler NIF | direct BEAM API and reference engine family | outdated/incomplete API, normal-scheduler calls, VM-wide native fault scope |
 | Go SDK | Wazero compiler or interpreter | none beyond Go binary | pure Go, cross-compilation, contexts, cache | independently reimplemented semantics and WASI |
 | JS SDK | host JS engine | none beyond JS environment | browsers, Node, Deno, Bun, workers | environment-dependent WASI, workers, HTTP, limits |
 | Java SDK | Wasmtime through `libextism` | shared library | established Java API and reference behavior | not JVM-native; native target constraints |
@@ -537,6 +560,7 @@ These are evaluation criteria, not findings. They remain tracked in
 - [Extism host-function namespaces](../30-sources/extism-project-2026-host-function-namespaces.md)
 - [Extism runtime kernel](../30-sources/extism-project-2026-runtime-kernel.md)
 - [Extism reference runtime](../30-sources/extism-project-2026-reference-runtime.md)
+- [Extism Elixir SDK](../30-sources/extism-project-2026-elixir-sdk.md)
 - [Extism Go SDK](../30-sources/extism-project-2026-go-sdk.md)
 - [Extism JavaScript SDK](../30-sources/extism-project-2026-js-sdk.md)
 - [Extism Java SDK](../30-sources/extism-project-2026-java-sdk.md)

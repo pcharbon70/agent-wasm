@@ -29,6 +29,10 @@ open workbenches in inquiries, and session evidence in the journal.
 
 ### Documents
 
+- [Agent WASM Host Implementation Language and Runtime Boundary](agent-wasm-host-implementation-language-and-runtime-boundary.md)
+  — compares Rust, Go, Elixir, and Elixir/Rustler, audits the current Hex path,
+  recommends an Elixir control plane with a process-isolated Rust execution
+  worker, and defines gates for a Rustler optimization or language reversal.
 - [Extism Plugin-System Architecture and Runtimes](extism-plugin-system-architecture-and-runtimes.md)
   — detailed synthesis of Extism's ABI, kernel, call lifecycle, state,
   manifest, capabilities, PDK/SDK split, runtime families, and Agent WASM

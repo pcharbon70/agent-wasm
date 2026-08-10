@@ -28,6 +28,9 @@ documents belong together instead of duplicating directory inventories.
 
 ### Documents
 
+- [Agent WASM Host Implementation Language](agent-wasm-host-implementation-language.md)
+  — compares Rust, Go, Elixir, and Elixir/Rustler through the host-control,
+  engine, scheduler, fault-boundary, deployment, and evidence decisions.
 - [Agent WASM Research](home.md) — selective home map for active inquiries,
   topic maps, developed work, and unresolved threads.
 - [Extism Plugin System](extism-plugin-system.md) — routes through the portable
