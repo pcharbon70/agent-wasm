@@ -2,7 +2,7 @@
 
 Package the runtime as an operable framework platform with stable host APIs, SDKs, local tooling, observability, upgrades, deployment guidance, and production acceptance evidence.
 
-Current status: Phase 1 complete, Phase 2 in progress; all other phases and tasks are unchecked.
+Current status: Phase 3 complete; all other phases and tasks are unchecked.
 
 ## Purpose
 
