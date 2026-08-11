@@ -48,7 +48,6 @@ Related chapters:
 [Embedded And Server Host APIs Configuration And Packaging Contract And Data Model](46-embedded-and-server-host-apis-configuration-and-packaging-contract-and-data-model.md),
 [Guest SDK CLI Simulator Templates Fixtures And Debugging Contract And Data Model](47-guest-sdk-cli-simulator-templates-fixtures-and-debugging-contract-and-data-model.md),
 [Telemetry Tracing Audit Redaction Health And Operator Actions Contract And Data Model](48-telemetry-tracing-audit-redaction-health-and-operator-actions-contract-and-data-model.md),
-[Compatibility Upgrades Migrations Deployment And Horizontal Coordination Contract And Data Model](49-compatibility-upgrades-migrations-deployment-and-horizontal-coordination-contract-and-data-model.md),
 [Examples Runbooks SLO Evidence And Production Acceptance Contract And Data Model](50-examples-runbooks-slo-evidence-and-production-acceptance-contract-and-data-model.md),
 [Examples Runbooks SLO Evidence And Production Acceptance Behavior And Integration](50-examples-runbooks-slo-evidence-and-production-acceptance-behavior-and-integration.md),
 [Examples Runbooks SLO Evidence And Production Acceptance Failure Evidence And Operational Notes](50-examples-runbooks-slo-evidence-and-production-acceptance-failure-evidence-and-operational-notes.md).
