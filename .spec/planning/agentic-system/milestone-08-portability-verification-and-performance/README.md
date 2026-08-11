@@ -2,7 +2,7 @@
 
 Turn the research assurance design into release evidence spanning standards conformance, independent Extism runtimes, fuzzing, replay, isolation, fault behavior, and performance.
 
-Current status: planned; all phases and tasks are unchecked.
+Current status: phase 1-6 complete; milestone 8 complete.
 
 ## Purpose
 
