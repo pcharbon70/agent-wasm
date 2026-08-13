@@ -16,7 +16,8 @@ aliases:
 ## Context
 
 Continued Milestone 7 implementation with Phase 4: Threads, Checkpoints,
-Memory, Approvals, Quotas, And Secret Leases.
+Memory, Approvals, Quotas, And Secret Leases. The implementation records
+for this phase are in [70-milestones/m7-phase-04-contract-and-data-model-implementation.md](../70-milestones/m7/m7-phase-04-contract-and-data-model-implementation.md).
 
 ## Work done
 
@@ -34,10 +35,10 @@ Implemented all 4 sections of Phase 4:
 
 ### Implementation notes (4 files)
 
-- `20-notes/m7-phase-04-contract-and-data-model-implementation.md`
-- `20-notes/m7-phase-04-behavior-and-integration-implementation.md`
-- `20-notes/m7-phase-04-failure-evidence-and-operational-notes-implementation.md`
-- `20-notes/m7-phase-04-integration-tests-implementation.md`
+- `70-milestones/m7-phase-04-contract-and-data-model-implementation.md`
+- `70-milestones/m7-phase-04-behavior-and-integration-implementation.md`
+- `70-milestones/m7-phase-04-failure-evidence-and-operational-notes-implementation.md`
+- `70-milestones/m7-phase-04-integration-tests-implementation.md`
 
 ### Specification chapters (4 files)
 
@@ -61,12 +62,20 @@ All changes validated by `validate_archive.py`:
 - 55 specification chapters checked
 - 139 classified fenced blocks checked
 
+## See also
+
+- [Milestone 7](https://en.wikipedia.org/wiki/Milestone_(project_management)) — the planning milestone this work belongs to
+- [70-milestones/m7-phase-04-contract-and-data-model-implementation.md](../70-milestones/m7/m7-phase-04-contract-and-data-model-implementation.md)
+- [70-milestones/m7-phase-04-behavior-and-integration-implementation.md](../70-milestones/m7/m7-phase-04-behavior-and-integration-implementation.md)
+- [70-milestones/m7-phase-04-failure-evidence-and-operational-notes-implementation.md](../70-milestones/m7/m7-phase-04-failure-evidence-and-operational-notes-implementation.md)
+- [70-milestones/m7-phase-04-integration-tests-implementation.md](../70-milestones/m7/m7-phase-04-integration-tests-implementation.md)
+
 ## Next steps
 
-Create a single PR for all Phase 4 changes.
+Create a single PR for all Phase 4 changes. See also the [archive guide](../README.md) for maintenance conventions.
 
 See also:
-- [Phase 4 Contract And Data Model Implementation](../20-notes/m7-phase-04-contract-and-data-model-implementation.md)
-- [Phase 4 Behavior And Integration Implementation](../20-notes/m7-phase-04-behavior-and-integration-implementation.md)
-- [Phase 4 Failure Evidence And Operational Notes Implementation](../20-notes/m7-phase-04-failure-evidence-and-operational-notes-implementation.md)
-- [Phase 4 Integration Tests Implementation](../20-notes/m7-phase-04-integration-tests-implementation.md)
+- [Phase 4 Contract And Data Model Implementation](../70-milestones/m7/m7-phase-04-contract-and-data-model-implementation.md)
+- [Phase 4 Behavior And Integration Implementation](../70-milestones/m7/m7-phase-04-behavior-and-integration-implementation.md)
+- [Phase 4 Failure Evidence And Operational Notes Implementation](../70-milestones/m7/m7-phase-04-failure-evidence-and-operational-notes-implementation.md)
+- [Phase 4 Integration Tests Implementation](../70-milestones/m7/m7-phase-04-integration-tests-implementation.md)

@@ -7,6 +7,81 @@ thought while keeping provenance, navigation, and document structure reliable.
 Follow an explicit user request when it conflicts with this file. Otherwise,
 use these conventions for every document and organizational change.
 
+## Project context
+
+This repository is the research and implementation corpus for **Agent WASM**: a
+Wasm-based agentic system inspired by [Jido](https://github.com/agentjido).
+
+### What it is
+
+A host-owned actor runtime that invokes WebAssembly decision modules for one
+serialized turn at a time. Authoritative agent state, policy, scheduling,
+durability, topology, and effects stay in the host. Each agent is a versioned
+deterministic reducer compiled to a portable Wasm module. Extism provides the
+byte-buffer plug-in protocol; the Component Model and WASI are evaluated for
+the longer term.
+
+### Reference architecture
+
+```text
+Elixir/OTP host (authoritative control plane)
+  ├─ signals, admission, mailboxes, supervision, topology, policy
+  ├─ durable state, journal, directive outbox
+  └─ execution adapter
+       ├─ default: supervised Erlang Port pool
+       │    └─ Rust worker: Extism reference runtime / Wasmtime
+       ├─ optional after evidence: Rustler NIF adapter
+       └─ conformance: Go runner / Extism on Wazero
+```
+
+### Key decisions already made
+
+- **Product language:** Elixir/OTP. The native Extism worker is a private
+  supervised Port component, not a public API.
+- **Engine boundary:** Rust worker behind a framed Port protocol (bytes-in,
+  bytes-out). Rustler is an optional in-process optimization, conditional on
+  evidence.
+- **Plug-in substrate:** Extism 1.21.0 on Wasmtime, with Go/Wazero as the
+  independent conformance target. Adoption conditioned on pinned profile and
+  differential tests.
+- **Guest contract:** A minimal `reduce(request) -> TurnResult` export with
+  JSON test vectors, host-owned snapshots, schema validation, and a durable
+  directive outbox.
+- **Release model:** Hex dependency + Mix release + OCI multi-arch image with
+  SBOM and SLSA provenance. One immutable release subject per digest.
+
+### Research paths explored (see `20-notes/`)
+
+| Note | What it covers |
+| --- | --- |
+| `webassembly-foundations-...` | Core semantics, standards maturity, runtime tradeoffs, 8 security layers, evaluation program |
+| `extism-plugin-system-...` | Extism kernel, ABI, manifest, capabilities, 4 execution families, parity caveats |
+| `jido-agent-architecture-...` | Jido decomposition into 5 planes, host-guest mapping, staged construction program |
+| `agent-wasm-host-...` | Rust/Go/Elixir/Elixir+Rustler comparison, recommended boundary contract, decision gates |
+| `elixir-otp-port-...` | Finished-product packaging, Port protocol, reference probe, Dockerfile, release workflow |
+
+### Current implementation milestones (see `20-notes/m*-phase-*.md`)
+
+M1–M4 cover the deterministic kernel: `reduce` export, JSON protocol, host-owned
+state, schema validation, no-I/O directive interpreter. M5 covers behavior and
+integration tests around the full turn flow. M7 covers contract and data-model
+implementation. M8 covers failure evidence, integration tests, runtime matrix,
+deployment, and release pipeline. The health-only Port probe is implemented and
+tested; the full Extism invocation adapter is not yet built.
+
+### Major open questions
+
+- Complete the Elixir/OTP Port adapter: Extism invocation, cancellation, bounded
+  supervised pool, malformed-frame handling, worker crash recovery.
+- Freeze a Core/WASI/Extism/PDK profile and define semantic equivalence for
+  cross-runtime `TurnResult` values.
+- Prove cross-runtime equivalence on Wasmtime vs Wazero for the pinned subset
+  (reset, state, limits, deadlines, cancellation, error channels).
+- Demonstrate that host-owned actor cells with disposable reducers survive
+  crash, isolation, and performance tests.
+- Determine whether a pinned Component Model and WASI 0.3 profile is stable
+  enough for an initial Agent WASM contract.
+
 ## Archive principles
 
 - Folders describe what a document is doing; maps, links, and tags describe
@@ -30,6 +105,7 @@ use these conventions for every document and organizational change.
 40-inquiries/     Active questions and research workbenches
 50-journal/       Dated observations and research-session evidence
 60-specification/ Versioned normative rules and conformance obligations
+70-milestones/    Implementation records for each milestone
 90-archive/       Inactive or superseded material worth retaining
 assets/           Images, PDFs, diagrams, datasets, and attachments
 templates/        Starting points for documents and directory indexes

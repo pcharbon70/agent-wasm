@@ -28,22 +28,22 @@ Created and pushed branch `milestone-07-phase-03-direct-fsm-tool-loop-and-planni
 
 Created four implementation notes documenting each section of Phase 3:
 
-1. **[Phase 3 Contract And Data Model Implementation](../20-notes/m7-phase-03-contract-and-data-model-implementation.md)**
+1. **[Phase 3 Contract And Data Model Implementation](../70-milestones/m7/m7-phase-03-contract-and-data-model-implementation.md)**
    - Documents Subtask 3.1.1.1: Direct strategy behavior for one validated action and result without hidden continuation state (8 fields including strategy kind, action ID, result ID, continuation, iteration, budget remaining)
    - Documents Subtask 3.1.1.2: FSM strategy states (7 states), events (24 events), snapshot schema (10 fields), and migration rules (5 rules)
    - Documents Subtask 3.1.1.3: Bounded tool-loop state (10 states), tool selection strategy (4 rules), iteration budgets (6 budget types), and termination conditions (9 conditions)
 
-2. **[Phase 3 Behavior And Integration Implementation](../20-notes/m7-phase-03-behavior-and-integration-implementation.md)**
+2. **[Phase 3 Behavior And Integration Implementation](../70-milestones/m7/m7-phase-03-behavior-and-integration-implementation.md)**
    - Documents Subtask 3.2.1.1: Planning strategy outputs (9 plan state fields, 8-step flow, 5 reviewability requirements)
    - Documents Subtask 3.2.1.2: Budget enforcement (6 budget types, 6 enforcement points, 6 exhaustion diagnostics)
    - Documents Subtask 3.2.1.3: Failure behavior (7 failure types: invalid snapshot, non-progress loop, repeated tool request, contradictory plan, missing result, model drift, forced termination)
 
-3. **[Phase 3 Failure Evidence And Operational Notes Implementation](../20-notes/m7-phase-03-failure-evidence-and-operational-notes-implementation.md)**
+3. **[Phase 3 Failure Evidence And Operational Notes Implementation](../70-milestones/m7/m7-phase-03-failure-evidence-and-operational-notes-implementation.md)**
    - Documents Subtask 3.3.1.1: Failure outcomes (26 diagnostics across 6 categories: malformed, incompatible, conflicting, unauthorized, exhausted, unavailable)
    - Documents Subtask 3.3.1.2: Bounded diagnostics (10 fields) and evidence emission (11 fields, 9 evidence types)
    - Documents Subtask 3.3.1.3: Implementation-defined choices (8 choices), deferred work (10 items), and milestone assumption validation (none yet)
 
-4. **[Phase 3 Integration Tests Implementation](../20-notes/m7-phase-03-integration-tests-implementation.md)**
+4. **[Phase 3 Integration Tests Implementation](../70-milestones/m7/m7-phase-03-integration-tests-implementation.md)**
    - Documents Subtask 3.4.1.1: Successful flow tests (32 tests: 5 direct strategy, 8 FSM transitions, 6 tool-loop, 4 plan submission, 3 budget tracking, 2 snapshot restoration, 3 evidence emission)
    - Documents Subtask 3.4.1.2: Failure handling tests (32 tests: 6 malformed, 3 incompatible, 2 conflicting, 3 unauthorized, 5 budget exhaustion, 3 unavailable, 2 invalid snapshot, 1 non-progress loop, 1 repeated tool request, 1 contradictory plan, 1 missing result, 1 model drift)
    - Documents Subtask 3.4.1.3: Timeout and cancellation tests (14 tests: 4 timeout, 4 cancellation, 3 unavailable dependency, 3 retry)

@@ -28,22 +28,22 @@ Created and pushed branch `milestone-07-phase-02-tool-catalogs-retrieval-code-ex
 
 Created four implementation notes documenting each section of Phase 2:
 
-1. **[Phase 2 Contract And Data Model Implementation](../20-notes/m7-phase-02-contract-and-data-model-implementation.md)**
+1. **[Phase 2 Contract And Data Model Implementation](../70-milestones/m7/m7-phase-02-contract-and-data-model-implementation.md)**
    - Documents Subtask 2.1.1.1: Tool descriptor identity and properties (15 fields including side-effect classification and capability binding)
    - Documents Subtask 2.1.1.2: Retrieval request and result schema (9 request fields, 6 result fields, 4 item fields with content deduplication)
    - Documents Subtask 2.1.1.3: Code-execution request and result schema (12 request fields, 9 result fields with immutable environment and resource budgeting)
 
-2. **[Phase 2 Behavior And Integration Implementation](../20-notes/m7-phase-02-behavior-and-integration-implementation.md)**
+2. **[Phase 2 Behavior And Integration Implementation](../70-milestones/m7/m7-phase-02-behavior-and-integration-implementation.md)**
    - Documents Subtask 2.2.1.1: Tool resolution and catalog policy filtering (6-step flow)
    - Documents Subtask 2.2.1.2: Tool execution through durable effect attempts (8-step flow)
    - Documents Subtask 2.2.1.3: Outcome definitions (9 outcomes: unknown tool, schema mismatch, denied capability, stale catalog, unsafe output, sandbox failure, partial connector success, provenance loss)
 
-3. **[Phase 2 Failure Evidence And Operational Notes Implementation](../20-notes/m7-phase-02-failure-evidence-and-operational-notes-implementation.md)**
+3. **[Phase 2 Failure Evidence And Operational Notes Implementation](../70-milestones/m7/m7-phase-02-failure-evidence-and-operational-notes-implementation.md)**
    - Documents Subtask 2.3.1.1: Failure outcomes (26 diagnostics across 6 categories)
    - Documents Subtask 2.3.1.2: Bounded diagnostics (8 required fields) and evidence emission (12 evidence types)
    - Documents Subtask 2.3.1.3: Implementation-defined choices (8 choices including timeouts, memory limits) and deferred work (5 items)
 
-4. **[Phase 2 Integration Tests Implementation](../20-notes/m7-phase-02-integration-tests-implementation.md)**
+4. **[Phase 2 Integration Tests Implementation](../70-milestones/m7/m7-phase-02-integration-tests-implementation.md)**
    - Documents Subtask 2.4.1.1: Successful flow tests (26 tests: 10 tool, 8 retrieval, 8 code)
    - Documents Subtask 2.4.1.2: Failure handling tests (24 tests: 9 malformed, 4 incompatible, 2 conflicting, 3 unauthorized, 3 exhausted, 3 unavailable)
    - Documents Subtask 2.4.1.3: Timeout and cancellation tests (23 tests: 5 tool timeout, 5 retrieval timeout, 5 code timeout, 8 cancellation)

@@ -1208,7 +1208,7 @@ research does not maintain parallel public implementations.
   identifies the host-owned responsibilities that remain in Elixir.
 - [Extism Invocation Boundary](../60-specification/20-extism-invocation-boundary-instances-and-output-validation.md)
   defines the draft behavior the production Port adapter must preserve.
-- [Milestone 8 Phase 6 deployment work](m8-p6-behavior-and-integration-implementation.md)
+- [Milestone 8 Phase 6 deployment work](../70-milestones/m8/m8-p6-behavior-and-integration-implementation.md)
   states the broader artifact and integrity goals that this concrete pipeline
   begins to operationalize.
 

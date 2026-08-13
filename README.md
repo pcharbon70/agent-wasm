@@ -34,8 +34,10 @@ research evidence or normative specification.
 - [`40-inquiries/`](40-inquiries/README.md) — active research workbenches
 - [`50-journal/`](50-journal/README.md) — dated observations and experiments
 - [`60-specification/`](60-specification/README.md) — versioned normative rules
+- [`70-milestones/`](70-milestones/README.md) — implementation records for each milestone
 - [`90-archive/`](90-archive/README.md) — inactive or superseded material
 - [`assets/`](assets/README.md) — images, PDFs, datasets, and attachments
+- [`src/`](src/README.md) — Elixir/OTP application source and build configuration
 - [`templates/`](templates/README.md) — artifact and index starting points
 
 ## Frontmatter
