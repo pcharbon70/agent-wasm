@@ -2,7 +2,7 @@
 title: "Direct FSM Tool-Loop And Planning Strategies Failure Evidence And Operational Notes"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.1.0"
 tags:
   - milestone-07
@@ -12,7 +12,6 @@ tags:
   - planning-strategies
   - failure-evidence
   - diagnostics
-  - implementation-defined-choices
 aliases:
   - "M7-P3 Failure Evidence And Operational Notes"
 ---
@@ -21,7 +20,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 3](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/phase-03-direct-fsm-tool-loop-and-planning-strategies.md)
 of
 [Milestone 7](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/README.md)
@@ -29,7 +28,7 @@ of
 AI, Tools, Memory, And Human Control.
 It establishes the failure evidence and operational notes for direct FSM
 tool-loop and planning strategies, including failure outcomes, bounded
-diagnostics, evidence emission, implementation-defined choices, deferred
+diagnostics, evidence emission, profiled configuration, deferred
 work, and results that would invalidate earlier milestone assumptions.
 
 This chapter is normative by default within its stated scope.
@@ -149,9 +148,13 @@ behavior.
 
 | Diagnostic | Cause | Host behavior |
 |------------|-------|---------------|
-| `model_unavailable` | The model is unavailable (e.g., network error, service down). | Retry the model request or terminate the strategy execution and emit a `model_unavailable` diagnostic. |
-| `tool_unavailable` | The tool is unavailable (e.g., network error, service down). | Retry the tool request or terminate the strategy execution and emit a `tool_unavailable` diagnostic. |
+| Canonical Chapter 41 model diagnostic | A model, provider, or connection is unavailable. | Preserve the exact Chapter 41 diagnostic and retry classification, then deliver the `model_unavailable` FSM event. |
+| Canonical Chapter 42 tool diagnostic | A tool or connector is unavailable. | Preserve the exact Chapter 42 diagnostic and retry classification, then deliver the `tool_unavailable` FSM event. |
 | `snapshot_store_unavailable` | The snapshot store is unavailable (e.g., network error, service down). | Retry the snapshot restoration or terminate the strategy execution and emit a `snapshot_store_unavailable` diagnostic. |
+
+The FSM event names are not diagnostic aliases. This chapter MUST NOT emit
+`model_unavailable` or `tool_unavailable` as a diagnostic or widen retry
+eligibility established by Chapters 41 and 42.
 
 ### Bounded diagnostics
 
@@ -211,15 +214,22 @@ The following evidence types are normative:
 | `fsm.forced_termination` | Emitted when forced termination is triggered. |
 | `fsm.invalid_snapshot` | Emitted when an invalid snapshot is detected. |
 
-### Implementation-defined choices
+`fsm.nonprogress_loop` evidence MUST contain the terminal state,
+`progress_revision`, and `nonprogress_entry_count: 5`.
+`fsm.repeated_tool_request` evidence MUST contain `last_tool_id`, the bounded
+canonical result digest or null, and `repeated_tool_request_count: 5`. Evidence
+MUST NOT contain raw tool results.
+
+### Configuration requirements
 
 > **Normative definition.**
-The following implementation-defined choices MUST be documented in host configuration:
+The following fixed values and permitted defaults MUST be documented in the
+conformance profile:
 
 | Choice | Default | Documentation requirement |
 |--------|---------|---------------------------|
-| Non-progress loop threshold (N) | 5 | MUST be documented in host configuration. |
-| Repeated tool request threshold (N) | 5 | MUST be documented in host configuration. |
+| Non-progress loop counter | Fixed algorithm; threshold 5 | Progress events, equality, resets, and threshold MUST NOT be changed by host configuration. |
+| Repeated tool request counter | Fixed algorithm; threshold 5 | Tool/result equality, resets, and threshold MUST NOT be changed by host configuration. |
 | Missing result timeout | 30 seconds | MUST be documented in host configuration. |
 | Budget default values | As stated in Section 43.1 | MUST be documented in host configuration. |
 | Budget maximum values | As stated in Section 43.1 | MUST be documented in host configuration. |
@@ -229,7 +239,7 @@ The following implementation-defined choices MUST be documented in host configur
 
 ### Deferred work
 
-> **Non-normative guidance.**
+> **Non-normative note.**
 The following work is deferred to future phases:
 
 | Item | Description | Priority |
@@ -247,7 +257,7 @@ The following work is deferred to future phases:
 
 ### Results that would invalidate earlier milestone assumptions
 
-> **Non-normative guidance.**
+> **Non-normative note.**
 The following results would invalidate earlier milestone assumptions:
 
 | Result | Description | Impact |
@@ -258,17 +268,17 @@ The following results would invalidate earlier milestone assumptions:
 
 ### 43.3.1 Non-progress loop threshold
 
-- **Permission**: The host MAY configure the non-progress loop threshold (N) different from the default.
-- **Recommendation**: The host SHOULD use a threshold between 3 and 10.
-- **Permitted presentation**: The host MAY present the configured threshold to the operator.
-- **Limit**: The host MUST document the configured threshold.
+- **Requirement**: The fixed `progress_revision` counter terminates at exactly
+  5 unchanged state entries.
+- **Permitted presentation**: The host MAY present the fixed threshold to the operator.
+- **Limit**: Configuration MUST NOT change the threshold.
 
 ### 43.3.2 Repeated tool request threshold
 
-- **Permission**: The host MAY configure the repeated tool request threshold (N) different from the default.
-- **Recommendation**: The host SHOULD use a threshold between 3 and 10.
-- **Permitted presentation**: The host MAY present the configured threshold to the operator.
-- **Limit**: The host MUST document the configured threshold.
+- **Requirement**: The fixed `tool_id` and canonical result-digest counter
+  terminates at exactly 5 requests without a different result.
+- **Permitted presentation**: The host MAY present the fixed threshold to the operator.
+- **Limit**: Configuration MUST NOT change the threshold.
 
 ### 43.3.3 Missing result timeout
 

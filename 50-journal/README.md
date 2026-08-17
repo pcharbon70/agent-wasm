@@ -29,6 +29,9 @@ whose time and execution context matter.
 
 ### Documents
 
+- [2026-08-11 Guest Protocol Port Conformance](2026-08-11-guest-protocol-port-conformance.md)
+  — records the first durable compiled no-WASI guest ABI and runtime-timeout run
+  through the private Elixir-to-Extism Port, bounded to one SpecLed requirement.
 - [2026-08-10 Elixir Port Packaging Probe](2026-08-10-elixir-port-packaging-probe.md)
   — records the framed Port test, production Mix release, container build,
   missing-CA and locale failures, corrections, and final non-root health smoke.

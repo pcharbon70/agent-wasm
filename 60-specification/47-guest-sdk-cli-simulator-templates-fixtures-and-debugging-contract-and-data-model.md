@@ -2,7 +2,7 @@
 title: "Guest SDK CLI Simulator Templates Fixtures And Debugging Contract And Data Model"
 kind: specification
 created: "2026-08-10"
-status: draft
+status: normative
 spec_version: "0.2.0"
 tags:
   - milestone-09
@@ -23,7 +23,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 2](../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/phase-02-guest-sdk-cli-simulator-templates-fixtures-and-debugging.md)
 of
 [Milestone 9](../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/README.md)
@@ -76,7 +76,7 @@ surfaces:
 | `fixtures` | Integration test fixture composition and assertion. |
 
 > **Non-normative note.**
-SDK languages are implementation-defined.
+An implementation MAY choose its supported SDK languages.
 The SDK MUST provide type-safe bindings for the protocol surfaces above.
 Language-specific conventions (e.g., Rust traits, TypeScript interfaces,
 Python protocols) are permitted but MUST expose the same semantic contract.
@@ -298,7 +298,7 @@ See [Variability register](#variability-register).
 | Template patterns | Section 47.1.5 | MAY | Must include `direct` and `fsm` templates. Other patterns are permitted. |
 | Debugging view access methods | Section 47.1.6 | MAY | Must support CLI and SDK access. HTTP/gRPC endpoints are permitted. |
 | Compatibility negotiation fields | Section 47.1.7 | Required | Must include all fields listed in the compatibility table. |
-| Deprecation policy durations | Section 47.1.8 | Implementation-defined | Must document the duration for each deprecation stage. |
+| Deprecation policy durations | [Deprecation Policy](#4718-deprecation-policy) | Required | `deprecated` lasts 6 months and `sunset` lasts 3 months before removal. |
 | Offline capabilities | Section 47.1.9 | MAY | Must support at least `artifact build` and `fixture test` offline. |
 | Reproducible build verification | Section 47.1.10 | Required | Must verify determinism, source inclusion, and dependency pinning. |
 | Actionable failure fields | Section 47.1.11 | Required | Must include all fields listed in the actionable failures table. |

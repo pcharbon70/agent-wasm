@@ -2,7 +2,7 @@
 title: "Provider-Neutral Model Requests Responses Streaming And Usage Behavior And Integration"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.2.0"
 tags:
   - milestone-07
@@ -24,7 +24,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 1](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/phase-01-provider-neutral-model-requests-responses-streaming-and-usage.md)
 of
 [Milestone 7](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/README.md).
@@ -114,13 +114,14 @@ When the host receives a model intent, it MUST execute this order:
 4. Authorize the originating agent's `ModelAccess` for that slot, purpose,
    tools, content classification, deadline, and budget.
 5. Load exactly one active approved binding revision for the slot.
-6. Validate the bound model against the recorded catalog revision and current
-   policy without changing the selection.
+6. Load the binding's exact connection revision and validate its custody mode,
+   lease linkage, catalog revision, and current policy without changing the
+   selection.
 7. Materialize the concrete request and deterministic request identity.
 8. Atomically commit the request, journal fact, quota reservation, and outbox
    effect before dispatch.
-9. Dispatch the recorded outbox effect through the bound adapter and
-   credential custodian.
+9. Dispatch the recorded outbox effect through the bound adapter and, for an
+   authenticated connection, credential custodian.
 
 Failure before step 8 MUST leave no request, quota reservation, or external
 effect. Failure after step 8 is recovered through the durable effect protocol
@@ -138,6 +139,11 @@ Authenticated model dispatch has two independent authority checks:
 The host MUST deny dispatch unless both checks allow it. `ModelAccess` MUST
 NOT imply `CredentialUse`, and `CredentialUse` MUST NOT grant model choice,
 tool authority, credential read, or credential export.
+
+The second check applies to authenticated dispatch. A pinned
+`custody_mode: none` connection performs no credential dispatch and MUST NOT
+create a `CredentialUseRequest`; it remains subject to `ModelAccess`, endpoint,
+network, tenant, deadline, and budget policy.
 
 For `separated-credential-custody`, the dispatch flow is:
 
@@ -160,7 +166,10 @@ The custodian MUST reject arbitrary origins, methods, authentication headers,
 provider or model substitutions, reused nonces, and request-digest changes.
 The host MUST NOT have direct authenticated egress to the bound provider in
 this profile. Local unauthenticated models MAY use a connection that declares
-no credential custodian, subject to normal network and tenant policy.
+`custody_mode: none` and no custodian, lease, or handle, subject to normal
+network and tenant policy. After the local operation completes, the host MUST
+create the `NoCredentialReceipt` defined in Section 41.1 and validate it
+against the pinned connection revision before result or usage admission.
 
 ### Adapter and stream behavior
 
@@ -171,8 +180,8 @@ tool deltas, and cumulative usage before emission.
 The host MAY expose bounded text and tool-request deltas as causally linked
 signals. These deltas are observations and MUST NOT directly commit agent
 state. On completion, the host MUST validate tool requests, structured output,
-finish reason, usage, safety metadata, and the custodian receipt before
-atomically recording the final result.
+finish reason, usage, safety metadata, and the applicable credential receipt
+before atomically recording the final result.
 
 The host MUST emit:
 
@@ -197,7 +206,8 @@ headers, arbitrary endpoints, raw provider errors, or custodian internals.
 On cancellation, the host MUST:
 
 1. Mark the durable request cancellation as requested.
-2. Send cancellation through the same pinned connection and custodian.
+2. Send cancellation through the same pinned connection and, when present,
+   custodian.
 3. Stop admitting new deltas.
 4. Record whether the custodian confirmed cancellation.
 5. Release unused quota and retain usage already confirmed.
@@ -220,8 +230,9 @@ missing, or incompatible, the request fails and awaits explicit user
 reconfiguration. Reconfiguration applies to a new intent, not to mutation of
 the old durable request.
 
-The host MAY retry transport and adapter failures only when the adapter and
-custodian declare the operation idempotent or support status reconciliation.
+The host MAY retry transport and adapter failures only when the adapter and,
+for authenticated dispatch, custodian declare the operation idempotent or
+support status reconciliation.
 A retry after an uncertain outcome MUST reconcile by request identity before
 creating another provider operation.
 
@@ -244,6 +255,7 @@ creating another provider operation.
 | Late response | `model.request.late_response` | Do not advance cancelled or expired work; retain bounded reconciliation evidence. |
 | Ambiguous billing | `model.request.ambiguous_billing` | Preserve provider and host calculations; enforce the more conservative authorized budget. |
 | Invalid custodian receipt | `credential.receipt.invalid` | Reject result admission and open reconciliation. |
+| Invalid no-credential receipt | `model.receipt.invalid_no_credential` | Reject result admission; do not create credential-use state. |
 
 ### Security invariants
 
@@ -263,16 +275,25 @@ The following invariants apply to every model request:
 7. A response is not admitted without valid correlation, policy, quota, and
    receipt evidence.
 
+For invariant 7, receipt evidence means a verified Section 44 receipt for an
+authenticated request or a valid `NoCredentialReceipt` for a pinned local
+unauthenticated connection.
+
 ## Variability register
+
+The following table summarizes fixed limits and internal mechanisms governed by the
+linked sections.
+
+> **Non-normative note.**
 
 | Item | Permission | Recommendation | Constraint |
 | --- | --- | --- | --- |
-| Binding input presentation | Implementation-defined | Interactive installer or authenticated declarative configuration | User authority and full requirement visibility must be preserved |
-| Adapter concurrency | Implementation-defined | Bound per tenant and connection | Must preserve per-request ordering and quotas |
-| Stream buffering | Implementation-defined | Use bounded backpressure | Must not reorder accepted events |
-| Transport retry limit | Implementation-defined | Exponential backoff with jitter | Must preserve binding and idempotency identity |
-| Request timeout | Implementation-defined | Shorter of request deadline and policy limit | Must be documented and enforced |
-| Local unauthenticated models | Optional | Register as explicit no-credential connections | Must still satisfy tenant, endpoint, model, and budget policy |
+| [Binding input presentation](#installation-and-configuration) | Permitted interface | Interactive installer or authenticated declarative configuration | Both forms must preserve user authority and full requirement visibility |
+| [Adapter concurrency](41-provider-neutral-model-requests-responses-streaming-and-usage-failure-evidence-and-operational-notes.md#implementation-limits-and-fixed-rules) | Implementation limit | Bound per tenant and connection | Must preserve per-request ordering and quotas |
+| [Stream buffering](41-provider-neutral-model-requests-responses-streaming-and-usage-failure-evidence-and-operational-notes.md#implementation-limits-and-fixed-rules) | Implementation limit | Use bounded backpressure | Must not reorder accepted events |
+| [Transport retry scheduling](41-provider-neutral-model-requests-responses-streaming-and-usage-failure-evidence-and-operational-notes.md#internal-mechanisms-non-normative) | Internal mechanism | Exponential backoff with jitter | Must preserve binding, idempotency identity, and terminal outcome |
+| [Request timeout](41-provider-neutral-model-requests-responses-streaming-and-usage-failure-evidence-and-operational-notes.md#implementation-limits-and-fixed-rules) | Fixed rule plus implementation limit | Earlier of request deadline and host policy limit | Limit must be published and enforced |
+| Local unauthenticated models | Optional closed mode | Register with `custody_mode: none` | Must have no custodian, lease, handle, or authenticated operation and must produce `NoCredentialReceipt` |
 | Streaming signals | Optional | Emit bounded deltas | Deltas must not mutate authoritative state directly |
 | Automatic provider/model fallback | Deferred | Fail closed and request user reconfiguration | Runtime substitution is prohibited |
 

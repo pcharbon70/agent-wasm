@@ -2,7 +2,7 @@
 title: "Embedded And Server Host APIs Configuration And Packaging Contract And Data Model"
 kind: specification
 created: "2026-08-10"
-status: draft
+status: normative
 spec_version: "0.2.0"
 tags:
   - milestone-09
@@ -20,7 +20,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 1](../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/phase-01-embedded-and-server-host-apis-configuration-and-packaging.md)
 of
 [Milestone 9](../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/README.md)
@@ -114,7 +114,7 @@ List operations MUST support pagination with the following envelope:
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `limit` | integer | No | Maximum number of results. Default and maximum are implementation-defined. |
+| `limit` | integer | No | Maximum number of results. Defaults to 100 and MUST be between 1 and 1000 inclusive. |
 | `cursor` | string | No | Opaque cursor for continuation. First request omits cursor. |
 | `items` | array | Yes | List of results. |
 | `next_cursor` | string | No | Cursor for the next page. Absent if no more pages. |
@@ -129,12 +129,22 @@ Cursor-based pagination is recommended for large datasets.
 > **Normative definition.**
 Idempotent operations MUST support an `Idempotency-Key` header or field
 in the envelope.
-Identical requests with the same idempotency key MUST produce the same
-result without re-executing side effects.
+While an idempotency key identifies an in-flight or retained completed request,
+equivalent requests using that key MUST produce the same result without
+re-executing side effects.
 
-The host MUST reject duplicate idempotency keys with a `request.idempotent_duplicate`
-diagnostic after the original request completes, unless the original request
-is still in-flight.
+The host MUST retain a completed idempotency key for exactly 24 hours after
+completion. During that interval, an equivalent request with the same key MUST
+return the original completed result and original `request_id` without
+re-executing side effects or emitting an error diagnostic. An equivalent
+request received while the original is in flight MUST correlate to that
+operation rather than create another operation.
+
+Request equivalence requires the same authenticated principal, operation,
+protocol version, and canonical payload. A non-equivalent request that reuses
+a retained key MUST be rejected with `request.idempotent_duplicate`. After the
+24-hour interval, the key no longer identifies the completed request and reuse
+is processed as a new request.
 
 ### 46.1.4 Error Envelope
 
@@ -199,8 +209,14 @@ structure:
 | `source` | string | Yes | Configuration source identifier. |
 | `precedence` | integer | Yes | Precedence level. Higher values override lower values. |
 | `values` | object | Yes | Configuration key-value pairs. |
-| `secrets` | object | No | Secret references. Values are resolved at runtime. |
+| `secrets` | object | No | Secret references. Values are resolved at runtime and are not diagnostic data. |
 | `profiles` | array | No | Named configuration profiles for environment selection. |
+
+A secret reference's path or key, version, and resolved-store metadata are
+sensitive reference content. Response envelopes, diagnostics, evidence, logs,
+traces, and metrics MUST NOT include that content. A failure MAY identify the
+configuration field location containing the reference, but not the reference
+content stored at that location.
 
 > **Non-normative note.**
 Configuration sources are merged in precedence order.
@@ -217,11 +233,12 @@ See [Variability register](#variability-register).
 | Host operations surface | Section 46.1.1 | Required | Must include all operations listed in the host operations table. |
 | Envelope fields | Section 46.1.1 | Required | Must include all fields listed in the envelope table. |
 | Pagination strategy | Section 46.1.2 | MAY | Must support cursor-based pagination. Offset-based is permitted. |
-| Pagination default limit | Section 46.1.2 | Implementation-defined | Must document the default and maximum limit values. |
-| Idempotency key storage duration | Section 46.1.3 | Implementation-defined | Must document the duration for which idempotency keys are retained. |
+| Pagination default and maximum | [Pagination Envelope](#4612-pagination-envelope) | Required | Default 100; valid range 1 through 1000. |
+| Idempotency key storage duration | [Idempotency](#4613-idempotency) | Required | Retain completed keys for exactly 24 hours. |
 | Dependency injection scope | Section 46.1.6 | Required | Must accept all required dependencies. Optional dependencies are permitted. |
-| Configuration source count | Section 46.1.7 | Implementation-defined | Must document the maximum number of configuration sources supported. |
-| Configuration precedence range | Section 46.1.7 | Implementation-defined | Must document the precedence range and ordering. |
+| Configuration source support | [Configuration Data Model](#4617-configuration-data-model) | Required minimum | Support default values, configuration files, and environment variables. Command-line, remote, and runtime-injection sources are optional. |
+| Configuration precedence range | [Configuration Data Model](#4617-configuration-data-model) | Required | Every supported source class uses its fixed precedence value of 0, 10, 20, 30, 40, or 50. |
+| Secret-reference output | [Configuration Data Model](#4617-configuration-data-model) | Prohibited | Paths, keys, versions, and resolved-store metadata must not appear in host outputs; only the containing configuration field location may be identified. |
 
 ## Rationale and evidence (non-normative)
 

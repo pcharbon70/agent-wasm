@@ -52,7 +52,27 @@ An implementation-defined choice is permitted only where a normative chapter:
 1. uses the visible implementation-defined callout;
 2. enumerates the complete set or bounded domain of choices;
 3. states which observations may differ; and
-4. requires the selected choice in the implementation profile.
+4. requires the selected choice in the conformance profile.
+
+The governed paragraph or table positively identifies the choice as
+implementation-defined, or states that the host or implementation defines the
+choice, and states how the conformance profile records or publishes the
+selection. A negated mention of “implementation-defined” and a fixed rule are
+not declarations.
+
+The governed block enumerates at least two alternatives with `either ... or`,
+`one of`, `whether`, a parenthesized alternative list, multiple table rows, or
+an explicitly bounded or finite set, range, or domain. Naming an algorithm,
+format, mechanism, policy, or other single value does not establish a choice.
+The block also uses `observations that may differ` or states that an
+`observable` result `may` or `can` `differ`, `vary`, or `change`, followed by
+the affected observations. These explicit forms keep declaration checks
+deterministic.
+
+A statement that the selection must not be recorded, documented, published,
+selected, specified, declared, included, or contained in the conformance
+profile is invalid whether the negation precedes or follows “conformance
+profile”. It cannot satisfy the profile obligation.
 
 Specification silence and existing implementation behavior create no choice.
 
@@ -87,11 +107,24 @@ Use these rendered callouts in normative chapters:
 - `> **Normative implementation-defined choice.**`
 - `> **Normative unspecified presentation.**`
 
-The label applies to the immediately following paragraph or table. An
-unspecified-presentation paragraph contains the words “bounded unspecified
-presentation” and states its bound. Each specification-area README summarizes
-all `MAY`, `SHOULD`, presentation, and limit clauses in a
-`## Variability register`.
+The label applies to exactly one immediately following paragraph or table. A
+list, fenced block, or mixed sequence of Markdown blocks is not a governing
+block. A thematic break ends any pending or active local scope. A table exists
+for this purpose only when its header is immediately followed by a valid
+Markdown delimiter row; a wrapped prose line containing a pipe remains part of
+its paragraph. An unspecified-presentation paragraph contains the words
+“bounded unspecified presentation” and states its bound. Each
+specification-area README summarizes all `MAY`, `SHOULD`, presentation, and
+limit clauses in a `## Variability register`.
+
+A dependent rule or conformance test refers to an already declared choice as
+the `profile-selected` or `profile-recorded` value and cites the governing
+heading with an anchored Markdown link. Such a reference does not repeat the
+variability callout and cannot widen the declared domain or alter its
+observations. Each occurrence is either inside its own rendered anchored link
+or is followed by that link in the same sentence or table row before another
+profile reference or a semicolon; one link cannot satisfy multiple
+occurrences. Link-like text inside inline code is not a citation.
 
 ## Conformance profiles
 

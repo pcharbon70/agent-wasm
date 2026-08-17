@@ -2,7 +2,7 @@
 title: "Examples Runbooks SLO Evidence And Production Acceptance Failure Evidence And Operational Notes"
 kind: specification
 created: "2026-08-10"
-status: draft
+status: normative
 spec_version: "0.2.0"
 tags:
   - milestone-09
@@ -22,7 +22,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 5](../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/phase-05-examples-runbooks-slo-evidence-and-production-acceptance.md)
 of
 [Milestone 9](../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/README.md)
@@ -81,8 +81,9 @@ Each outcome includes a stable diagnostic code family, cause, and behavior.
 
 | Diagnostic | Cause | Behavior |
 | --- | --- | --- |
-| `slo.violation` | SLO violation detected (e.g., admission success rate below 99.9%). | Alert on violation. Log at `WARN` level. Emit diagnostic with SLO details. |
-| `slo.budget.exhausted` | SLO error budget exhausted (e.g., budget falls below threshold). | Alert on exhaustion. Log at `ERROR` level. Emit diagnostic with budget details. Trigger incident response. |
+| `slo.violation` | A fixed-window measurement first transitions into `violated`. | Alert once for the transition and include the exact objective, window, observed value, and target. |
+| `slo.budget.exhausted` | A positive budget first reaches zero or a zero-budget objective first transitions into `violated`. | Alert once for the transition, include exact budget fields, and trigger incident response. |
+| `slo.measurement.unavailable` | The fixed window has zero eligible units or required source records cannot be verified. | Mark the objective unavailable, emit the diagnostic, and block production acceptance. Do not classify it as met. |
 
 #### Evidence failures
 
@@ -91,6 +92,7 @@ Each outcome includes a stable diagnostic code family, cause, and behavior.
 | `evidence.generation.failed` | Evidence generation fails (e.g., test fails, capture fails, package fails). | Log failure at `ERROR` level. Emit diagnostic with generation failure. |
 | `evidence.storage.failed` | Evidence storage fails (e.g., write fails, hash fails). | Log failure at `ERROR` level. Emit diagnostic with storage failure. |
 | `evidence.tamper.detected` | Evidence tampering detected (e.g., hash mismatch, modification detected). | Log failure at `ERROR` level. Emit diagnostic with tamper detection. Alert security team. |
+| `evidence.deletion.prohibited` | A deletion request targets production acceptance evidence. | Reject without changing identity, bytes, digest, storage, or availability. Emit the diagnostic even when the requester is an operator or general retention has elapsed. |
 
 #### Production acceptance failures
 
@@ -121,6 +123,14 @@ Each outcome includes a stable diagnostic code family, cause, and behavior.
 | `release.review.failed` | Release review fails (e.g., security review fails, conformance check fails). | Block release. Log at `ERROR` level. Emit diagnostic with review failure. |
 | `release.deploy.failed` | Release deployment fails (e.g., deployment fails, smoke tests fail). | Rollback release. Log at `ERROR` level. Emit diagnostic with deployment failure. |
 | `release.verify.failed` | Release verification fails (e.g., SLOs not met, smoke tests fail). | Rollback release. Log at `ERROR` level. Emit diagnostic with verification failure. |
+
+#### Cross-chapter evidence precedence
+
+For production acceptance evidence, `evidence.deletion.prohibited` and the
+indefinite-retention rule in Section 50.1.4 explicitly replace Chapter 34's
+general operator-deletion exception and post-retention availability rule.
+Chapter 34 continues to govern evidence not classified as production
+acceptance evidence.
 
 ### 50.3.2 Bounded Diagnostics and Evidence
 
@@ -153,21 +163,24 @@ Evidence is retained for operational debugging and compliance auditing.
 Evidence is retrievable via the `evidence inspect` CLI command or SDK
 function with appropriate access controls.
 
-### 50.3.3 Implementation-Defined Choices
+### 50.3.3 Conformance Summary
 
 > **Non-normative note.**
-The following choices are implementation-defined and must be documented
-in the conformance profile.
+The following table summarizes fixed acceptance behavior and
+equivalence-constrained internal mechanisms from the governing contract.
 
 | Choice | Description | Default |
 | --- | --- | --- |
 | SLO target values | Target values for all SLOs. | As defined in Section 50.1.3. |
 | SLO error budget values | Error budget values for all SLOs. | As defined in Section 50.1.3. |
-| SLO alert thresholds | Thresholds for SLO alerts (violation, budget exhaustion). | Implementation-defined. |
-| Evidence storage backend | Backend for evidence storage (immutable, tamper-evident). | Implementation-defined. |
-| Evidence retention period | Retention period for evidence. | Indefinite (per retention policy). |
+| SLO alert thresholds | Thresholds for SLO alerts (violation, budget exhaustion). | Target violation and zero remaining error budget. |
+| SLO measurement window | Window and evaluation schedule. | Rolling 30 days at each UTC minute boundary. |
+| SLO calculation | Eligible units, bad units, percentile, and budget arithmetic. | Exact Section 50.1.3 formulas; no sampling or estimation. |
+| Evidence storage backend | Backend for evidence storage (immutable, tamper-evident). | Internal; must preserve identical evidence bytes, immutability, and tamper detection. |
+| Evidence retention period | Retention period for production acceptance evidence. | Indefinite under [Production Acceptance Evidence](50-examples-runbooks-slo-evidence-and-production-acceptance-contract-and-data-model.md#5014-production-acceptance-evidence). |
+| Evidence deletion | Deletion behavior for production acceptance evidence. | Always reject with `evidence.deletion.prohibited`; Chapter 34 deletion permissions do not apply. |
 | Residual risk review frequency | Frequency of residual risk reviews (quarterly, etc.). | Quarterly. |
-| Release schedule | Release schedule (weekly, monthly, etc.). | Implementation-defined. |
+| Release schedule | Timing of releases. | Internal; must not alter steps or acceptance decisions. |
 
 ### 50.3.4 Deferred Work
 
@@ -219,7 +232,9 @@ See [Variability register](#variability-register).
 | Diagnostic field set | Section 50.3.2 | Required | Must include all fields listed in the bounded diagnostics table. |
 | Diagnostic redaction | Section 50.3.2 | Required | Must redact secrets, stack traces, and irrelevant user data. |
 | Actionable failure fields | Section 50.3.2 | Required | Must include `hint` and `reference` fields. |
-| Implementation-defined choices documentation | Section 50.3.3 | Required | Must document all implementation-defined choices in the conformance profile. |
+| Conformance summary | Section 50.3.3 | Required | Must preserve fixed acceptance behavior and equivalence constraints. |
+| SLO failure calculation | Sections 50.3.1 and 50.3.3 | Required | Must use the fixed window, formulas, transition conditions, and unavailable outcome. |
+| Evidence deletion failure | Sections 50.3.1 and 50.3.3 | Required | Must reject deletion with `evidence.deletion.prohibited` regardless of operator authority or elapsed retention. |
 | Deferred work enforcement | Section 50.3.4 | MUST | Must NOT implement deferred work without evidence from the corresponding future phase. |
 
 ## Rationale and evidence (non-normative)
@@ -234,8 +249,8 @@ context for operational debugging.
 Actionable failures include hints and references to enable operators to
 resolve issues without consulting support.
 
-Implementation-defined choices are documented to enable conformance
-verification and interoperability.
+Fixed acceptance behavior and equivalence-constrained internals enable
+conformance verification and interoperability.
 Deferred work is explicitly identified to prevent scope creep and ensure
 that future phases build on the verified foundation of Phase 5.
 

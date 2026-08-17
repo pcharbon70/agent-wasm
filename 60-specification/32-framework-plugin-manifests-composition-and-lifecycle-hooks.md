@@ -2,7 +2,7 @@
 title: "Framework Plugin Manifests Composition And Lifecycle Hooks"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.2.0"
 tags:
   - milestone-05
@@ -20,7 +20,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 3](../.spec/planning/agentic-system/milestone-05-capabilities-plugins-security-and-tenancy/phase-03-framework-plugin-manifests-composition-and-lifecycle-hooks.md)
 of
 [Milestone 5](../.spec/planning/agentic-system/milestone-05-capabilities-plugins-security-and-tenancy/README.md)
@@ -55,7 +55,7 @@ Phase 3 MILESTONE ACCEPTANCE requires:
 4. **Evidence recording**: All integration test evidence MUST be recorded
    as machine-readable YAML reports in the `50-journal/` directory.
 5. **Conformance profile**: The conformance profile MUST document all
-   implementation-defined choices listed in this chapter.
+   profile selections declared by visible callouts in this chapter.
 
 > **Normative definition.**
 Phase 3 FAILS MILESTONE ACCEPTANCE if:
@@ -181,10 +181,10 @@ identifies the plugin within the host's plugin registry.
 Two plugins with the same `id` are mutually exclusive and one MUST
 always override the other through the host's precedence rules.
 
-> **Normative implementation-defined choice.**
-The host defines the exact rules used to validate the `id` format.
-The host MUST document this format in its conformance profile and reject
-identifiers that do not match it.
+> **Normative definition.**
+The `id` MUST match `[a-z][a-z0-9]*(?:-[a-z0-9]+)*` exactly. The host MUST
+reject any other representation with `plugin.malformed_manifest`. No
+conformance profile may select another identifier syntax.
 
 > **Normative definition.**
 The `publisher` field is the identifier of the trusted entity responsible
@@ -216,22 +216,22 @@ content-addressable digest, and a declared trust tier.
 ```
 ArtifactReference {
   artifact_id: ArtifactId,
-  digest: Digest,
+  digest: ArtifactDigest,
   trust_tier: ArtifactTrustTier,
   size_bytes: u64?,
   media_type: string?
 }
 
 ArtifactId = string
-Digest = {
-  algorithm: HashAlgorithm,
-  value: bytes
-}
-
-HashAlgorithm = "sha256" | "sha384" | "sha512"
+ArtifactDigest = string
 
 ArtifactTrustTier = "untrusted-guest" | "reviewed-preparation" | "privileged-host"
 ```
+
+`ArtifactDigest` MUST be the canonical `artifact:sha256:<hex>` identity from
+the fixed construction in
+[Artifact structure](03-agent-manifests-artifacts-schemas-and-registries.md#artifact-structure).
+An alternate algorithm or representation is invalid.
 
 > **Normative definition.**
 The `trust_tier` field classifies each artifact into exactly one of three
@@ -339,10 +339,10 @@ the same pattern for the same signal kind.
 When ambiguous routing is detected, the host MUST fail composition
 with the diagnostic `ambiguous-route`.
 
-> **Normative implementation-defined choice.**
-The host defines how priority conflicts are resolved when two routes
-match the same pattern with different priorities.
-The host MUST document this resolution in its conformance profile.
+> **Normative definition.**
+When two routes match the same pattern with different priorities, the route
+with the lower numeric `priority` value wins. Equal-priority matches are
+rejected with `plugin.route_conflict`; no tie-break is permitted.
 
 > **Non-normative note.**
 A deterministic route resolution prevents non-deterministic behavior in
@@ -1071,40 +1071,42 @@ to publishers before publishing plugins.
 
 ## Implementation-defined choices
 
+> **Normative definition.**
+The plugin-registry storage backend and its durability and concurrency
+mechanisms are internal. Every backend MUST be observationally equivalent for
+manifest admission, artifact-digest validation, composition order, conflict
+detection, lifecycle transitions, diagnostics, and committed registry state.
+Backend selection MUST NOT change any accepted input, result, ordering, or
+failure outcome defined by this chapter.
+
 > **Normative implementation-defined choice.**
 The following choices are implementation-defined and MUST be documented
 in the conformance profile:
+Each selection is one of the mechanism alternatives stated below. Observable
+approval-channel latency, schedule wake-up granularity, and operational
+resource consumption may differ according to the recorded selections; route
+selection, composition order, lifecycle results, and diagnostics MUST NOT
+differ.
 
-1. **Plugin registry backend**: The storage mechanism for plugin
-   manifests and artifacts (in-memory, database, filesystem, etc.).
-   Baseline conformance is BACKEND-AGNOSTIC.
-   Conformance does NOT depend on backend type.
-   Implementations define backend-specific behavior (e.g., durability,
-   concurrency) as implementation-defined choices documented in the
-   conformance profile.
-
-2. **Route pattern matching**: The exact algorithm used to match
+1. **Route pattern matching**: The exact algorithm used to match
    signal and action patterns against routes.
 
-3. **State namespace isolation**: The mechanism used to isolate plugin
+2. **State namespace isolation**: The mechanism used to isolate plugin
    state namespaces (separate databases, table prefixes, in-memory
    maps, etc.).
 
-4. **Review evidence storage**: The mechanism used to store review
+3. **Review evidence storage**: The mechanism used to store review
    evidence for `reviewed-preparation` artifacts.
 
-5. **Schedule resolution**: The mechanism used to convert schedule
+4. **Schedule resolution**: The mechanism used to convert schedule
    declarations into signals (timer threads, event loops, etc.).
 
-6. **Lifecycle approval workflow**: The mechanism used to obtain
+5. **Lifecycle approval workflow**: The mechanism used to obtain
    operator approval for lifecycle transitions.
 
-7. **Composition order tie-breaking**: The exact implementation of
-   the tie-breaking rules defined in
-   [Composition order](#composition-order).
-
-8. **Conflict resolution priority**: The exact priority resolution
-   when two routes match the same pattern with different priorities.
+6. **Composition implementation**: The internal mechanism used to apply the
+   fixed tie-breaking rules defined in [Composition order](#composition-order).
+   Every mechanism MUST produce the same global order.
 
 ### Deferred work promotion
 
@@ -1156,34 +1158,45 @@ the affected milestone MUST be revised and re-validated.
 
 ## Variability register
 
+The register below indexes profile selections and other variability governed by
+the linked clauses. It does not independently license variation.
+
+> **Non-normative note.**
+
 | Item | Permission | Recommendation | Constraint |
 |------|------------|----------------|------------|
-| Plugin registry backend | Implementation-defined | Document in conformance profile | Must support manifest storage and artifact digests |
-| Route pattern matching | Implementation-defined | Document in conformance profile | Must enforce unambiguous resolution |
-| State namespace isolation | Implementation-defined | Document in conformance profile | Must prevent cross-plugin state access |
-| Review evidence storage | Implementation-defined | Document in conformance profile | Must persist review decisions |
-| Schedule resolution | Implementation-defined | Document in conformance profile | Must convert schedules to signals deterministically |
-| Lifecycle approval workflow | Implementation-defined | Document in conformance profile | Must support publisher and operator approval |
-| Composition order tie-breaking | Implementation-defined | Document in conformance profile | Must produce a deterministic global order |
-| Conflict resolution priority | Implementation-defined | Document in conformance profile | Must resolve route priority conflicts explicitly |
-| Trust tier enforcement | Implementation-defined | Document in conformance profile | Must enforce all three trust tier rules |
-| Manifest version validation | Implementation-defined | Document in conformance profile | Must reject unsupported manifest versions |
-| Model requirement descriptions | Optional | Explain functional needs without naming a concrete provider or model | Must not become a hidden selection constraint |
-| Model binding configuration | Required | User or authorized tenant operator selects each required slot | Must remain outside artifact digest and publisher control |
-| Model binding revision approval | Required | Reapprove after binding or requirement changes | Existing in-flight requests remain pinned to their recorded revision |
+| [Plugin registry backend](#implementation-defined-choices) | Internal mechanism | No profile selection | Must preserve all observable registry and composition semantics |
+| [Plugin identifier syntax](#identity-and-versioning) | Required | Fixed lower-kebab-case regular expression | Reject every non-matching identifier |
+| [Route pattern matching](#routes) | Implementation-defined | Document in conformance profile | Must enforce the same unambiguous resolution |
+| [State namespace isolation](#state-namespaces) | Implementation-defined | Document in conformance profile | Must prevent cross-plugin state access |
+| [Review evidence storage](#implementation-defined-choices) | Implementation-defined | Document in conformance profile | Must persist review decisions |
+| [Schedule resolution](#schedules) | Implementation-defined | Document in conformance profile | Must convert schedules to signals deterministically |
+| [Lifecycle approval workflow](#lifecycle-operations) | Implementation-defined | Document in conformance profile | Must support publisher and operator approval |
+| [Composition order tie-breaking](#composition-order) | Required | Apply the fixed identifier, version, and digest order | Must produce the fixed global order |
+| [Route priority resolution](#routes) | Required | Lower numeric priority wins | Equal-priority matches are rejected |
+| [Trust tier enforcement](#artifacts) | Required | Enforce all declared trust tiers | Must enforce all three trust tier rules |
+| [Manifest version validation](#identity-and-versioning) | Required | Validate the closed manifest-version set | Must reject unsupported manifest versions |
+| [Model requirement descriptions](#model-requirements) | Optional | Explain functional needs without naming a concrete provider or model | Must not become a hidden selection constraint |
+| [Model binding configuration](#model-requirements) | Required | User or authorized tenant operator selects each required slot | Must remain outside artifact digest and publisher control |
+| [Model binding revision approval](#model-requirements) | Required | Reapprove after binding or requirement changes | Existing in-flight requests remain pinned to their recorded revision |
 
 ## Operational variability register
 
+The register below indexes operational profile selections and requirements
+governed by the linked clauses. It does not independently license variation.
+
+> **Non-normative note.**
+
 | Item | Permission | Recommendation | Constraint |
 |------|------------|----------------|------------|
-| Diagnostic formatting | Implementation-defined | Document in conformance profile | Must produce parseable output |
-| Audit log retention | Implementation-defined | Document in conformance profile | Must support forensic analysis |
-| Failure detection granularity | Implementation-defined | Document in conformance profile | Must detect all fifteen failure outcomes |
+| [Diagnostic formatting](#fixed-operational-behavior) | Required | Exact Chapter 04 top-level structure | Must use canonical JSON and the assigned family and code |
+| [Audit log retention](#fixed-operational-behavior) | Required | Use the governing Chapter 34 evidence-retention policy | Must not expire earlier than governing evidence |
+| [Failure detection granularity](#failure-outcomes) | Required | Detect every defined outcome | Must detect all fifteen failure outcomes |
 
 ## 3.3 Failure Evidence And Operational Notes
 
 This section establishes the failure outcomes, bounded diagnostics, evidence
-requirements, implementation-defined choices, deferred work, and potential
+requirements, profile selections, deferred work, and potential
 invalidation results for framework plugin manifests composition and
 lifecycle hooks.
 
@@ -1228,16 +1241,24 @@ with comprehensive failure visibility.
 ### Bounded diagnostics and evidence
 
 > **Normative definition.**
-The host MUST emit bounded diagnostics for each failure outcome. Each
-diagnostic MUST contain:
+The host MUST emit bounded diagnostics for each failure outcome using exactly
+the Chapter 04 `Diagnostic` top-level structure. The specific plugin error is
+`code`, `severity` is `error`, and `details` contains `phase`, `contract`,
+`profile`, `failed_boundary`, `failure_category`, `plugin_id`, `timestamp`,
+`retryable`, and bounded `evidence_reference` when evidence exists.
 
-1. The failure outcome category (malformed, incompatible, conflicting,
-   unauthorized, exhausted, or unavailable).
-2. The specific error code from the error code table.
-3. The phase boundary at which the failure was detected.
-4. The affected plugin identifier, if applicable.
-5. A human-readable description of the failure.
-6. The evidence required to reproduce or investigate the failure.
+| Failure category | Family |
+|------------------|--------|
+| Malformed | `identity.validation.plugin_lifecycle` |
+| Incompatible | `identity.compatibility.plugin_lifecycle` |
+| Conflicting | `identity.conflict.plugin_lifecycle` |
+| Unauthorized | `identity.authorization.plugin_lifecycle` |
+| Exhausted | `identity.limit.plugin_lifecycle` |
+| Unavailable | `identity.resource.plugin_lifecycle` |
+
+Each domain code has the family of its failure category in
+[Failure semantics](#failure-semantics). No additional top-level diagnostic
+member is permitted.
 
 > **Normative definition.**
 The host MUST NOT include the following information in diagnostics:
@@ -1275,36 +1296,16 @@ monitoring. Operators SHOULD monitor the lifecycle audit log for
 patterns that indicate systemic issues, such as repeated malformed
 manifests from a specific publisher.
 
-### Operational implementation-defined choices
+### Fixed operational behavior
 
-> **Normative implementation-defined choice.**
-The following choices are implementation-defined and MUST be documented
-in the conformance profile. These choices affect how the host detects
-and reports failure outcomes, but do not affect the normative failure
-semantics defined in this section.
-
-1. **Plugin registry backend**: The storage mechanism for plugin
-   manifests and artifacts (in-memory, database, filesystem, etc.).
-2. **Route pattern matching**: The exact algorithm used to match
-   signal and action patterns against routes.
-3. **State namespace isolation**: The mechanism used to isolate plugin
-   state namespaces (separate databases, table prefixes, in-memory
-   maps, etc.).
-4. **Review evidence storage**: The mechanism used to store review
-   evidence for `reviewed-preparation` artifacts.
-5. **Schedule resolution**: The mechanism used to convert schedule
-   declarations into signals (timer threads, event loops, etc.).
-6. **Lifecycle approval workflow**: The mechanism used to obtain
-   operator approval for lifecycle transitions.
-7. **Composition order tie-breaking**: The exact implementation of
-   the tie-breaking rules defined in
-   [Composition order](#composition-order).
-8. **Conflict resolution priority**: The exact priority resolution
-   when two routes match the same pattern with different priorities.
-9. **Diagnostic formatting**: The exact format of diagnostic messages
-   (JSON, YAML, plain text, etc.).
-10. **Audit log retention**: The retention policy for lifecycle audit
-    log entries (TTL, archival, deletion, etc.).
+> **Normative definition.**
+Failure diagnostics MUST use canonical JSON and the exact Chapter 04 top-level
+structure, assigned family, and domain code defined in this chapter. Lifecycle
+audit entries MUST be retained for at least the governing evidence-retention
+period in
+[Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md).
+Internal detection, storage, and delivery mechanisms MUST NOT change which
+failure is detected, the selected code, diagnostic bytes, or retained evidence.
 
 > **Non-normative note.**
 These implementation-defined choices allow host implementations to
@@ -1522,6 +1523,9 @@ reproducible evidence for later milestone and release gates.
 > Each test MUST capture the specific diagnostic emitted, the registry
 > state after failure, and the absence of unauthorized or partially-loaded
 > artifacts.
+> Each test MUST also verify the exact Chapter 04 top-level shape, the
+> category-specific `identity.*.plugin_lifecycle` family, the domain `code`,
+> `severity: "error"`, and every required bounded `details` member.
 
 > **Normative definition.**
 >

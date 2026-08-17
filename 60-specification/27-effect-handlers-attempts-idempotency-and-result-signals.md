@@ -2,7 +2,7 @@
 title: "Effect Handlers Attempts Idempotency And Result Signals"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.1.0"
 tags:
   - milestone-04
@@ -20,7 +20,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 3](../.spec/planning/agentic-system/milestone-04-durable-state-effects-and-recovery/phase-03-effect-handlers-attempts-idempotency-and-result-signals.md)
 of
 [Milestone 4](../.spec/planning/agentic-system/milestone-04-durable-state-effects-and-recovery/README.md)
@@ -369,7 +369,18 @@ and includes:
 - `max_attempts`: The maximum number of dispatch attempts (including the
   original).
 - `backoff_ms`: The base backoff duration in milliseconds.
-- `jitter_ms`: Optional additional random jitter in milliseconds.
+- `jitter_ms`: Optional shared-schema field that MUST be absent or zero for an
+  effect-handler retry policy.
+
+> **Normative definition.**
+An effect-handler `RetryPolicy` MUST conform to the fixed directive retry
+semantics in
+[Directives Strategies Continuations And Terminal States](13-directives-strategies-continuations-and-terminal-states.md#fixed-directive-and-strategy-policy):
+`max_attempts` is at least 1 and counts the initial attempt, `backoff_ms` is the
+exact constant delay before every subsequent attempt, and `jitter_ms` is absent
+or zero. A policy requesting exponential or linear growth, non-zero jitter, or
+another delay transformation MUST be rejected with `handler.retry_policy_invalid`
+before the handler registration becomes active.
 
 ## 3.3 Failure Evidence And Operational Notes
 
@@ -410,6 +421,7 @@ idempotency and result signals:
 | `handler.response_too_large` | Response exceeds byte limit |
 | `handler.duration_exceeded` | Dispatch exceeded duration limit |
 | `handler.diagnostics_too_large` | Diagnostics exceed byte limit |
+| `handler.retry_policy_invalid` | Retry policy requests an invalid attempt count, delay transformation, or non-zero jitter |
 | `attempt.handler_crashed` | Handler crashed during dispatch |
 | `attempt.lease_expired` | Attempt lease expired |
 | `attempt.conflicting_replay` | Replayed attempt produced different result |
@@ -426,16 +438,22 @@ boundary without exposing secrets.
 ### Bounded diagnostics
 
 > **Normative definition.**
-The host MUST emit bounded diagnostics for each failure outcome.
-The diagnostics MUST include:
+The host MUST emit bounded diagnostics for each failure outcome using exactly
+the Chapter 04 `Diagnostic` top-level structure. The domain error is `code`,
+`severity` is `error`, and `details` contains `phase`, `contract`, `profile`,
+`failed_boundary`, `context`, `entity_identifiers`, `timestamp`, and
+`retryable`.
 
-1. **Error code**: The specific error code from the table above.
-2. **Context**: The operation that failed (e.g., handler dispatch, attempt
-   retry).
-3. **Entity identifiers**: The tenant ID, agent ID, attempt ID, or handler ID
-   involved (without exposing sensitive data).
-4. **Timestamp**: The time the error occurred.
-5. **Retryable**: Whether the operation can be retried.
+| Family | Domain codes |
+|--------|--------------|
+| `identity.validation.effect_handler` | `handler.schema_mismatch`, `handler.retry_policy_invalid` |
+| `identity.authorization.effect_handler` | `handler.trust_violation`, `handler.capability_violation` |
+| `identity.conflict.effect_handler` | `attempt.conflicting_replay`, `commit.conflict`, `storage.snapshot.duplicate` |
+| `identity.limit.effect_handler` | `handler.idempotency_key_expired`, `handler.payload_too_large`, `handler.response_too_large`, `handler.duration_exceeded`, `handler.diagnostics_too_large`, `attempt.max_retries_exceeded` |
+| `identity.effect.effect_handler` | `handler.not_registered`, `attempt.handler_crashed`, `attempt.lease_expired` |
+| `identity.storage.effect_handler` | `storage.unavailable` |
+
+No additional top-level diagnostic member is permitted.
 
 > **Normative definition.**
 The host MUST NOT expose internal implementation details, secrets, or
@@ -446,14 +464,18 @@ sensitive data in diagnostics.
 > **Normative implementation-defined choice.**
 The following choices are implementation-defined and MUST be documented in the
 conformance profile:
+Each selection is one of the alternatives or finite positive limit domains
+stated below. Observable response-limit rejections and dispatch timeout timing
+may differ according to the recorded selections; handler results and durable
+effect semantics MUST NOT differ.
 
-1. **Handler registry**: The handler registry implementation (in-memory,
-   database, etc.).
-2. **Retry policy defaults**: The default retry policy for effect handlers.
-3. **Idempotency key storage**: The idempotency key storage implementation.
-4. **Response size limit**: The default response size limit for effect
+1. **Handler registry**: An in-memory registry backed by a durable snapshot or a
+   transactional database registry.
+2. **Idempotency key storage**: A transactional database table or an
+   append-only durable key log.
+3. **Response size limit**: The default response size limit for effect
    handlers.
-5. **Duration limit**: The default duration limit for effect handler
+4. **Duration limit**: The default duration limit for effect handler
    dispatches.
 
 ### Deferred work
@@ -485,15 +507,20 @@ affected milestone MUST be revised and re-validated.
 
 ## Variability register
 
+The register below indexes profile selections and other variability governed by
+the linked clauses. It does not independently license variation.
+
+> **Non-normative note.**
+
 | Item | Permission | Recommendation | Constraint |
 |------|------------|----------------|------------|
-| Handler registry implementation | Implementation-defined | Document in conformance profile | Must support hot-reload |
-| Retry policy defaults | Implementation-defined | Document in conformance profile | Must not exceed turn timeout |
-| Idempotency key storage | Implementation-defined | Document in conformance profile | Must support tenant/agent/directive/global scopes |
-| Response size limit | Implementation-defined | Document in conformance profile | Must be bounded |
-| Duration limit | Implementation-defined | Document in conformance profile | Must be bounded |
-| Backoff strategy | Implementation-defined | Exponential backoff | Must be bounded |
-| Handler trust classes | Implementation-defined | Document in conformance profile | Must enforce trust boundaries |
+| [Handler registry implementation](#implementation-defined-choices) | Implementation-defined | Document in conformance profile | Must support hot-reload |
+| [Retry policy](#failure-behavior) | Required | Explicit `max_attempts`, constant `backoff_ms`, and absent or zero `jitter_ms` | Must not exceed the turn timeout |
+| [Idempotency key storage](#implementation-defined-choices) | Implementation-defined | Document in conformance profile | Must support tenant/agent/directive/global scopes |
+| [Response size limit](#pre-dispatch-validation) | Implementation-defined | Document in conformance profile | Must be bounded |
+| [Duration limit](#pre-dispatch-validation) | Implementation-defined | Document in conformance profile | Must be bounded |
+| [Backoff strategy](#failure-behavior) | Required | Exact constant `backoff_ms` | No growth algorithm or non-zero jitter |
+| [Handler trust classes](#effect-handler-registration) | Required | Use the closed trust-class set | Must enforce trust boundaries |
 
 ## 3.4 Phase 3 Integration Tests
 
@@ -563,10 +590,13 @@ The following tests MUST verify failure handling:
    verify the `handler.response_too_large` error code.
 8. **Duration exceeded**: Simulate a dispatch that exceeds the duration limit
    and verify the `handler.duration_exceeded` error code.
+9. **Invalid retry policy**: Register a handler with non-zero jitter or a delay
+   growth algorithm and verify `handler.retry_policy_invalid` and that the
+   registration does not become active.
 
 > **Normative definition.**
-Each test MUST verify that the error code and diagnostic message match the
-expected values.
+Each test MUST verify the exact Chapter 04 diagnostic shape, assigned family,
+domain `code`, `severity: "error"`, message, and required bounded details.
 
 ### Transient failure recovery tests
 
@@ -587,6 +617,9 @@ The following tests MUST verify transient failure recovery:
    replayed attempt is marked as `Failed` with `attempt.conflicting_replay`.
 6. **Max retries exceeded**: Simulate exceeding the maximum retry attempts and
    verify the attempt is marked as `Failed` with `attempt.max_retries_exceeded`.
+7. **Constant retry delay**: Fail at least three attempts and verify every
+   subsequent dispatch starts after exactly the registered `backoff_ms`, with
+   no exponential growth and no jitter, including across host recovery.
 
 > **Normative definition.**
 Each test MUST verify that no unauthorized or partial state is left after the
@@ -631,4 +664,3 @@ The Phase 3 integration tests MUST produce the following evidence:
 > **Normative definition.**
 The integration test evidence MUST be retained for later milestone and release
 gates.
-

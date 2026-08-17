@@ -3,7 +3,7 @@ title: "Sensors Schedules Timers And External Signal Ingress"
 kind: specification
 created: "2026-08-08"
 status: normative
-spec_version: "0.1.0"
+spec_version: "1.0.0"
 tags:
   - milestone-03
   - phase-04
@@ -19,7 +19,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 4](../.spec/planning/agentic-system/milestone-03-host-actor-runtime-and-lifecycle/phase-04-sensors-schedules-timers-and-external-signal-ingress.md)
 of
 [Milestone 3](../.spec/planning/agentic-system/milestone-03-host-actor-runtime-and-lifecycle/README.md)
@@ -74,10 +74,18 @@ SensorId = string
 SourceConfigRef {
   type: SourceType,
   config_id: string,
-  version: string
+  version: string,
+  authentication: SourceAuthentication
 }
 
 SourceType = "http" | "websocket" | "file" | "queue" | "custom"
+
+SourceAuthentication {
+  kind: SourceAuthenticationKind,
+  credential_ref: string
+}
+
+SourceAuthenticationKind = "api-key" | "oauth2" | "mtls"
 
 SignalSchema {
   type: string,
@@ -110,14 +118,16 @@ SensorCheckpoint {
 }
 ```
 
-`TenantId`, `AgentId`, `Grant`, and `UnixTimestamp` are defined in
+`TenantId`, `AgentId`, and `UnixTimestamp` are defined in
 [Mailboxes Ordering Bounds Fairness And Turn Leases](21-mailboxes-ordering-bounds-fairness-and-turn-leases.md).
+`Grant` is defined in
+[Grants](04-turn-lifecycle-protocols-and-canonical-encoding.md#grants).
 
 | Field | Type | Required | Purpose |
 |-------|------|----------|---------|
 | `sensor_id` | SensorId | Yes | Unique sensor identifier |
 | `tenant_id` | TenantId | Yes | Tenant this sensor belongs to |
-| `agent_id` | AgentId? | No | Agent this sensor is for. Null means global. |
+| `agent_id` | AgentId? | No | Optional authenticated target constraint; null imposes none |
 | `source_config` | SourceConfigRef | Yes | Source configuration reference |
 | `signal_schemas` | SignalSchema[] | Yes | Schemas for signals emitted by this sensor |
 | `grants` | Grant[] | Yes | Grants for this sensor |
@@ -126,13 +136,28 @@ SensorCheckpoint {
 
 > **Normative definition.**
 The `agent_id` field is optional.
-If null, the sensor emits signals to all agents in the tenant.
-If present, the sensor emits signals only to the specified agent.
+If null, the sensor imposes no target-instance constraint and Chapter 10 still
+selects exactly one target for each submission. If present, the selected route
+MUST resolve to that agent or admission fails with
+`signal.ingress.resolution_failed`; the field never bypasses canonical route
+or selector evaluation. Fan-out requires separate submissions with distinct
+logical signal identities and is not implicit when this field is null.
 
 > **Normative definition.**
 The `signal_schemas` field defines the signal schemas that this sensor
 can emit.
 The host MUST validate emitted signals against these schemas.
+
+> **Normative definition.**
+`source_config.authentication.kind` MUST be one of `api-key`, `oauth2`, or
+`mtls`, and `credential_ref` MUST identify host-custodied credential material.
+The descriptor MUST NOT contain the credential material itself. An unknown
+authentication kind or unresolved credential reference is malformed and MUST
+be rejected with `signal.ingress.malformed` before the source is enabled.
+
+> **Normative definition.**
+`SensorLifecycle.retry_policy.jitter_ms` MUST be absent or zero. A non-zero
+value is malformed and MUST be rejected with `signal.ingress.malformed`.
 
 ### Schedule expression
 
@@ -161,13 +186,19 @@ NextFireCalculation = "from_last_fire" | "from_schedule_start"
 | `expression` | string | Yes | Cron-like schedule expression |
 | `timezone` | string | Yes | IANA timezone identifier |
 | `misfire_policy` | MisfirePolicy | Yes | Behavior when a fire is missed |
-| `jitter_ms` | u64? | No | Random jitter in milliseconds |
+| `jitter_ms` | u64? | No | Maximum deterministic jitter in milliseconds |
 | `next_fire_calculation` | NextFireCalculation | Yes | How to calculate next fire time |
 
 > **Normative definition.**
-The `expression` field uses a cron-like syntax: `minute hour day-of-month month day-of-week`.
-The host MUST validate the expression syntax.
-Invalid expressions MUST be rejected with `schedule.expression.invalid`.
+The `expression` field consists of exactly five fields in the order
+`minute hour day-of-month month day-of-week`, separated by one or more ASCII
+spaces. Each field is either `*` or a canonical unsigned decimal integer in
+these inclusive ranges: minute `0..59`, hour `0..23`, day-of-month `1..31`,
+month `1..12`, and day-of-week `0..6` with Sunday equal to `0`. A canonical
+integer has no leading zero unless it is `0`. Lists, ranges, steps, names, and
+all other forms are invalid. When both day fields are integers, both MUST
+match. The host MUST reject any other syntax with
+`schedule.expression.invalid`.
 
 > **Normative definition.**
 The `timezone` field uses IANA timezone identifiers (e.g., "America/New_York").
@@ -182,9 +213,15 @@ The `misfire_policy` field defines the behavior when a scheduled fire is missed:
 
 > **Normative definition.**
 The `jitter_ms` field is optional.
-If present, the host MUST add a random jitter between 0 and `jitter_ms`
-to the scheduled fire time.
-The jitter MUST be deterministic for a given schedule expression and fire time.
+If present, the host MUST add the following deterministic offset between zero
+and `jitter_ms` to the unjittered fire time. Let `H` be the unsigned big-endian
+integer represented by the first eight bytes of SHA-256 over the canonical JSON
+encoding defined by
+[Canonical JSON encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md#canonical-json-encoding)
+of `[expression, timezone, unjittered_fire_time]`, where
+`unjittered_fire_time` is its canonical UTC `UnixTimestamp`. The offset is `H`
+when `jitter_ms` is `18446744073709551615`; otherwise it is
+`H mod (jitter_ms + 1)`. No other jitter calculation is conforming.
 
 ### Durable timer directive
 
@@ -243,11 +280,23 @@ transport deliveries through one signal admission boundary.
 > **Normative definition.**
 The signal admission boundary performs the following steps:
 
-1. **Source authentication**: Authenticate the event source.
-2. **Tenant/agent resolution**: Resolve the tenant and agent for the event.
-3. **Schema validation**: Validate the event against the expected schema.
-4. **Deduplication**: Detect and reject duplicate events.
-5. **Mailbox admission**: Admit the event to the mailbox.
+1. **Source authentication**: Authenticate the event source and establish the
+   host-owned tenant and principal context.
+2. **Source resolution**: Resolve the sensor, timer, user transport, or other
+   source configuration without selecting a target agent instance.
+3. **Source-event schema validation**: For a sensor event, validate the source
+   payload against its declared `SignalSchema` before constructing a signal.
+   This validates source normalization, not the generic Chapter 10 `data`
+   field against a runtime-selected signal schema.
+4. **Submission construction**: Construct one canonical `SignalSubmission`
+   containing only sender-owned fields.
+5. **Canonical signal admission**: Run the complete ordered evaluation in
+   [Submission evaluation order](10-signals-causality-routing-and-delivery.md#submission-evaluation-order),
+   including TTL, duplicate detection, route resolution, authorization,
+   candidate selection, delivery identity, and atomic accepted-record
+   persistence.
+6. **Mailbox admission**: Enqueue a reference to the persisted
+   `AcceptedSignalEnvelope` for its recorded target.
 
 > **Normative definition.**
 If any step fails, the host MUST reject the event with the appropriate diagnostic.
@@ -256,55 +305,48 @@ The host MUST NOT admit invalid events to the mailbox.
 ### Source authentication
 
 > **Normative definition.**
-The host MUST authenticate event sources using the following mechanisms:
-
-1. **API key**: Authenticate using an API key.
-2. **OAuth 2.0**: Authenticate using OAuth 2.0 tokens.
-3. **mTLS**: Authenticate using mutual TLS.
-4. **Custom**: Authenticate using a custom mechanism.
-
-> **Normative definition.**
-The host MUST document the authentication mechanism for each source in
-the conformance profile.
+The host MUST authenticate each event source using the exact mechanism selected
+by `source_config.authentication.kind`: an API key for `api-key`, an OAuth 2.0
+token for `oauth2`, or a client certificate authenticated by mutual TLS for
+`mtls`. Authentication backend and credential-storage layout MUST NOT change
+which credential reference, token, key, or certificate is accepted.
 
 > **Normative definition.**
 The host MUST reject unauthenticated sources with `signal.ingress.unauthenticated`.
 
-### Tenant/agent resolution
+### Tenant and target-constraint resolution
 
 > **Normative definition.**
-The host MUST resolve the tenant and agent for each event using the following mechanisms:
+The host MUST resolve the tenant and any optional target constraint for each
+event using the following mechanisms:
 
 1. **Tenant header**: Resolve the tenant from the `X-Tenant-ID` header.
-2. **Agent header**: Resolve the agent from the `X-Agent-ID` header.
-3. **Sensor resolution**: Resolve the agent from the sensor descriptor.
-4. **Timer resolution**: Resolve the agent from the timer directive.
+2. **Agent header**: Treat an authenticated `X-Agent-ID` as a target constraint.
+3. **Sensor resolution**: Treat a sensor descriptor's `agent_id` as a target constraint.
+4. **Timer resolution**: Treat the timer directive's agent as a target constraint.
 
 > **Normative definition.**
-The host MUST reject events with missing or invalid tenant/agent resolution
-with `signal.ingress.resolution_failed`.
+The host MUST reject events with missing or invalid tenant resolution, or
+whose Chapter 10 selected target does not satisfy an authenticated target
+constraint, with `signal.ingress.resolution_failed`. Constraint resolution
+MUST NOT itself choose an instance or advance selector state.
 
 ### Schema validation
 
 > **Normative definition.**
-The host MUST validate events against the expected schema using the following mechanisms:
-
-1. **JSON Schema**: Validate against a JSON Schema.
-2. **Custom schema**: Validate against a custom schema.
-
-> **Normative definition.**
+Each `SignalSchema.data_schema` MUST resolve to a JSON Schema Draft 2020-12
+schema. The host MUST validate the event against that exact schema and MUST
+reject an unresolved schema reference as `signal.ingress.schema_invalid`.
 The host MUST reject events that fail schema validation with `signal.ingress.schema_invalid`.
 
 ### Deduplication
 
 > **Normative definition.**
-The host MUST detect and reject duplicate events using the following mechanisms:
-
-1. **Event ID**: Reject events with duplicate event IDs.
-2. **Event signature**: Reject events with duplicate signatures.
-
-> **Normative definition.**
-The host MUST reject duplicate events with `signal.ingress.duplicate`.
+The host MUST compute and retain the logical identity through Chapter 10's
+canonical admission transaction. After first acceptance, a second event with
+the same logical identity is rejected with `signal.duplicate`. The host MUST
+preserve each accepted logical identity indefinitely across host restart.
+There is no time-based deduplication window.
 
 ### Mailbox admission
 
@@ -313,7 +355,8 @@ The host MUST admit events to the mailbox using the following mechanisms:
 
 1. **Priority class**: Assign a priority class to the event.
 2. **Mailbox bounds**: Enforce mailbox bounds on the event.
-3. **Overload policy**: Apply the overload policy when bounds are reached.
+3. **Overload rejection**: Apply the fixed rejection behavior when a bound is
+   reached.
 
 > **Normative definition.**
 The host MUST admit events to the mailbox with the appropriate priority class.
@@ -325,12 +368,11 @@ The host MUST enforce mailbox bounds on all events.
 The host MUST handle the following signal outcomes:
 
 1. **Skipped**: The signal was skipped due to misfire policy.
-2. **Coalesced**: The signal was coalesced with another signal.
-3. **Replayed**: The signal was replayed from a checkpoint.
-4. **Late**: The signal arrived after its deadline.
-5. **Duplicate**: The signal was rejected as a duplicate.
-6. **Disabled**: The sensor was disabled.
-7. **Failed source**: The source failed to emit the signal.
+2. **Replayed**: The signal was replayed from a checkpoint.
+3. **Late**: The signal arrived after its deadline.
+4. **Duplicate**: The signal was rejected as a duplicate.
+5. **Disabled**: The sensor was disabled.
+6. **Failed source**: The source failed to emit the signal.
 
 > **Normative definition.**
 
@@ -343,7 +385,6 @@ SignalOutcome {
 
 OutcomeKind {
   Skipped,
-  Coalesced,
   Replayed,
   Late,
   Duplicate,
@@ -355,10 +396,9 @@ OutcomeKind {
 | Kind | Description | Conditions | Diagnostic |
 |------|-------------|------------|------------|
 | `Skipped` | Signal skipped | Misfire policy is skip | `signal.ingress.skipped` |
-| `Coalesced` | Signal coalesced | Overload policy is coalesce | `signal.ingress.coalesced` |
 | `Replayed` | Signal replayed | Sensor checkpoint replay | `signal.ingress.replayed` |
 | `Late` | Signal late | Signal arrived after deadline | `signal.ingress.late` |
-| `Duplicate` | Signal duplicate | Duplicate event detected | `signal.ingress.duplicate` |
+| `Duplicate` | Signal duplicate | Duplicate event detected | `signal.duplicate` |
 | `Disabled` | Sensor disabled | Sensor is disabled | `signal.ingress.disabled` |
 | `FailedSource` | Source failed | Source failed to emit signal | `signal.ingress.failed_source` |
 
@@ -403,25 +443,22 @@ without exposing secrets or implementation internal state.
 
 | Family | Purpose | Example codes |
 |--------|---------|---------------|
-| `signal.ingress` | Signal ingress failures | `malformed`, `incompatible`, `unauthorized`, `unavailable`, `unauthenticated`, `resolution_failed`, `schema_invalid`, `skipped`, `coalesced`, `replayed`, `late`, `duplicate`, `disabled`, `failed_source` |
+| `signal.ingress` | Source normalization failures | `malformed`, `incompatible`, `unauthorized`, `unavailable`, `unauthenticated`, `resolution_failed`, `schema_invalid`, `skipped`, `replayed`, `late`, `disabled`, `failed_source` |
+| `signal.duplicate` | Canonical logical-signal duplicate | `identity_matches` |
 | `sensor` | Sensor failures | `capacity.exhausted` |
 | `timer` | Timer failures | `duplicate` |
 | `schedule` | Schedule failures | `expression.invalid`, `timezone.invalid` |
 
-### Implementation-defined choices
+### Internal mechanisms and fixed behavior
 
-> **Normative implementation-defined choice.**
-The following choices are implementation-defined and do not create
-conformance obligations.
-The Variability register below catalogs all such choices.
-
-1. **Source authentication mechanism**: The host MAY choose the source authentication mechanism. The mechanism MUST be documented in the conformance profile.
-
-2. **Deduplication window**: The host MAY choose the deduplication window. The window MUST be documented in the conformance profile.
-
-3. **Jitter determinism**: The host MAY choose how to make jitter deterministic. The method MUST be documented in the conformance profile.
-
-4. **Schedule expression syntax**: The host MAY choose the schedule expression syntax. The syntax MUST be documented in the conformance profile.
+> **Normative definition.**
+Credential storage, duplicate-identity indexing, schedule evaluation, and timer
+storage are internal mechanisms. Every such mechanism MUST be observationally
+equivalent with respect to source acceptance, logical signal identity,
+indefinite duplicate rejection, schedule acceptance,
+calculated jitter, fire time, mailbox admission, and diagnostics. Runtime configuration
+selects a source's authentication kind; it is not a host-release semantic
+selection.
 
 ### Deferred work
 
@@ -448,7 +485,8 @@ event is processed successfully through the full signal ingress pipeline.
 Expected behavior:
 
 - Input: valid sensor event with authenticated source, resolved tenant/agent, and valid schema.
-- Expected output: SignalEnvelope admitted to mailbox.
+- Expected output: one persisted `AcceptedSignalEnvelope` whose reference is
+  admitted to the mailbox for its recorded target.
 - Expected error: null.
 
 ### Negative: malformed event
@@ -502,9 +540,10 @@ The negative duplicate event test validates that duplicate events are rejected.
 
 Expected behavior:
 
-- Input: event with duplicate event ID.
+- Input: event with the same logical signal identity as an earlier accepted
+  event, including after host restart.
 - Expected output: null.
-- Expected error: `signal.ingress.duplicate`.
+- Expected error: `signal.duplicate`.
 
 ### Negative: late event
 
@@ -572,6 +611,24 @@ Expected behavior:
 - Expected output: null.
 - Expected error: `schedule.timezone.invalid`.
 
+### Fixed authentication, identity, schedule, and jitter behavior
+
+> **Normative conformance criterion.**
+The Phase 4 integration tests MUST additionally verify:
+
+1. Each of `api-key`, `oauth2`, and `mtls` accepts only credentials validated
+   through the descriptor's `credential_ref`; an unknown kind or unresolved
+   reference fails before source enablement.
+2. Duplicate detection uses the Chapter 10 logical identity and remains active
+   indefinitely across host restart, independent of the identity index
+   implementation.
+3. A valid five-field expression accepts each boundary integer, while a list,
+   range, step, name, leading-zero integer, or out-of-range integer fails with
+   `schedule.expression.invalid`.
+4. Repeated evaluation of the same expression, timezone, and unjittered UTC
+   fire time produces the exact SHA-256-derived offset specified above.
+5. A non-zero sensor retry jitter fails with `signal.ingress.malformed`.
+
 ### Cross-milestone fixture regression
 
 > **Normative conformance criterion.**
@@ -596,14 +653,21 @@ Any approved variability MUST be documented in the Milestone 3 exit report.
 
 ## Variability register
 
-| Clause | Type | Selection |
-|--------|------|-----------|
-| Sensor descriptor structure | Required | Fields fixed by this chapter |
-| Schedule expression structure | Required | Fields fixed by this chapter |
-| Durable timer structure | Required | Fields fixed by this chapter |
-| Signal admission boundary | Required | 5 steps fixed by this chapter |
+The register summarizes fixed behavior, runtime record selections, and internal
+mechanisms. It does not independently license variation.
 
-Other variability choices are documented in the section on host-defined selections.
+| Clause | Type | Selection | Constraint |
+|--------|------|-----------|------------|
+| Sensor descriptor structure | Required | Fields fixed by this chapter | Reject malformed descriptors before enablement |
+| [Source authentication](#source-authentication) | Runtime configuration | `api-key`, `oauth2`, or `mtls` | Use the descriptor's host-custodied `credential_ref` |
+| [Duplicate detection](#deduplication) | Required | Chapter 10 logical signal identity | Retain indefinitely across restart and reject before mailbox admission |
+| [Event schema validation](#schema-validation) | Required | JSON Schema Draft 2020-12 | Resolve and apply the exact referenced schema |
+| [Schedule expression](#schedule-expression) | Required | Fixed five-field integer-or-wildcard grammar | Reject every other form |
+| [Schedule jitter](#schedule-expression) | Required | Fixed SHA-256 calculation | Offset remains in `0..jitter_ms` |
+| Sensor retry jitter | Required | Absent or zero | Reject non-zero values as malformed |
+| Durable timer structure | Required | Fields fixed by this chapter | Preserve timer identity and causation |
+| Signal admission boundary | Required | Six steps fixed by this chapter | Source normalization feeds the complete Chapter 10 admission transaction before Chapter 21 mailbox admission |
+| Credential, identity-index, schedule, and timer machinery | Internal mechanism | No profile selection | Preserve all acceptance, identity, timing, admission, and diagnostic observations |
 
 ## Rationale and evidence (non-normative)
 

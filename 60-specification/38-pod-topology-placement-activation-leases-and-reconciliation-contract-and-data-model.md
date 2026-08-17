@@ -2,7 +2,7 @@
 title: "Pod Topology Placement Activation Leases And Reconciliation Contract And Data Model"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.1.0"
 tags:
   - milestone-06
@@ -19,7 +19,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 4](../.spec/planning/agentic-system/milestone-06-multi-agent-coordination-and-topology/phase-04-pod-topology-placement-activation-leases-and-reconciliation.md)
 of
 [Milestone 6](../.spec/planning/agentic-system/milestone-06-multi-agent-coordination-and-topology/README.md)
@@ -85,34 +85,55 @@ Every pod topology node MUST include the following fields:
 
 | Field | Content | Source |
 |-------|---------|--------|
-| `node_id` | A deterministic node identity derived from the topology version and the node's position in the topology graph. | Topology directive. |
+| `node_id` | The fixed node identity derived from topology version, role, agent address, and position in the topology directive's node list. | Topology directive. |
 | `agent_address` | The `TenantQualifiedAgentAddress` of the agent that this node describes. | Topology directive. |
 | `role` | The agent's role within the topology (e.g., `orchestrator`, `worker`, `coordinator`, `observer`). | Topology directive. |
 | `dependencies` | A list of `node_id` values for nodes that this node depends on; empty list means no dependencies. | Topology directive. |
 | `dependents` | A list of `node_id` values for nodes that depend on this node; computed from dependency declarations, not stored. | Derived. |
-| `owner` | The `TenantQualifiedAgentAddress` of the principal that owns or controls this node. | Topology directive. |
+| `owner` | The `AddressablePrincipal` that owns or controls this node. Agents use `TenantQualifiedAgentAddress`; non-agent owners use `PrincipalAddress`. | Topology directive. |
 | `activation_mode` | The activation mode: `durable`, `ephemeral`, or `manual`. | Topology directive. |
 | `placement_constraints` | A set of constraints that describe where the node MAY be placed (e.g., `resource_class`, `topology_region`). | Topology directive. |
-| `resource_class` | The implementation-defined resource class that describes the node's expected resource footprint. | Topology directive. |
+| `resource_class` | The resource class. Version `0.1.0` permits only `default`, which adds no placement constraint beyond the disclosed topology implementation limits. | Topology directive. |
 | `lifecycle_policy` | The lifecycle policy for this node's live placement: `terminate-on-topology-revoke`, `wait-completion-on-topology-revoke`, or `allow-partial-on-topology-revoke`. | Topology directive. |
 | `topology_version` | The monotonic version of the topology that this node belongs to. | Topology directive. |
 | `created_at` | The ISO 8601 timestamp of node creation. | Topology directive. |
 | `purpose` | A human-readable description of the node's purpose within the topology. | Topology directive. |
 
+The `resource_class` value MUST be `default`. Any other value is incompatible
+with this version and MUST be rejected with
+`topology.node.incompatible-resource-class`.
+
 > **Normative definition.**
-The `node_id` is computed by hashing the concatenation of the
-`topology_version`, the node's role, the `agent_address`, and a
-deterministic position index, then encoding the resulting digest in the
-canonical string representation defined in
-[Agent Identity Addressing Ownership And Dependency Relations](35-agent-identity-addressing-ownership-and-dependency-relations.md).
+Define `frame(x)` as the unsigned 64-bit big-endian byte length of `x` followed
+by exactly the bytes of `x`, and define `u64be(n)` as the eight-byte unsigned
+big-endian encoding of `n`. The `node_id` is:
+
+> **Normative definition.**
+
+```
+"topology-node:sha256:" + lowercase_hex(SHA-256(
+  frame(utf8("agent-wasm/topology-node/v1")) ||
+  frame(u64be(topology_version)) ||
+  frame(utf8(role)) ||
+  frame(utf8(canonical_agent_address)) ||
+  frame(u64be(position_index))
+))
+```
+
+`canonical_agent_address` is the canonical Chapter 35 agent-address string.
+The position index is the zero-based index in the topology directive's
+canonical `nodes` list. No alternate hash, prefix, framing, component order, or
+integer encoding is conforming.
 The `node_id` is deterministic: the same inputs in the same order always
 produce the same `node_id`, regardless of the host process, engine
 instance, or physical node on which the topology is evaluated.
+A supplied `node_id` that does not equal this construction MUST be rejected
+with `topology.directive.malformed-node-id` before topology state changes.
 
 > **Non-normative note.**
 Deterministic `node_id` values serve three purposes: (1) they enable exact
-deduplication of concurrent topology directives that carry the same
-semantic content; (2) they provide a stable reference for dependency
+deduplication when the topology version, role, agent address, and position are
+identical; (2) they provide a stable reference for dependency
 resolution, allowing any node to be traced back to its position in the
 topology graph without requiring additional context; and (3) they enable
 replay of the topology execution sequence from the durable state journal
@@ -161,6 +182,35 @@ monotonic per-tenant sequence counter.
 The topology identity is stored in the durable journal and is used to
 correlate topology directives, node states, and reconciliation events.
 
+Every topology directive MUST include `topology_sequence`, the `u64` sequence
+reserved for that distinct directive within its owner scope, and the
+corresponding `topology_identity`. An agent owner uses its address tenant, a
+tenant-scoped `PrincipalAddress` uses its `tenant_id`, and a system-scoped
+principal uses the single system scope. The sequence starts at 1 and MUST NOT be reused. A
+retransmission reuses the original sequence and identity; a new same-content
+directive reserves a new sequence. Zero or reuse for a distinct directive is
+malformed and MUST be rejected with `topology.directive.malformed`. The
+per-scope sequence allocator and mapping from reserved sequence to
+`topology_identity` MUST be durable and reserved atomically before directive
+emission. The canonical
+owner bytes are the UTF-8 canonical agent-address string for an agent owner or
+the Canonical JSON bytes of `PrincipalAddress` for a non-agent owner. The
+topology identity is:
+
+> **Normative definition.**
+
+```
+"topology:sha256:" + lowercase_hex(SHA-256(
+  frame(utf8("agent-wasm/topology/v1")) ||
+  frame(u64be(topology_version)) ||
+  frame(canonical_owner_bytes) ||
+  frame(u64be(topology_sequence))
+))
+```
+
+A supplied `topology_identity` that does not equal this construction MUST be
+rejected with `topology.directive.malformed` before topology state changes.
+
 > **Normative definition.**
 Observed status is identified by the topology identity and includes:
 
@@ -172,7 +222,7 @@ Observed status is identified by the topology identity and includes:
 | `nodes_missing` | A list of `node_id` values for nodes in desired topology that are NOT present in live placement. | Host runtime. |
 | `nodes_extra` | A list of `node_id` values for nodes in live placement that are NOT present in desired topology. | Host runtime. |
 | `nodes_failed` | A list of `node_id` values for nodes in live placement that have failed. | Host runtime. |
-| `nodes_stale` | A list of `node_id` values for nodes in live placement whose live state has not been refreshed within the implementation-defined stale timeout. | Host runtime. |
+| `nodes_stale` | A list of `node_id` values for nodes in live placement whose live state has not been refreshed within the fixed 60-second stale timeout under [Implementation limits](38-pod-topology-placement-activation-leases-and-reconciliation-failure-evidence-and-operational-notes.md#implementation-limits). | Host runtime. |
 | `reconciliation_timestamp` | The ISO 8601 timestamp of the last reconciliation pass. | Host runtime. |
 | `reconciliation_result` | The result of the last reconciliation pass: `success`, `partial`, or `failed`. | Host runtime. |
 

@@ -2,7 +2,7 @@
 title: "Tool Catalogs Retrieval Code Execution And Connectors Failure Evidence And Operational Notes"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.2.0"
 tags:
   - milestone-07
@@ -13,7 +13,6 @@ tags:
   - connectors
   - failure-evidence
   - diagnostics
-  - implementation-defined-choices
   - credential-custody
 aliases:
   - "M7-P2 Failure Evidence And Operational Notes"
@@ -23,7 +22,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 2](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/phase-02-tool-catalogs-retrieval-code-execution-and-connectors.md)
 of
 [Milestone 7](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/README.md)
@@ -31,7 +30,7 @@ of
 AI, Tools, Memory, And Human Control.
 It establishes the failure evidence and operational notes for tool catalogs,
 retrieval, code execution, and connectors, including failure outcomes,
-bounded diagnostics, evidence emission, and implementation-defined choices.
+bounded diagnostics, evidence emission, and profiled configuration.
 
 Version `0.2.0` adds authenticated-connector binding and custody failures.
 The tool layer preserves canonical `credential.*` diagnostics and does not
@@ -113,6 +112,7 @@ host behavior.
 | `tool.request.malformed-code` | Code execution request with invalid `code` field. | Reject request; do NOT create partial execution state. |
 | `tool.request.malformed-environment` | Code execution request with invalid `environment` field. | Reject request; do NOT create partial execution state. |
 | `tool.request.malformed-query` | Retrieval request with missing or invalid `query` field. | Reject request; do NOT create partial execution state. |
+| `tool.descriptor.malformed-destination` | A descriptor contains a non-canonical or structurally invalid `NetworkDestination`, or destinations inconsistent with its side-effect class. | Reject before catalog admission; do NOT create executable tool state. |
 | `tool.result.malformed-output` | Tool result with invalid `output` data. | Reject result; do NOT create partial result state. |
 | `tool.result.malformed-usage` | Tool result with invalid `resource_usage` metrics. | Reject result; do NOT create partial result state. |
 
@@ -171,8 +171,11 @@ state, which is consistent with the capability policy defined in
 | Diagnostic | Cause | Host behavior |
 |------------|-------|---------------|
 | `tool.execution.quota_exhausted` | Agent's capability budget is insufficient to cover the request. | Reject request; do NOT create partial execution state. |
-| `tool.execution.exhausted-concurrency` | Host would exceed the implementation-defined maximum number of concurrent tool executions. | Reject request; do NOT create partial execution state. |
-| `tool.execution.exhausted-code` | Host would exceed the implementation-defined maximum number of concurrent code executions. | Reject request; do NOT create partial execution state. |
+| `tool.execution.exhausted-concurrency` | Host would exceed the disclosed concurrent-tool implementation limit. | Reject request; do NOT create partial execution state. |
+| `tool.execution.exhausted-code` | Host would exceed the disclosed concurrent-code implementation limit. | Reject request; do NOT create partial execution state. |
+| `tool.execution.exhausted-retrieval` | Host would exceed the disclosed concurrent-retrieval implementation limit. | Reject request; do NOT create partial execution state. |
+| `tool.execution.exhausted-timeout` | Requested or descriptor timeout exceeds the disclosed timeout implementation limit. | Reject request; do NOT create partial execution state. |
+| `tool.execution.exhausted-memory` | Requested sandbox memory exceeds the disclosed sandbox-memory implementation limit. | Reject request; do NOT create partial execution state. |
 | `tool.execution.timeout` | Tool execution exceeded the `timeout_ms` limit. | Cancel execution; do NOT create partial result state. |
 
 > **Non-normative note.**
@@ -187,7 +190,7 @@ which is consistent with the resource limits defined in
 |------------|-------|---------------|
 | `tool.execution.unavailable_tool` | Tool is not active in the framework plugin registry. | Reject request; do NOT create partial execution state. |
 | `tool.execution.unavailable_connector` | Connector is not active in the connector registry. | Reject request; do NOT create partial execution state. |
-| `tool.execution.sandbox_failure` | Code execution failed due to sandbox restrictions. | Cancel execution; do NOT create partial result state. |
+| `tool.execution.sandbox_failure` | Code execution passed network admission but attempted a destination outside its durable `authorized_network_destinations` or exceeded its network budget. | Deny contact, cancel execution, and do NOT create partial result state. |
 | `tool.execution.connector_failure` | Connector failed to execute the tool. | Cancel execution; do NOT create partial result state. |
 
 > **Non-normative note.**
@@ -287,32 +290,30 @@ Evidence MUST NOT contain credentials, refresh tokens, authentication headers,
 opaque handles, arbitrary endpoints, request bodies, or unbounded custodian
 and external-service errors.
 
-### Implementation-defined choices
+### Implementation limits and closed deployment modes
 
 > **Normative definition.**
-The following implementation-defined choices are documented by this section.
-Host implementations MUST document these choices in the conformance
-profile.
+Resource ceilings are implementation limits. A conforming host MUST publish
+each positive limit in its conformance profile and use the named diagnostic
+when otherwise valid work exceeds it. Connector custody and receipt proof use
+only the closed domains listed below.
 
-| Choice | Description | Constraint |
-|--------|-------------|------------|
-| Maximum concurrent tool executions | The maximum number of concurrent tool executions. | Must be at least 1 and at most the implementation-defined maximum. Must be documented in the conformance profile. |
-| Maximum concurrent code executions | The maximum number of concurrent code executions. | Must be at least 1 and at most the implementation-defined maximum. Must be documented in the conformance profile. |
-| Maximum concurrent retrieval requests | The maximum number of concurrent retrieval requests. | Must be at least 1 and at most the implementation-defined maximum. Must be documented in the conformance profile. |
-| Tool execution timeout | The default maximum duration of a tool execution before timeout. | Must be longer than the maximum expected tool execution duration. Must be documented in the conformance profile. |
-| Code execution timeout | The default maximum duration of a code execution before timeout. | Must be longer than the maximum expected code execution duration. Must be documented in the conformance profile. |
-| Retrieval timeout | The default maximum duration of a retrieval request before timeout. | Must be longer than the maximum expected retrieval duration. Must be documented in the conformance profile. |
-| Sandbox memory limit | The maximum memory for code execution sandboxes. | Must be at least 64 MB and at most the implementation-defined maximum. Must be documented in the conformance profile. |
-| Sandbox network access | Whether code execution sandboxes have network access. | Must be configurable per tool or globally. Must be documented in the conformance profile. |
-| Connector custody mode | External broker, provider workload identity, or explicit host-local compatibility. | End-user separated-custody distributions must keep credentials outside host, Port, plugin, and guest processes. |
-| Connector receipt verification | Signature or authenticated-transport proof mechanism. | Must bind request, operation, resource, binding revision, outcome, and usage. |
+| Item | Domain or constraint | Diagnostic or profile requirement |
+|------|----------------------|-----------------------------------|
+| Maximum concurrent tool executions | Positive implementation limit. | `tool.execution.exhausted-concurrency`; publish limit. |
+| Maximum concurrent code executions | Positive implementation limit. | `tool.execution.exhausted-code`; publish limit. |
+| Maximum concurrent retrieval requests | Positive implementation limit. | `tool.execution.exhausted-retrieval`; publish limit. |
+| Maximum accepted `timeout_ms` | Positive implementation limit. | `tool.execution.exhausted-timeout`; publish limit. |
+| Sandbox memory limit | At least 64 MB. | `tool.execution.exhausted-memory`; publish limit. |
+| Retrieval timeout | Exactly 60 seconds. | `tool.execution.timeout` on expiry. |
+| Sandbox network access | Denied unless network side-effect class, matching network capability, positive request budget, and a non-empty exact descriptor-and-policy destination intersection are present. | `tool.execution.denied_capability` for admission denial; `tool.execution.sandbox_failure` for a non-member destination or post-admission budget violation. |
+| Connector custody mode | `external-broker`, `provider-workload-identity`, or explicit `host-local` compatibility. | Record the selected mode; `host-local` cannot claim separated custody. |
+| Connector receipt verification | Signature or authenticated-transport proof. | Record the selected proof class; bind request, operation, resource, binding revision, outcome, and usage. |
 
 > **Non-normative note.**
-The implementation-defined choices above provide flexibility for
-different deployment scenarios while ensuring that constraints are
-documented and auditable.
-Host implementations MUST document these choices in the conformance
-profile so that operators can understand the system's behavior.
+Internal executor, queue, storage, and transport implementations may vary only
+when they preserve these limits, fixed timeout and authorization behavior,
+receipt bindings, diagnostics, and externally visible outcomes.
 
 ### Deferred work
 
@@ -402,20 +403,19 @@ following earlier chapters:
 
 ## Variability register
 
-The following table lists every implementation-defined choice,
-non-normative disposition, and permitted presentation documented in this
-chapter.
+The following table summarizes the variability documented in this chapter.
+
+> **Non-normative note.**
 
 | Item | Location | Nature | Constraint |
 |------|----------|--------|------------|
-| Maximum concurrent tool executions | Section 42.3 | MAY | Must be at least 1 and at most the implementation-defined maximum. Documented in conformance profile. |
-| Maximum concurrent code executions | Section 42.3 | MAY | Must be at least 1 and at most the implementation-defined maximum. Documented in conformance profile. |
-| Maximum concurrent retrieval requests | Section 42.3 | MAY | Must be at least 1 and at most the implementation-defined maximum. Documented in conformance profile. |
-| Tool execution timeout | Section 42.3 | MAY | Must be at least the minimum execution duration. Documented in conformance profile. |
-| Code execution timeout | Section 42.3 | MAY | Must be at least the minimum execution duration. Documented in conformance profile. |
-| Retrieval timeout | Section 42.3 | MAY | Must be at least the minimum execution duration. Documented in conformance profile. |
-| Sandbox memory limit | Section 42.3 | MAY | Must be at least 64 MB and at most the implementation-defined maximum. Documented in conformance profile. |
-| Sandbox network access | Section 42.3 | MAY | Must be configurable per tool or globally. Documented in conformance profile. |
+| Maximum concurrent tool executions | [Limits and modes](#implementation-limits-and-closed-deployment-modes) | Implementation limit | Positive, published, and exhausted with `tool.execution.exhausted-concurrency`. |
+| Maximum concurrent code executions | [Limits and modes](#implementation-limits-and-closed-deployment-modes) | Implementation limit | Positive, published, and exhausted with `tool.execution.exhausted-code`. |
+| Maximum concurrent retrieval requests | [Limits and modes](#implementation-limits-and-closed-deployment-modes) | Implementation limit | Positive, published, and exhausted with `tool.execution.exhausted-retrieval`. |
+| Maximum accepted timeout | [Limits and modes](#implementation-limits-and-closed-deployment-modes) | Implementation limit | Positive, published, and exhausted with `tool.execution.exhausted-timeout`. |
+| Retrieval timeout | [Limits and modes](#implementation-limits-and-closed-deployment-modes) | Fixed | Exactly 60 seconds. |
+| Sandbox memory limit | [Limits and modes](#implementation-limits-and-closed-deployment-modes) | Implementation limit | At least 64 MB; exhausted with `tool.execution.exhausted-memory`. |
+| Sandbox network access | [Limits and modes](#implementation-limits-and-closed-deployment-modes) | Fixed authorization rule | Admission denial uses `tool.execution.denied_capability`; a non-member canonical destination or post-admission network-budget violation uses `tool.execution.sandbox_failure`. |
 | Diagnostic message format | Section 42.3 | MAY | Must include all required fields. Free-text portion is informational. |
 | Evidence record field order | Section 42.3 | SHOULD | Must include all required fields. Order is informational. |
 | Evidence record hash algorithm | Section 42.3 | MAY | Must be deterministic. Documented in conformance profile. |

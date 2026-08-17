@@ -2,7 +2,7 @@
 title: "Pod Topology Placement Activation Leases And Reconciliation Phase 4 Integration Tests"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.1.0"
 tags:
   - milestone-06
@@ -20,7 +20,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 4](../.spec/planning/agentic-system/milestone-06-multi-agent-coordination-and-topology/phase-04-pod-topology-placement-activation-leases-and-reconciliation.md)
 of
 [Milestone 6](../.spec/planning/agentic-system/milestone-06-multi-agent-coordination-and-topology/README.md)
@@ -85,7 +85,8 @@ behavior, and the retention requirements for test evidence.
 | Test ID | Description |
 |---------|-------------|
 | `P4-SF-001` | Create a topology directive with a valid topology directive and verify that all required validation rules pass (topology owner resolution, node list non-empty, node agent resolution, dependency validation, activation mode validation, lifecycle policy validation). |
-| `P4-SF-002` | Create a topology directive with a deterministic `topology_identity` and verify that two identical directives produce the same `topology_identity`. |
+| `P4-SF-002` | Evaluate the fixed topology identity construction twice with the same directive and reserved `topology_sequence` and verify the same `topology_identity`; increment only the sequence and verify a different identity; restart the host and verify topology and lease sequence allocators resume without reuse. |
+| `P4-SF-002A` | Verify `topology_identity`, `node_id`, and `lease_id` against fixed domain-separated, length-prefixed SHA-256 test vectors and reject alternate prefixes, hashes, framing, component order, or integer encoding. |
 | `P4-SF-003` | Create a topology directive with all three activation modes (`durable`, `ephemeral`, `manual`) and verify that each mode is correctly recorded in the topology directive. |
 | `P4-SF-004` | Create a topology directive with attenuated delegation grants and verify that the topology nodes' grants are strictly a subset of the topology owner's grants as defined in
 [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md). |
@@ -117,16 +118,16 @@ that the host behaves correctly according to the rule.
 
 | Test ID | Description |
 |---------|-------------|
-| `P4-SF-011` | Verify that an activation lease is correctly issued for a reconciliation pass and that the lease includes all required fields. |
+| `P4-SF-011` | Verify that the first activation lease for a node includes all required fields and has `fence_token: 1`. |
 | `P4-SF-012` | Verify that an activation lease with a lower `fence_token` than the current fence token is rejected with `topology.lease.expired-fence`. |
-| `P4-SF-013` | Verify that an activation lease with a past `expires_at` timestamp is rejected with `topology.lease.expired-timeout`. |
-| `P4-SF-014` | Verify that an activation lease is correctly renewed before expiration and that the renewed lease extends the `expires_at` timestamp. |
-| `P4-SF-015` | Verify that an activation lease is correctly transferred to another host and that the new host's lease has an incremented `fence_token`. |
+| `P4-SF-013` | Admit a valid activation lease, advance the clock to `expires_at`, and verify that later use is rejected with `topology.lease.expired-timeout`. |
+| `P4-SF-014` | Renew an activation lease before expiration and verify that only `expires_at` changes to exactly 30 seconds after renewal acceptance while `lease_id`, `lease_sequence`, `host_id`, and `fence_token` remain unchanged. |
+| `P4-SF-014A` | After a lease expires or is revoked, issue a distinct lease for the same `node_id` and verify a new `lease_sequence` and `lease_id` and a `fence_token` exactly one greater than the previous token. |
 
 > **Non-normative note.**
-Tests `P4-SF-011` through `P4-SF-015` exercise the full activation lease
+Tests `P4-SF-011` through `P4-SF-014` exercise the activation lease
 flow defined in section 38.2.
-Each test validates one of the five lease operations and verifies that
+Each test validates one of the supported lease operations and verifies that
 the host behaves correctly according to the operation.
 
 #### Topology versioning flow
@@ -152,14 +153,20 @@ Failure handling tests verify that the host correctly rejects invalid inputs
 with stable diagnostics and without leaving unauthorized or partial state.
 Each test scenario below describes the invalid input, the expected diagnostic,
 and the state invariants that MUST hold after the failure.
+Every failure test MUST verify the exact Chapter 04 top-level fields, the
+category-specific `identity.*.topology` family from Section 38.3, the listed
+domain `code`, `severity: "error"`, and all required bounded `details` members.
 
 #### Malformed input tests
 
 | Test ID | Description | Expected diagnostic |
 |---------|-------------|---------------------|
 | `P4-FH-001` | Topology directive with missing `topology_owner` field. | `topology.directive.malformed` |
+| `P4-FH-001A` | `topology_identity` with an alternate prefix, digest length, case, hash, framing, component order, sequence encoding, or a digest that does not match `topology_version`, `topology_owner`, and `topology_sequence`. | `topology.directive.malformed` |
+| `P4-FH-001B` | `topology_sequence: 0` or reuse of a reserved sequence for a distinct topology directive. | `topology.directive.malformed` |
 | `P4-FH-002` | Topology directive with empty `nodes` list. | `topology.directive.malformed-nodes` |
 | `P4-FH-003` | Topology directive with invalid `node_id` format. | `topology.directive.malformed-node-id` |
+| `P4-FH-003A` | `node_id` that does not match the fixed identity construction from the topology version, role, agent address, and canonical position. | `topology.directive.malformed-node-id` |
 | `P4-FH-004` | Topology directive with invalid `agent_address` format. | `topology.directive.malformed-agent-address` |
 | `P4-FH-005` | Topology directive with unknown `role` value. | `topology.directive.malformed-role` |
 | `P4-FH-006` | Topology directive with unknown `activation_mode` value. | `topology.directive.malformed-activation-mode` |
@@ -167,7 +174,8 @@ and the state invariants that MUST hold after the failure.
 | `P4-FH-008` | Topology node with missing required fields. | `topology.node.malformed` |
 | `P4-FH-009` | Topology node with invalid `dependencies` list. | `topology.node.malformed-dependencies` |
 | `P4-FH-010` | Activation lease with missing required fields. | `topology.lease.malformed` |
-| `P4-FH-011` | Activation lease with past `expires_at` timestamp. | `topology.lease.malformed-expiry` |
+| `P4-FH-010A` | `lease_id` that does not match the fixed construction or reuses a sequence from a distinct lease issuance. | `topology.lease.malformed` |
+| `P4-FH-011` | New lease admission request whose supplied `expires_at` is already in the past. | `topology.lease.malformed-expiry` |
 
 > **Normative definition.**
 Each malformed input test MUST verify that the host: (1) rejects the
@@ -191,6 +199,8 @@ guarantees defined in
 | `P4-FH-013` | Topology node whose `agent_address` does not resolve to an active agent. | `topology.node.incompatible-agent` |
 | `P4-FH-014` | Topology node whose `dependencies` reference non-existent `node_id` values. | `topology.node.incompatible-dependency` |
 | `P4-FH-015` | Topology directive whose `nodes` list contains a circular dependency. | `topology.node.incompatible-circular-dependency` |
+| `P4-FH-015A` | Topology node whose `resource_class` is not `default`. | `topology.node.incompatible-resource-class` |
+| `P4-FH-015B` | Request to transfer an activation lease to another host. | `topology.lease.transfer-unsupported`; current lease remains unchanged |
 
 > **Non-normative note.**
 The incompatible input tests validate the semantic validation layer that
@@ -205,7 +215,6 @@ state or leave partial state in the durable journal.
 | `P4-FH-016` | Two topology directives with the same `topology_version` submitted concurrently. | `topology.directive.duplicate-version` for the second directive. |
 | `P4-FH-017` | Two topology directives with the same `node_id` submitted concurrently. | `topology.node.duplicate-node-id` for the second directive. |
 | `P4-FH-018` | Two activation leases with lower `fence_token` than the current fence token for the same `node_id`. | `topology.lease.expired-fence` for the second lease. |
-| `P4-FH-019` | Two activation leases with past `expires_at` timestamp. | `topology.lease.expired-timeout` for the second lease. |
 | `P4-FH-020` | Two reconciliation passes attempt to modify the same `node_id` concurrently. | `topology.reconciliation.conflict` for the second pass. |
 
 > **Non-normative note.**
@@ -232,9 +241,9 @@ policy and compromise system security.
 
 | Test ID | Description | Expected diagnostic |
 |---------|-------------|---------------------|
-| `P4-FH-024` | Topology directive that would exceed the implementation-defined maximum number of nodes per topology. | `topology.directive.exhausted-nodes` |
-| `P4-FH-025` | Topology node that would exceed the implementation-defined maximum concurrency per topology. | `topology.node.exhausted-concurrency` |
-| `P4-FH-026` | Host that would exceed the implementation-defined maximum number of concurrent leases. | `topology.lease.exhausted-concurrency` |
+| `P4-FH-024` | Topology directive that would exceed the disclosed maximum nodes under [Implementation limits](38-pod-topology-placement-activation-leases-and-reconciliation-failure-evidence-and-operational-notes.md#implementation-limits). | `topology.directive.exhausted-nodes` |
+| `P4-FH-025` | Topology node that would exceed the disclosed topology concurrency under [Implementation limits](38-pod-topology-placement-activation-leases-and-reconciliation-failure-evidence-and-operational-notes.md#implementation-limits). | `topology.node.exhausted-concurrency` |
+| `P4-FH-026` | Host that would exceed the disclosed concurrent leases under [Implementation limits](38-pod-topology-placement-activation-leases-and-reconciliation-failure-evidence-and-operational-notes.md#implementation-limits). | `topology.lease.exhausted-concurrency` |
 
 > **Non-normative note.**
 The exhausted input tests validate the resource limit enforcement layer
@@ -246,7 +255,7 @@ and compromise system stability.
 
 | Test ID | Description | Expected diagnostic |
 |---------|-------------|---------------------|
-| `P4-FH-027` | Topology directive whose `topology_owner` is not active in the durable registry. | `topology.directive.unavailable` |
+| `P4-FH-027` | Topology directive whose agent or non-agent `topology_owner` is not active in the registry selected by its address discriminant. | `topology.directive.unavailable` |
 | `P4-FH-028` | Topology node whose `agent_address` is not active in the durable registry. | `topology.node.unavailable-agent` |
 | `P4-FH-029` | Activation lease whose `host_id` is not active in the host registry. | `topology.lease.unavailable-host` |
 
@@ -267,8 +276,10 @@ cancellation under various `lifecycle_policy` settings.
 
 | Test ID | Description |
 |---------|-------------|
-| `P4-TO-001` | Create a topology directive and verify that the directive is accepted before the implementation-defined timeout expires. |
-| `P4-TO-002` | Create a topology directive and verify that the directive is rejected with `topology.directive.timeout` if it exceeds the implementation-defined timeout. |
+| `P4-TO-001` | Create a topology directive and verify that validation completes before the fixed 30-second [topology validation](38-pod-topology-placement-activation-leases-and-reconciliation-behavior-and-integration.md#topology-versioning-validation-rollout-rollback-and-audit-evidence) timeout. |
+| `P4-TO-002` | Create a topology directive and verify rejection with `topology.directive.timeout` when validation exceeds the fixed 30-second [topology validation](38-pod-topology-placement-activation-leases-and-reconciliation-behavior-and-integration.md#topology-versioning-validation-rollout-rollback-and-audit-evidence) timeout. |
+| `P4-TO-006` | Verify activation leases expire 30 seconds after `issued_at` unless renewed. |
+| `P4-TO-007` | Verify a live node is marked `stale` after 60 seconds without refresh. |
 | `P4-TO-003` | Create a topology directive with `lifecycle_policy: terminate-on-topology-revoke` and verify that the directive is terminated when the topology is revoked. |
 | `P4-TO-004` | Create a topology directive with `lifecycle_policy: wait-completion-on-topology-revoke` and verify that the directive is allowed to complete before being terminated. |
 | `P4-TO-005` | Create a topology directive with `lifecycle_policy: allow-partial-on-topology-revoke` and verify that the directive is allowed to continue but its results are excluded from aggregation. |
@@ -381,7 +392,7 @@ subsystems (such as the agent registry, mailboxes, and durable journal).
 > **Normative definition.**
 Integration test evidence is the durable, auditable record that the Phase 4
 integration tests were executed and the results.
-Evidence is the primary input for promotion from `status: draft` to
+Evidence is the primary input for promotion from `status: candidate` to
 `status: normative`.
 
 > **Normative definition.**
@@ -410,7 +421,7 @@ evidence record has not been tampered with after creation.
 The `approved_variability` field enables operators to document and
 retroactively approve intentional deviations from the baseline, which
 is important for cross-milestone compatibility testing where some
-variations are acceptable (such as implementation-defined bounded times).
+variations are acceptable (such as disclosed implementation resource limits).
 
 > **Normative definition.**
 A run of all Phase 4 integration tests passes if and only if:
@@ -426,7 +437,7 @@ A run of all Phase 4 integration tests passes if and only if:
    [Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md).
 
 > **Normative definition.**
-Promotion from `status: draft` to `status: normative` requires:
+Promotion from `status: candidate` to `status: normative` requires:
 
 1. A passing run of all Phase 4 integration tests as defined above.
 2. A passing run of all cross-milestone compatibility tests as defined

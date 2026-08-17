@@ -2,7 +2,7 @@
 title: "Fan-Out Fan-In Delegation And Result Aggregation Contract And Data Model"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.1.0"
 tags:
   - milestone-06
@@ -19,7 +19,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 3](../.spec/planning/agentic-system/milestone-06-multi-agent-coordination-and-topology/phase-03-fan-out-fan-in-delegation-and-result-aggregation.md)
 of
 [Milestone 6](../.spec/planning/agentic-system/milestone-06-multi-agent-coordination-and-topology/README.md)
@@ -83,8 +83,9 @@ Every fan-out plan MUST include the following fields:
 | Field | Content | Source |
 |-------|---------|--------|
 | `plan_id` | A deterministic plan identity derived from delegating agent address, payload hash, and a monotonic per-agent sequence counter. | Fan-out plan construction. |
+| `plan_sequence` | The monotonic per-delegating-agent `u64` sequence value reserved for this distinct plan. | Fan-out plan construction. |
 | `delegating_agent` | The `TenantQualifiedAgentAddress` of the agent that created the fan-out plan. | Fan-out plan directive. |
-| `work_items` | A list of child work items to be executed in parallel, each referencing an artifact, manifest, and input data. | Fan-out plan directive. |
+| `work_items` | An ordered list of work-item drafts to be executed in parallel, each referencing an artifact, manifest, and input data. | Fan-out plan directive. |
 | `concurrency_bound` | The maximum number of child agents that may execute concurrently for this plan. | Fan-out plan directive. |
 | `deadline` | An ISO 8601 timestamp after which the plan is considered expired and partial results MAY be aggregated. | Fan-out plan directive. |
 | `cancellation_policy` | The policy for cancelling child agents when the plan is cancelled or expired: `cancel-all`, `wait-completion`, or `allow-partial`. | Fan-out plan directive. |
@@ -94,19 +95,45 @@ Every fan-out plan MUST include the following fields:
 | `delegation_grants` | The attenuated grant scope inherited by child agents from the delegating agent. | Fan-out plan directive. |
 
 > **Normative definition.**
-The `plan_id` is computed by hashing the concatenation of the delegating
-agent address, payload hash, and a monotonic per-agent sequence counter,
-then encoding the resulting digest in the canonical string representation
-defined in
-[Agent Identity Addressing Ownership And Dependency Relations](35-agent-identity-addressing-ownership-and-dependency-relations.md).
+Each directive `work_items` entry contains exactly `artifact`, `manifest`,
+`input_data`, `delegation_grants`, and `purpose`; `work_item_id`, `plan_id`, and
+`work_item_index` are derived during admission and MUST NOT appear in a draft.
+
+Define `frame(x)` as the unsigned 64-bit big-endian byte length of `x` followed
+by exactly the bytes of `x`. Define `u64be(n)` as the eight-byte unsigned
+big-endian encoding of `n`. The plan payload hash is the lowercase hexadecimal
+SHA-256 digest of the Canonical JSON encoding of every plan directive field
+except `plan_id` and `plan_sequence`; work-item drafts are encoded in their
+listed order with exactly the fields above. The `plan_id` is:
+
+> **Normative definition.**
+
+```
+"fanout-plan:sha256:" + lowercase_hex(SHA-256(
+  frame(utf8("agent-wasm/fanout-plan/v1")) ||
+  frame(utf8(canonical_delegating_agent_address)) ||
+  frame(utf8(plan_payload_hash)) ||
+  frame(u64be(plan_sequence))
+))
+```
+
+`canonical_delegating_agent_address` is the canonical Chapter 35 agent-address
+string. `plan_sequence` starts at 1, advances once for each distinct plan
+constructed by the delegating agent, and MUST NOT be reused. A retransmission
+MUST reuse its reserved `plan_sequence` and `plan_id`; a new same-content plan
+MUST reserve a new sequence and therefore has a different `plan_id`. Zero or
+reuse for a distinct plan is malformed and MUST be rejected with
+`fanout.plan.malformed`.
+The per-agent sequence allocator and mapping from reserved sequence to
+`plan_id` MUST be durable and reserved atomically before plan emission.
 The `plan_id` is deterministic: the same inputs in the same order always
 produce the same `plan_id`, regardless of the host process, engine
 instance, or physical node on which the plan is evaluated.
 
 > **Normative definition.**
-Deterministic `plan_id` values serve three purposes: (1) they enable
-exact deduplication of concurrent fan-out plan requests that carry the
-same semantic content; (2) they provide a stable reference for result
+Deterministic `plan_id` values serve three purposes: (1) they enable exact
+deduplication of retransmissions carrying the same reserved sequence while
+keeping distinct same-content plans unique; (2) they provide a stable reference for result
 correlation, allowing any aggregated result to be traced back to the
 originating plan without requiring additional context; and (3) they
 enable replay of the plan execution sequence from the durable state
@@ -122,7 +149,9 @@ before admission:
    durable registry.
 2. The `work_items` list MUST contain at least one work item and at
    least one work item MUST reference a valid artifact digest recorded
-   in the manifest registry.
+   in the manifest registry. A list exceeding the disclosed maximum work-items
+   implementation limit MUST be rejected with
+   `fanout.plan.exhausted-work-items`.
 3. Each work item's artifact digest MUST pass the schema validation
    defined in
    [Agent Manifests Artifacts Schemas And Registries](03-agent-manifests-artifacts-schemas-and-registries.md).
@@ -130,19 +159,25 @@ before admission:
     artifact digest; a manifest that does not declare the artifact MUST
     be rejected with the diagnostic `fanout.plan.incompatible-manifest-artifact`.
 5. The `concurrency_bound` MUST be a positive integer and MUST not
-   exceed the implementation-defined maximum concurrency per plan.
+   exceed the disclosed maximum concurrency implementation limit under
+   [Implementation limits](37-fan-out-fan-in-delegation-and-result-aggregation-failure-evidence-and-operational-notes.md#implementation-limits).
 6. The `deadline` MUST be a future timestamp relative to the current
    host clock.
 7. The `aggregation_policy` MUST name a policy defined by this chapter's
    normative policy table.
 8. When `aggregation_policy` is `quorum`, the `quorum_threshold` MUST
    be a positive integer less than or equal to the number of work items.
-9. A fan-out plan whose `plan_id` matches an already-admitted plan
+9. `result_contract` MUST reference a schema version supported by the admitted
+   work-item manifests; a structurally valid but unsupported version MUST be
+   rejected with `fanout.plan.incompatible`.
+10. `plan_id` MUST equal the fixed construction above for the directive and
+   `plan_sequence`; a mismatch MUST be rejected with `fanout.plan.malformed`.
+11. A fan-out plan whose `plan_id` matches an already-admitted plan
    (recorded in the durable state journal) MUST be rejected with the
    diagnostic `fanout.plan.duplicate-plan-id`.
 
 > **Non-normative note.**
-The nine validation rules above ensure that fan-out plans are governed,
+The eleven validation rules above ensure that fan-out plans are governed,
 auditable, and replayable operations.
 Each rule maps to a specific existing chapter's contract, and failure
 at any rule prevents the plan from entering any observable state.
@@ -156,8 +191,8 @@ The host MUST atomically commit the following state changes when admitting
 a fan-out plan directive through the atomic commit protocol defined in
 [Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md):
 
-1. Write the fan-out plan's registry entry (status: `pending`, address:
-   derived from the plan's deterministic construction).
+1. Write a durable fan-out plan record keyed by `plan_id` with status
+   `pending`.
 2. Record the `plan_id` in the durable journal with status `admitted`.
 3. Create child work items for each entry in `work_items`, each with a
    deterministic work item identity derived from the `plan_id`, the
@@ -192,9 +227,9 @@ Every child work item MUST include the following fields:
 
 | Field | Content | Source |
 |-------|---------|--------|
-| `work_item_id` | A deterministic work item identity derived from `plan_id`, work item index, and input data hash. | Fan-out plan directive. |
-| `plan_id` | The `plan_id` of the parent fan-out plan. | Fan-out plan directive. |
-| `work_item_index` | The zero-indexed position of this work item in the parent plan's `work_items` list. | Fan-out plan directive. |
+| `work_item_id` | A deterministic work item identity derived from `plan_id`, work item index, and input data hash. | Host admission. |
+| `plan_id` | The `plan_id` of the parent fan-out plan. | Host admission. |
+| `work_item_index` | The zero-indexed position of this work item in the parent plan's `work_items` list. | Host admission. |
 | `artifact` | The artifact digest and selection that the child agent will execute. | Fan-out plan directive. |
 | `manifest` | The reviewed manifest record that declares the artifact's declared capabilities, input schema, output schema, and trust tier. | [Agent Manifests Artifacts Schemas And Registries](03-agent-manifests-artifacts-schemas-and-registries.md). |
 | `input_data` | The serialized input data for this work item, structured against the manifest's declared input schema. | Fan-out plan directive. |
@@ -202,10 +237,21 @@ Every child work item MUST include the following fields:
 | `purpose` | A human-readable description of the work item's purpose within the plan. | Fan-out plan directive. |
 
 > **Normative definition.**
-The `work_item_id` is computed by hashing the concatenation of the
-`plan_id`, the `work_item_index`, and the input data hash, then encoding
-the resulting digest in the canonical string representation defined in
-[Agent Identity Addressing Ownership And Dependency Relations](35-agent-identity-addressing-ownership-and-dependency-relations.md).
+The input data hash is the lowercase hexadecimal SHA-256 digest of the
+Canonical JSON encoding of `input_data`. The `work_item_id` is:
+
+> **Normative definition.**
+
+```
+"fanout-work-item:sha256:" + lowercase_hex(SHA-256(
+  frame(utf8("agent-wasm/fanout-work-item/v1")) ||
+  frame(utf8(plan_id)) ||
+  frame(u64be(work_item_index)) ||
+  frame(utf8(input_data_hash))
+))
+```
+
+The `frame` and `u64be` functions are those defined for `plan_id` above.
 The `work_item_id` is deterministic: the same inputs in the same order
 always produce the same `work_item_id`, regardless of the host process,
 engine instance, or physical node on which the work item is evaluated.
@@ -314,31 +360,51 @@ Every child result MUST include the following fields:
 | `timestamp` | The ISO 8601 timestamp of result submission. | Child agent. |
 
 > **Normative definition.**
-The `result_id` is computed by hashing the concatenation of the
-`work_item_id`, the `sequence_number`, and the result payload hash,
-then encoding the resulting digest in the canonical string representation
-defined in
-[Agent Identity Addressing Ownership And Dependency Relations](35-agent-identity-addressing-ownership-and-dependency-relations.md).
+The result payload hash is the lowercase hexadecimal SHA-256 digest of the
+Canonical JSON encoding of an object containing exactly `result_data`,
+`status`, `failure_code`, and `failure_message`. `timestamp` is excluded so a
+retransmission can retain the original identity. The `result_id` is:
+
+> **Normative definition.**
+
+```
+"fanout-result:sha256:" + lowercase_hex(SHA-256(
+  frame(utf8("agent-wasm/fanout-result/v1")) ||
+  frame(utf8(work_item_id)) ||
+  frame(u64be(sequence_number)) ||
+  frame(utf8(result_payload_hash))
+))
+```
+
+The `frame` and `u64be` functions are those defined for `plan_id` above.
 The `result_id` is deterministic: the same inputs in the same order
 always produce the same `result_id`, regardless of the host process,
 engine instance, or physical node on which the result is submitted.
+The child result sequence counter MUST be durable and MUST be advanced
+atomically with result admission. A retransmission reuses the original
+`sequence_number` and `result_id`; a distinct result uses a new sequence. Zero
+or reuse for a distinct result is malformed and MUST be rejected with
+`fanout.result.malformed`.
 
 > **Normative definition.**
 Child results are ordered within a fan-out plan according to the parent
 plan's `aggregation_policy`:
 
 - `all`: Results are aggregated in the order they are received; partial
-  results are collected until the `deadline` expires.
+  results are collected through the aggregation cutoff defined under
+  [Aggregation policies](37-fan-out-fan-in-delegation-and-result-aggregation-behavior-and-integration.md#aggregation-policies).
 - `quorum`: Results are aggregated in the order they are received;
   aggregation completes when `quorum_threshold` successful results are
-  received.
+  received or fails at the aggregation cutoff without quorum.
 - `first-success`: Aggregation completes when the first successful result
-  is received; subsequent results are discarded.
-- `best-effort`: Results are aggregated in the order they are received;
-  the host selects the best result according to an implementation-defined
-  quality metric.
+  is received; subsequent results are discarded; the plan fails at the
+  aggregation cutoff if no result succeeds.
+- `best-effort`: Results are collected through the aggregation cutoff; the host selects
+  one result using the fixed ordering under
+  [Aggregation policies](37-fan-out-fan-in-delegation-and-result-aggregation-behavior-and-integration.md#aggregation-policies).
 - `ordered`: Results are aggregated in the order specified by the parent
-  plan's `work_items` list, regardless of submission order.
+  plan's `work_items` list, regardless of submission order, through the
+  aggregation cutoff.
 
 ### Partial completion and duplicate suppression
 
@@ -358,8 +424,9 @@ The host MUST classify partial results according to the parent plan's
 - `first-success`: Partial results are discarded; only successful results
   are aggregated.
 - `best-effort`: Partial results are included in the aggregated result
-  if they are the best available according to the implementation-defined
-  quality metric.
+  only when the fixed ordering under
+  [Aggregation policies](37-fan-out-fan-in-delegation-and-result-aggregation-behavior-and-integration.md#aggregation-policies)
+  selects a partial result ahead of every other eligible result.
 - `ordered`: Partial results are included in the aggregated result in
   their specified order; the host MUST NOT reorder partial results.
 
@@ -377,7 +444,7 @@ The host MUST suppress duplicate results according to the following rules:
 
 1. A result whose `result_id` matches a previously-aggregated result
    MUST be rejected with the diagnostic `fanout.result.duplicate`.
-2. A result whose `work_item_id` and `result_data` hash match a previously-
+2. A result whose `work_item_id` and result payload hash match a previously-
    aggregated result MUST be rejected with the diagnostic
    `fanout.result.duplicate-content`.
 3. Duplicate suppression is applied before aggregation; rejected results
@@ -388,9 +455,8 @@ The host MUST suppress duplicate results according to the following rules:
 The two duplicate suppression rules provide defense-in-depth: the first
 rule prevents replay of the same result identity; the second rule
 prevents replay of results with identical content but different identities.
-Both rules are necessary because the `result_id` may be regenerated
-across host restarts if the monotonic sequence counter is not durable,
-while the `result_data` hash is always durable.
+Both rules remain necessary even though sequence counters are durable: an
+invalid sender may deliberately submit a new sequence for duplicate content.
 
 ### Causal attachment
 

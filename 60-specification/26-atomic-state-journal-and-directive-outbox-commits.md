@@ -2,7 +2,7 @@
 title: "Atomic State Journal And Directive-Outbox Commits"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.1.0"
 tags:
   - milestone-04
@@ -19,7 +19,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 2](../.spec/planning/agentic-system/milestone-04-durable-state-effects-and-recovery/phase-02-atomic-state-journal-and-directive-outbox-commits.md)
 of
 [Milestone 4](../.spec/planning/agentic-system/milestone-04-durable-state-effects-and-recovery/README.md)
@@ -215,7 +215,7 @@ The agent assigns `Directive.id` during reduction.
 The host MUST NOT derive a new identifier; it MUST use the agent-assigned value.
 
 > **Normative definition.**
-The payload hash is a hash of the directive payload (e.g., SHA-256).
+The payload hash is the SHA-256 hash of the directive payload.
 The host MUST compute the payload hash before writing the commit unit.
 
 ### Compare-and-commit semantics
@@ -284,6 +284,12 @@ The host MUST NOT leave orphaned outbox entries.
 > **Normative definition.**
 The host MUST log all outbox entry deletions for audit purposes.
 
+> **Normative definition.**
+Completed, terminal-failed, cancelled, and superseded outbox entries MUST be
+retained for exactly 365 days after entering the terminal outbox state.
+Removing an outbox entry MUST NOT remove or alter its originating audit-journal
+entry, and the removal MUST be appended as a new audit-journal entry.
+
 ### Ambiguous commit resolution
 
 > **Normative definition.**
@@ -313,6 +319,14 @@ commit failed. The host MUST retry the commit.
 
 > **Normative definition.**
 The host MUST log all ambiguous commit resolutions for audit purposes.
+
+> **Normative definition.**
+Ambiguous commit resolution MUST complete within 30 seconds of the first
+post-failure resolution read. If the host cannot determine the outcome within
+30 seconds, it MUST return `commit.ambiguous-timeout`, MUST leave the durable
+revision, journal, and outbox unchanged, and MUST NOT dispatch any affected
+outbox entry. The host MUST repeat the resolution procedure before any later
+retry or dispatch for that commit.
 
 ## 2.3 Failure Evidence And Operational Notes
 
@@ -349,6 +363,7 @@ directive-outbox commits:
 | `commit.missing_payload_hash` | Outbox entry missing payload hash |
 | `commit.unresolved_directive` | Directive identity not determined before commit |
 | `commit.orphaned_outbox` | Outbox entry without committed state transition |
+| `commit.ambiguous-timeout` | Ambiguous commit outcome was not resolved within 30 seconds |
 | `outbox.attempt_number_exhausted` | attempt_number reached u32::MAX |
 | `storage.snapshot.duplicate` | Snapshot ID already exists (see [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md)) |
 | `storage.snapshot.not_found` | Snapshot ID does not exist (see [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md)) |
@@ -364,45 +379,60 @@ boundary without exposing secrets.
 ### Bounded diagnostics
 
 > **Normative definition.**
-The host MUST emit bounded diagnostics for each failure outcome.
-The diagnostics MUST include:
+The host MUST emit bounded diagnostics for each failure outcome using exactly
+the Chapter 04 `Diagnostic` top-level structure. The domain error is `code`,
+`severity` is `error`, and `details` contains `phase`, `contract`, `profile`,
+`failed_boundary`, `context`, `entity_identifiers`, `timestamp`, and
+`retryable`.
 
-1. **Error code**: The specific error code from the table above.
-2. **Context**: The operation that failed (e.g., commit write, outbox dispatch).
-3. **Entity identifiers**: The tenant ID, agent ID, revision, or entry ID
-   involved (without exposing sensitive data).
-4. **Timestamp**: The time the error occurred.
-5. **Retryable**: Whether the operation can be retried.
+| Family | Domain codes |
+|--------|--------------|
+| `identity.validation.atomic_commit` | `commit.invalid_revision`, `commit.missing_payload_hash`, `commit.unresolved_directive`, `commit.orphaned_outbox` |
+| `identity.conflict.atomic_commit` | `commit.conflict`, `storage.snapshot.duplicate` |
+| `identity.limit.atomic_commit` | `commit.ambiguous-timeout`, `outbox.attempt_number_exhausted` |
+| `identity.resource.atomic_commit` | `storage.snapshot.not_found`, `storage.unavailable` |
+| `identity.storage.atomic_commit` | `storage.snapshot.corruption`, `storage.journal.modified` |
+
+No additional top-level diagnostic member is permitted.
 
 > **Normative definition.**
 The host MUST NOT expose internal implementation details, secrets, or
 sensitive data in diagnostics.
 
-### Implementation-defined choices
+### Internal mechanisms and fixed behavior
 
-> **Normative implementation-defined choice.**
-The following choices are implementation-defined and MUST be documented in the
-conformance profile:
+> **Normative definition.**
+The storage backend and its internal concurrency mechanism are not observable
+choices. Every backend MUST be observationally equivalent with respect to
+commit atomicity, revision ordering, conflict diagnostics, outbox visibility,
+and crash recovery. Backend selection MUST NOT change whether a commit or
+dispatch is accepted, rejected, retried, or reported as successful.
 
-1. **Storage backend**: The chosen storage backend and its durability guarantees.
-2. **Hash algorithm**: The hash algorithm used for payload hashes.
-3. **Retry strategy**: The retry strategy for transient conflicts.
-4. **Outbox dispatch strategy**: The dispatch strategy (at-least-once, etc.).
-5. **Ambiguous commit resolution timeout**: The timeout for ambiguous commit
-   resolution.
+> **Normative definition.**
+Payload hashes use SHA-256. Transient commit conflicts are retried at most three
+times with delays of 100 milliseconds, 200 milliseconds, and 400 milliseconds.
+After the third failed retry the host MUST return `commit.conflict`.
+
+> **Normative definition.**
+Outbox dispatch uses at-least-once delivery with the directive idempotency key.
+The host MUST retry an unacknowledged dispatch according to the validated,
+persisted `RetryPolicy` on the selected effect-handler registration. That policy
+MUST use the fixed constant-delay, zero-jitter semantics in
+[Chapter 27 failure behavior](27-effect-handlers-attempts-idempotency-and-result-signals.md#failure-behavior).
+The host MUST persist the policy values before the first dispatch and MUST use
+those same values after recovery. It MUST NOT report completion until one
+attempt is acknowledged.
 
 ### Deferred work
 
 > **Non-normative note.**
 The following work is deferred to later phases or host implementations:
 
-1. **Outbox retry with backoff**: The retry strategy with exponential backoff.
-2. **Outbox deduplication**: The deduplication strategy for outbox entries, using
-   `DirectiveTarget.idempotency_key` when provided by the directive.
-3. **Outbox compaction**: The compaction strategy for completed outbox entries.
-4. **Cross-process fencing**: The fencing token strategy for multi-process
+1. **Outbox compaction**: Physical compaction techniques for expired terminal
+   outbox entries after their fixed retention period.
+2. **Cross-process fencing**: The fencing token strategy for multi-process
    deployments.
-5. **DirectiveTarget.type to DirectiveKindName mapping**: The relationship
+3. **DirectiveTarget.type to DirectiveKindName mapping**: The relationship
    between `DirectiveTarget.type` (Effect, Signal, Timer, Internal) and
    `DirectiveKindName` ("emit", "timer", "effect", "child-lifecycle",
    "approval", "topology") from
@@ -426,13 +456,19 @@ affected milestone MUST be revised and re-validated.
 
 ## Variability register
 
+The register below summarizes fixed behavior and internal mechanisms governed
+by the linked clauses. It does not independently license variation.
+
+> **Non-normative note.**
+
 | Item | Permission | Recommendation | Constraint |
 |------|------------|----------------|------------|
-| Hash algorithm for payload hashes | Use any cryptographically secure hash | SHA-256 or stronger | Must be constant within a deployment |
-| Outbox dispatch strategy | Implementation-defined | At-least-once with idempotency | Must prevent dispatch without commit |
-| Ambiguous commit resolution timeout | Implementation-defined | Document in conformance profile | Must not block agent turns indefinitely |
-| Outbox entry retention | Implementation-defined | Document retention policy | Must preserve audit journal for cancelled/completed agents |
-| Commit retry strategy | Implementation-defined | Exponential backoff | Must limit retries and back off |
+| [Hash algorithm for payload hashes](#directive-identity-and-payload-hash) | Required | SHA-256 | Must be constant across deployments |
+| [Outbox dispatch strategy](#internal-mechanisms-and-fixed-behavior) | Required | At-least-once with idempotency | Must prevent dispatch without commit |
+| [Ambiguous commit resolution timeout](#ambiguous-commit-resolution) | Required | 30 seconds | Must fail closed with `commit.ambiguous-timeout` |
+| [Outbox entry retention](#prevent-dispatch-without-commit) | Required | 365 days after terminal outbox state | Must preserve the originating audit-journal entry indefinitely |
+| [Commit retry strategy](#internal-mechanisms-and-fixed-behavior) | Required | Three retries at 100, 200, and 400 milliseconds | Must end with `commit.conflict` |
+| [Storage backend](#internal-mechanisms-and-fixed-behavior) | Internal mechanism | No profile selection | Must preserve observable commit semantics |
 
 ## 2.4 Phase 2 Integration Tests
 
@@ -500,8 +536,8 @@ The following tests MUST verify failure handling:
    the error code.
 
 > **Normative definition.**
-Each test MUST verify that the error code and diagnostic message match the
-expected values.
+Each test MUST verify the exact Chapter 04 diagnostic shape, assigned family,
+domain `code`, `severity: "error"`, message, and required bounded details.
 
 ### Transient failure recovery tests
 
@@ -516,9 +552,26 @@ The following tests MUST verify transient failure recovery:
    the operation is retried and eventually succeeds or fails with the correct
    error code.
 4. **Retry behavior**: Simulate transient conflicts and verify the retry logic
-   works correctly.
+   performs no more than three retries after delays of exactly 100, 200, and
+   400 milliseconds and returns `commit.conflict` after the third failed retry.
 5. **Ambiguous commit**: Simulate a crash during commit and verify the host
    resolves the ambiguous commit correctly.
+6. **Ambiguous commit timeout**: Keep the commit outcome unresolved for 30
+   seconds after the first post-failure read and verify
+   `commit.ambiguous-timeout`, no dispatch, and no mutation of the commit's
+   revision, journal, or outbox records. Verify that a later retry repeats the
+   resolution procedure first.
+7. **Unacknowledged outbox dispatch**: Verify that retries use the persisted
+   effect-handler `RetryPolicy` with a constant delay and zero jitter across a
+   host restart and reuse the same directive idempotency key. With a provider
+   that supports idempotency, verify one externally applied effect. With a
+   provider that does not support idempotency, verify at-least-once dispatch,
+   permit duplicate external application, suppress duplicate result admission,
+   and record bounded duplicate-risk evidence rather than claiming exactly-once
+   delivery.
+8. **Terminal outbox retention**: Verify that a terminal outbox entry remains
+   queryable through day 365, is removed after that period, and leaves both its
+   originating audit entry and a new audited-removal entry intact.
 
 > **Normative definition.**
 Each test MUST verify that no unauthorized or partial state is left after the

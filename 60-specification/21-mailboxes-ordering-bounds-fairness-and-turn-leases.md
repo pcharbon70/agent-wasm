@@ -3,7 +3,7 @@ title: "Mailboxes Ordering Bounds Fairness And Turn Leases"
 kind: specification
 created: "2026-08-08"
 status: normative
-spec_version: "0.1.0"
+spec_version: "1.0.0"
 tags:
   - milestone-03
   - phase-02
@@ -19,7 +19,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 2](../.spec/planning/agentic-system/milestone-03-host-actor-runtime-and-lifecycle/phase-02-mailboxes-ordering-bounds-fairness-and-turn-leases.md)
 of
 [Milestone 3](../.spec/planning/agentic-system/milestone-03-host-actor-runtime-and-lifecycle/README.md)
@@ -51,60 +51,53 @@ Related chapters:
 ### Mailbox entries
 
 > **Normative definition.**
-A mailbox entry is an authenticated signal reference with tenant, agent,
-priority class, enqueue time, deadline, and delivery metadata.
+A mailbox entry is a reference to one persisted `AcceptedSignalEnvelope` with
+tenant, recorded target agent, priority class, enqueue time, and deadline. It
+does not copy host-owned ingress context or carry retry state.
 
 > **Normative definition.**
 
 ```
 MailboxEntry {
-  signal: SignalEnvelope,
+  accepted_delivery_id: string,
   tenant_id: TenantId,
   agent_id: AgentId,
   priority_class: PriorityClass,
   enqueue_time: UnixTimestamp,
-  deadline: UnixTimestamp?,
-  delivery_metadata: DeliveryMetadata
+  deadline: UnixTimestamp?
 }
 
 TenantId = string
 AgentId = string
 
 PriorityClass = "realtime" | "high" | "normal" | "low" | "background"
-
-DeliveryMetadata {
-  attempt_count: u64,
-  last_attempt_at: UnixTimestamp?,
-  next_attempt_at: UnixTimestamp?,
-  backoff_ms: u64
-}
 ```
 
-`SignalEnvelope` is defined in
-[Signal Envelopes Causality Routing And Delivery](10-signals-causality-routing-and-delivery.md#signal-fields).
+`accepted_delivery_id` MUST equal the `delivery_id` inside exactly one
+persisted `AcceptedSignalEnvelope` defined by
+[Signal fields](10-signals-causality-routing-and-delivery.md#signal-fields).
 
 `UnixTimestamp` is defined in
 [Stable Identities Versions Errors And Limits](02-stable-identities-versions-errors-and-limits.md).
 
 | Field | Type | Required | Purpose |
 |-------|------|----------|---------|
-| `signal` | SignalEnvelope | Yes | The signal to deliver |
+| `accepted_delivery_id` | string | Yes | Lookup key for the immutable accepted-ingress record |
 | `tenant_id` | TenantId | Yes | Tenant this entry belongs to |
 | `agent_id` | AgentId | Yes | Agent this entry is for |
 | `priority_class` | PriorityClass | Yes | Priority class for ordering |
 | `enqueue_time` | UnixTimestamp | Yes | Time the entry was enqueued |
 | `deadline` | UnixTimestamp? | No | Absolute deadline for delivery |
-| `delivery_metadata` | DeliveryMetadata | Yes | Delivery attempt metadata |
 
 > **Normative definition.**
-The `priority_class` field determines the ordering within the mailbox.
-Entries with higher priority MUST be delivered before entries with lower priority.
+The `priority_class` field determines an entry's share of the fixed service
+cycle defined below. Higher-priority classes receive a larger service share.
 Within the same priority class, entries MUST be delivered in FIFO order.
 
 > **Normative definition.**
 The `deadline` field is optional.
-If present, the host MUST reject entries that have not been delivered by the deadline
-with `mailbox.delivery.expired`.
+If present, it participates in the effective deadline rule under
+[Mailbox bounds](#mailbox-bounds).
 
 ### Deterministic ordering
 
@@ -112,20 +105,17 @@ with `mailbox.delivery.expired`.
 The host MUST order mailbox entries deterministically within priority classes.
 The ordering MUST be stable: if two entries have the same priority class and
 enqueue time, they MUST be ordered by their `delivery_id` (lexicographically).
+Here `delivery_id` means the entry's `accepted_delivery_id`.
 
 > **Normative definition.**
-The host MUST provide explicit fairness between priority classes.
-The host MUST NOT starve lower-priority entries indefinitely.
-
-> **Normative definition.**
-The host MAY implement fairness using the following policies:
-
-1. **Weighted fair queuing**: Each priority class receives a weighted share of delivery capacity. The weights MUST be documented in the conformance profile.
-
-2. **Round-robin with priority**: Entries are delivered in round-robin fashion, but higher-priority classes are visited more frequently. The frequency MUST be documented in the conformance profile.
-
-> **Normative definition.**
-The host MUST document the chosen fairness policy in the conformance profile.
+The host MUST schedule non-empty priority classes using a repeated 31-slot
+service cycle containing, in order, 16 `realtime` slots, 8 `high` slots,
+4 `normal` slots, 2 `low` slots, and 1 `background` slot. A new mailbox starts
+at the first slot. For each dequeue, the host scans forward cyclically, skips
+empty classes, delivers the FIFO head from the first non-empty class, and
+places the cursor after the slot used. Enqueueing an entry MUST NOT reset the
+cursor. This schedule is the required fairness policy and MUST NOT starve a
+continuously non-empty class while dequeues continue.
 
 ### Mailbox bounds
 
@@ -162,34 +152,37 @@ MailboxBounds {
 | `delivery_deadline_ms` | u64? | No | Maximum delivery time in milliseconds. Null means no delivery deadline. |
 
 > **Normative definition.**
-The host MUST reject new entries when any bound is reached, according to the
-overload policy defined in section 3.2.
+The host MUST reject a new entry that would exceed a count, byte, per-source,
+or per-tenant admission bound according to
+[Overload behavior](#overload-behavior). It MUST reject an entry that exceeds
+the age bound with `mailbox.bounds.age_exceeded`.
 
 > **Normative definition.**
 The host MUST provide configuration for the mailbox bounds.
 The bounds MUST be documented in the conformance profile.
+
+> **Normative definition.**
+An entry's effective delivery deadline is the earlier of its explicit
+`deadline` and `enqueue_time + delivery_deadline_ms` when both are present. If
+only one is present, that value is the effective deadline; if neither is
+present, the entry has no delivery deadline. At or after an effective deadline,
+the host MUST reject the entry with `mailbox.delivery.expired`.
 
 ## 2.2 Behavior And Integration
 
 ### Overload behavior
 
 > **Normative definition.**
-When a mailbox bound is reached, the host MUST select one of the following
-overload actions for each signal class:
-
-1. **Reject**: Reject the new entry immediately with `mailbox.overload.rejected`.
-2. **Defer**: Queue the new entry in a separate overflow queue with `mailbox.overload.deferred`.
-3. **Coalesce**: Merge the new entry with an existing entry of the same type and source with `mailbox.overload.coalesced`.
-4. **Supersede**: Replace an existing entry of the same type and source with the new entry with `mailbox.overload.superseded`.
-5. **Dead-letter**: Move the new entry to a dead-letter queue with `mailbox.overload.dead_lettered`.
+When admitting a new entry would exceed the count, byte, per-source, or
+per-tenant bound, the host MUST reject that entry without changing an existing
+entry. The primary error MUST be the applicable `mailbox.bounds.*_exceeded`
+code, and the host MUST also emit `mailbox.overload.rejected` identifying the
+bound. Deferral, coalescing, supersession, and dead-letter admission are not
+part of this mailbox contract.
 
 > **Normative definition.**
-The host MUST document the overload policy for each signal class in the
-conformance profile.
-
-> **Normative definition.**
-The host MUST emit a diagnostic when any overload action is taken.
-The diagnostic MUST identify the bound that was reached and the action taken.
+The host MUST emit the overload diagnostic for every bound rejection. The
+diagnostic MUST identify the bound and the fixed rejection disposition.
 
 ### Per-agent turn leases
 
@@ -203,6 +196,7 @@ TurnLease {
   agent_id: AgentId,
   owner: HostInstanceId,
   revision: u64,
+  issued_at: UnixTimestamp,
   expiry: UnixTimestamp,
   fencing_token: u64,
   status: LeaseStatus
@@ -222,6 +216,7 @@ LeaseStatus {
 | `agent_id` | AgentId | Yes | Agent this lease is for |
 | `owner` | HostInstanceId | Yes | Host instance that owns the lease |
 | `revision` | u64 | Yes | State revision this lease covers |
+| `issued_at` | UnixTimestamp | Yes | Time this lease interval began |
 | `expiry` | UnixTimestamp | Yes | Absolute expiry time for the lease |
 | `fencing_token` | u64 | Yes | Fencing token for lease validation |
 | `status` | LeaseStatus | Yes | Current lease status |
@@ -241,9 +236,12 @@ If the fencing token does not match the current lease, the host MUST reject
 with `mailbox.turn_lease.stale_token`.
 
 > **Normative definition.**
-The host MUST renew the turn lease periodically during long-running turns.
-If the lease expires and is not renewed, the host MUST terminate the turn
-with `mailbox.turn_lease.expired`.
+The lease duration is `expiry - issued_at` and MUST be positive. During a
+long-running turn, the host MUST renew the lease no later than the midpoint of
+its current duration. Renewal sets `issued_at` to the renewal time and sets
+`expiry` one unchanged lease duration later. If the lease expires without a
+successful renewal, the host MUST terminate the turn with
+`mailbox.turn_lease.expired`.
 
 > **Normative definition.**
 The host MUST revoke the turn lease when the agent is cancelled or completed.
@@ -292,7 +290,7 @@ fairness, and turn leases:
 | Exhausted | Mailbox bounds exceeded | Count, byte, age, per-source, or per-tenant bound reached | `mailbox.bounds.count_exceeded`, `mailbox.bounds.byte_exceeded`, `mailbox.bounds.age_exceeded`, `mailbox.bounds.per_source_exceeded`, `mailbox.bounds.per_tenant_exceeded` |
 | Unavailable | Mailbox or lease unavailable | Mailbox not found or lease not acquired | `mailbox.entry.unavailable` |
 | DeliveryExpired | Entry delivery deadline passed | Entry not delivered before deadline | `mailbox.delivery.expired` |
-| Overload | Mailbox overload | Bound reached, overload policy triggered | `mailbox.overload.*` |
+| Overload | Mailbox overload | Admission bound reached | `mailbox.overload.rejected` plus the applicable `mailbox.bounds.*_exceeded` code |
 | LeaseExpired | Turn lease expired | Lease expiry time passed without renewal | `mailbox.turn_lease.expired` |
 | StaleToken | Stale fencing token | Fencing token does not match current lease | `mailbox.turn_lease.stale_token` |
 | LeaseRevoked | Turn lease revoked | Lease revoked due to cancellation or completion | `mailbox.turn_lease.revoked` |
@@ -319,25 +317,18 @@ without exposing secrets or implementation internal state.
 | `mailbox.entry` | Mailbox entry failures | `malformed`, `incompatible`, `unauthorized`, `unavailable` |
 | `mailbox.bounds` | Mailbox bound failures | `count_exceeded`, `byte_exceeded`, `age_exceeded`, `per_source_exceeded`, `per_tenant_exceeded` |
 | `mailbox.delivery` | Mailbox delivery failures | `expired` |
-| `mailbox.overload` | Mailbox overload failures | `rejected`, `deferred`, `coalesced`, `superseded`, `dead_lettered` |
+| `mailbox.overload` | Mailbox overload failures | `rejected` |
 | `mailbox.turn_lease` | Turn lease failures | `missing`, `expired`, `stale_token`, `revoked`, `conflict` |
 
-### Implementation-defined choices
+### Internal mechanisms and fixed behavior
 
-> **Normative implementation-defined choice.**
-The following choices are implementation-defined and do not create
-conformance obligations.
-The Variability register below catalogs all such choices.
-
-1. **Fairness policy**: The host MAY choose the fairness policy between priority classes. The policy MUST be documented in the conformance profile.
-
-2. **Overload policy**: The host MAY choose the overload policy for each signal class. The policy MUST be documented in the conformance profile.
-
-3. **Lease renewal interval**: The host MAY choose how frequently to renew turn leases. The interval MUST be documented in the conformance profile.
-
-4. **Dead-letter retention**: The host MAY choose how long to retain dead-lettered entries. The retention period MUST be documented in the conformance profile.
-
-5. **Delivery deadline**: The host MAY choose whether to enforce delivery deadlines. The deadline policy MUST be documented in the conformance profile.
+> **Normative definition.**
+Mailbox storage, readiness notification, and lease-renewal triggering are
+internal mechanisms. Every such mechanism MUST be observationally equivalent
+with respect to the 31-slot dequeue sequence, FIFO tie-breaking, bound and
+deadline rejection, overload diagnostics, fencing, lease expiry, and committed
+turn results. The mechanism MUST NOT introduce an overflow or dead-letter queue
+at this boundary.
 
 ### Deferred work
 
@@ -510,6 +501,23 @@ Expected behavior:
 - Expected output: null.
 - Expected error: `mailbox.delivery.expired`.
 
+### Fixed scheduling, overload, and renewal
+
+> **Normative conformance criterion.**
+The Phase 2 integration tests MUST additionally verify:
+
+1. With every priority class continuously non-empty, the first service cycle
+   delivers 16 `realtime`, 8 `high`, 4 `normal`, 2 `low`, and 1 `background`
+   entry in that order, preserving FIFO order within each class.
+2. Each count, byte, per-source, and per-tenant overflow rejects only the new
+   entry, preserves existing entries, returns the bound-specific primary error,
+   and emits `mailbox.overload.rejected`.
+3. A lease is renewed no later than its midpoint with an unchanged duration,
+   while a missed renewal terminates the turn at expiry.
+4. An entry with neither an explicit deadline nor a configured delivery
+   deadline remains eligible subject to the independent age bound; an entry
+   with both uses the earlier deadline.
+
 ### Cross-milestone fixture regression
 
 > **Normative conformance criterion.**
@@ -533,15 +541,20 @@ Any approved variability MUST be documented in the Milestone 3 exit report.
 
 ## Variability register
 
-| Clause | Type | Selection |
-|--------|------|-----------|
-| Mailbox entry structure | Required | Fields fixed by this chapter |
-| Priority classes | Required | realtime, high, normal, low, background, fixed by this chapter |
-| Deterministic ordering | Required | Stable FIFO within priority class, fixed by this chapter |
-| Mailbox bounds | Required | Count, byte, age, per-source, per-tenant, fixed by this chapter |
-| Turn lease structure | Required | Fields fixed by this chapter |
+The register summarizes fixed behavior, disclosed limits, and internal
+mechanisms. It does not independently license variation.
 
-Other variability choices are documented in the section on host-defined selections.
+| Clause | Type | Selection | Constraint |
+|--------|------|-----------|------------|
+| Mailbox entry structure | Required | Fields fixed by this chapter | Validate before admission |
+| Priority classes | Required | `realtime`, `high`, `normal`, `low`, `background` | Closed set |
+| [Cross-class scheduling](#deterministic-ordering) | Required | Fixed 16:8:4:2:1 service cycle | Preserve FIFO order within each class |
+| [Mailbox bounds](#mailbox-bounds) | Implementation limits | Positive configured values disclosed in the conformance profile | Reject with the bound-specific diagnostic |
+| [Overload behavior](#overload-behavior) | Required | Reject only the new entry | Emit `mailbox.overload.rejected`; do not mutate existing entries |
+| [Delivery deadline](#mailbox-bounds) | Required | Earlier configured or entry deadline; none only when both are absent | Reject at or after the effective deadline |
+| Turn lease structure | Required | Fields fixed by this chapter | Positive duration and fencing token validation |
+| [Lease renewal](#per-agent-turn-leases) | Required | No later than the lease midpoint | Preserve duration or terminate at expiry |
+| Mailbox and renewal machinery | Internal mechanism | No profile selection | Preserve all dequeue, rejection, diagnostic, and lease observations |
 
 ## Rationale and evidence (non-normative)
 

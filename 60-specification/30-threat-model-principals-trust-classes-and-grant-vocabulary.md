@@ -2,7 +2,7 @@
 title: "Threat Model Principals Trust Classes And Grant Vocabulary"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.2.0"
 tags:
   - milestone-05
@@ -21,7 +21,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 1](../.spec/planning/agentic-system/milestone-05-capabilities-plugins-security-and-tenancy/phase-01-threat-model-principals-trust-classes-and-grant-vocabulary.md)
 of
 [Milestone 5](../.spec/planning/agentic-system/milestone-05-capabilities-plugins-security-and-tenancy/README.md)
@@ -55,7 +55,7 @@ Phase 1 MILESTONE ACCEPTANCE requires:
 4. **Evidence recording**: All integration test evidence MUST be recorded
    as machine-readable YAML reports in the `50-journal/` directory.
 5. **Conformance profile**: The conformance profile MUST document all
-   implementation-defined choices listed in this chapter.
+   profile selections declared by visible callouts in this chapter.
 
 > **Normative definition.**
 Phase 1 FAILS MILESTONE ACCEPTANCE if:
@@ -178,11 +178,10 @@ Conformance profiles MAY add per-invocation validation for specific deployment
 models.
 
 > **Normative definition.**
-The `metadata` field is implementation-defined and MAY be indexed for
-observability, search, or filtering in the audit log, provided it MUST NOT
-be used for authorization decisions.
-Implementation-defined uses of metadata for observability MUST be documented
-in the conformance profile.
+The `metadata` field is opaque to the authorization model. Consumers MAY index
+it only for observability, search, or audit-log filtering. They MUST NOT require
+any metadata member, interpret metadata as authority, or use metadata to alter
+authentication, authorization, trust-class, grant, or tenant-isolation outcomes.
 
 > **Normative definition.**
 The `PrincipalKind` set is closed for Milestone 5.
@@ -346,8 +345,9 @@ to a specific tenant.
 The `expiry` field is optional and is null if the grant does not expire.
 The `delegating` field determines whether the grant can be delegated to other
 principals.
-The `metadata` field is implementation-defined and MUST NOT be used for
-authorization decisions.
+The `metadata` field is opaque to grant evaluation. Consumers MUST NOT require
+any metadata member or use metadata to alter authorization, attenuation,
+delegation, expiry, revocation, or tenant-isolation outcomes.
 
 > **Normative definition.**
 The host MUST enforce grants at every authorization boundary.
@@ -430,25 +430,26 @@ boundary without exposing secrets.
 ### Bounded diagnostics
 
 > **Normative definition.**
-The host MUST emit bounded diagnostics for each failure outcome.
-The diagnostics MUST include:
+The host MUST emit bounded diagnostics for each failure outcome using exactly
+the Chapter 04 `Diagnostic` top-level structure. The domain error is `code`,
+`severity` is `error`, and `details` contains `phase`, `contract`, `profile`,
+`failed_boundary`, `context`, `entity_identifiers`, `timestamp`, and
+`retryable`.
 
-1. **Error code**: The specific error code from the table above.
-2. **Context**: The operation that failed (e.g., authentication, authorization,
-   grant validation).
-3. **Entity identifiers**: The tenant ID, agent ID, or principal ID involved
-   (without exposing sensitive data).
-4. **Timestamp**: The time the error occurred.
-5. **Severity**: The severity level of the diagnostic (info, warning, error,
-   critical).
-6. **Retryable**: Whether the operation can be retried.
+| Family | Domain codes |
+|--------|--------------|
+| `identity.validation.security_policy` | `auth.authentication_failure`, `auth.principal_mismatch` |
+| `identity.authorization.security_policy` | `auth.grant_absence`, `auth.scope_conflict`, `auth.grant_expiry`, `auth.grant_revocation`, `auth.untrusted_publisher`, `auth.credential_use_only`, `auth.credential_export_forbidden`, `trust.untrusted_guest`, `trust.unreviewed_plugin`, `tenant.isolation_violation` |
+| `identity.conflict.security_policy` | `commit.conflict`, `storage.snapshot.duplicate` |
+| `identity.storage.security_policy` | `storage.unavailable` |
+
+No additional top-level diagnostic member is permitted.
 
 > **Normative definition.**
-The severity level MUST be one of:
-- **info**: Informational, no operator action required.
-- **warning**: Operator should review but no immediate action required.
-- **error**: Operator action required to resolve.
-- **critical**: System stability or security at risk; immediate action required.
+The Chapter 04 severity vocabulary is closed to `error`, `warning`, and `info`.
+Security failures in the table above use `error`. An implementation MUST NOT
+emit `critical`; operator escalation belongs in `details` and evidence, not in
+the severity field.
 
 > **Normative definition.**
 The host MUST NOT expose internal implementation details, secrets, or
@@ -459,6 +460,10 @@ sensitive data in diagnostics.
 > **Normative implementation-defined choice.**
 The following choices are implementation-defined and MUST be documented in the
 conformance profile:
+Each selection is one of the alternatives or bounded domains stated below.
+Observable authentication exchanges, approval notifications, and retained
+audit-history availability may differ according to the recorded selections;
+authorization decisions and tenant isolation MUST NOT differ.
 
 1. **Authentication mechanism**: The mechanism used for principal authentication
    (e.g., API keys, OAuth, mTLS).
@@ -607,8 +612,8 @@ without modification.
    the `tenant.isolation_violation` error code.
 
 > **Normative definition.**
-Each test MUST verify that the error code and diagnostic message match the
-expected values.
+Each test MUST verify the exact Chapter 04 diagnostic shape, assigned family,
+domain `code`, `severity: "error"`, message, and required bounded details.
 
 ### Security enforcement tests
 
@@ -676,14 +681,19 @@ gates.
 
 ## Variability register
 
+The register below indexes profile selections and other variability governed by
+the linked clauses. It does not independently license variation.
+
+> **Non-normative note.**
+
 | Item | Permission | Recommendation | Constraint |
 |------|------------|----------------|------------|
-| Authentication mechanism | Implementation-defined | Document in conformance profile | Must support principal forms |
-| Grant storage | Implementation-defined | Document in conformance profile | Must support grant dimensions |
-| Grant caching | Implementation-defined | Document in conformance profile | Must balance consistency and performance |
-| Audit log retention | Implementation-defined | Document in conformance profile | Must preserve audit trail |
-| Trust class assignment | Implementation-defined | Document in conformance profile | Must enforce trust boundaries |
-| Tenant isolation | Implementation-defined | Document in conformance profile | Must prevent cross-tenant access |
-| Credential custody | Required for end-user distributions | Support and document `separated-credential-custody` | Raw provider and external-service credentials must remain outside host, Port, and guest processes |
-| Host-local credential compatibility | Optional | Disabled by default and explicitly selected | Must not claim separated-credential-custody conformance |
-| Credential-use grants | Required | Independent, use-only `CredentialUse` capability | Must not imply `SecretRead` or `SecretWrite` |
+| [Authentication mechanism](#implementation-defined-choices) | Implementation-defined | Document in conformance profile | Must support principal forms |
+| [Grant storage](#implementation-defined-choices) | Implementation-defined | Document in conformance profile | Must support grant dimensions |
+| [Grant caching](#implementation-defined-choices) | Implementation-defined | Document in conformance profile | Must balance consistency and performance |
+| [Audit log retention](#implementation-defined-choices) | Implementation-defined | Document in conformance profile | Must preserve audit trail |
+| [Trust class assignment](#implementation-defined-choices) | Implementation-defined | Document in conformance profile | Must enforce trust boundaries |
+| [Tenant isolation](#threat-model) | Required | Enforce the threat-model boundary | Must prevent cross-tenant access |
+| [Credential custody](#grant-vocabulary) | Required for end-user distributions | Support and document `separated-credential-custody` | Raw provider and external-service credentials must remain outside host, Port, and guest processes |
+| [Host-local credential compatibility](#grant-vocabulary) | Optional | Disabled by default and explicitly selected | Must not claim separated-credential-custody conformance |
+| [Credential-use grants](#grant-vocabulary) | Required | Independent, use-only `CredentialUse` capability | Must not imply `SecretRead` or `SecretWrite` |

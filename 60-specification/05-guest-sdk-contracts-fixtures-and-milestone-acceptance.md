@@ -2,8 +2,8 @@
 title: "Guest SDK Contracts Fixtures And Milestone Acceptance"
 kind: specification
 created: "2026-08-08"
-status: draft
-spec_version: "0.1.0"
+status: normative
+spec_version: "1.0.0"
 tags:
   - milestone-01
   - phase-05
@@ -19,7 +19,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 5](../.spec/planning/agentic-system/milestone-01-contracts-profiles-and-artifacts/phase-05-guest-sdk-contracts-fixtures-and-milestone-acceptance.md)
 of
 [Milestone 1](../.spec/planning/agentic-system/milestone-01-contracts-profiles-and-artifacts/README.md)
@@ -106,10 +106,12 @@ rules defined in
 The codec MUST:
 
 - Sort object keys lexicographically.
-- Represent numbers without trailing zeros.
-- Represent strings with proper escaping.
+- Encode finite binary64 numbers in their shortest round-tripping form.
+- Emit non-control Unicode scalar values directly as UTF-8 and use only the
+  required canonical escapes.
 - Reject duplicate keys at decode time.
-- Reject numbers outside the JSON number range.
+- Reject numbers outside the finite binary64 domain.
+- Reject decoded input whose bytes differ from its canonical re-encoding.
 
 > **Normative definition.**
 
@@ -129,7 +131,12 @@ Diagnostics MUST conform to the `Diagnostic` type defined in
 
 The guest MUST NOT emit diagnostics that expose secrets or implementation
 internal state.
-The host MAY filter or redact diagnostics before recording them.
+Before recording a guest diagnostic, the host MUST replace every value it
+classifies as secret or implementation-internal with the literal
+`[REDACTED]`. The host MUST preserve the diagnostic's presence, family, code,
+and severity and MUST NOT otherwise filter or suppress it. When no classified
+value is present, the recorded message MUST be byte-identical to the emitted
+message.
 
 > **Normative definition.**
 
@@ -162,6 +169,7 @@ TestFixture {
   name: string,
   description: string,
   export: string,
+  timeout_ms: int,
   input: bytes,
   expected_output: bytes?,
   expected_error_category: string?,
@@ -170,6 +178,10 @@ TestFixture {
   artifact_metadata: JsonObject?
 }
 ```
+
+`timeout_ms` is a required positive harness ceiling for every fixture. For a
+`reduce` fixture it is independent of, and MUST be no shorter than, the input
+`deadline_ms` turn ceiling.
 
 ## Positive fixtures
 
@@ -186,19 +198,20 @@ TestFixture {
   name: "describe_positive",
   description: "Artifact returns all declared capabilities",
   export: "describe",
+  timeout_ms: 5000,
   input: {
-    protocol_version: "0.1.0"
+    protocol_version: "1.0.0"
   },
   expected_output: {
-    protocol_version: "0.1.0",
-    manifest_version: "0.1.0",
+    protocol_version: "1.0.0",
+    manifest_version: "1.0.0",
     actions: [ActionRef],
     routes: [RouteRef],
     state_schemas: [StateSchemaRef],
     strategies: [StrategyRef],
     required_capabilities: [CapabilityRef],
     required_wasm_features: [],
-    supported_protocol_versions: ["0.1.0"]
+    supported_protocol_versions: ["1.0.0"]
   },
   expected_error_category: null,
   expected_error_code: null,
@@ -220,14 +233,18 @@ TestFixture {
   name: "initialize_positive",
   description: "Artifact calculates initial state",
   export: "initialize",
+  timeout_ms: 5000,
   input: {
-    protocol_version: "0.1.0",
+    protocol_version: "1.0.0",
+    initialization_id: "init:agent:test/chatbot/u-1",
     agent_type: "agent:test/chatbot:1.0.0",
+    instance_id: "u-1",
     state_schema_version: "1.0.0",
     initial_config: {}
   },
   expected_output: {
-    protocol_version: "0.1.0",
+    protocol_version: "1.0.0",
+    initialization_id: "init:agent:test/chatbot/u-1",
     state_revision: 1,
     initial_state: {
       counter: 0,
@@ -243,6 +260,12 @@ TestFixture {
 }
 ```
 
+The initialization fixture suite MUST include a variant with one startup
+directive. Its id is
+`directive:init:agent:test/chatbot/u-1:timer:0`, its `causation_id` is
+`init:agent:test/chatbot/u-1`, and a mutation of either value rejects the
+entire initialization with no initial state or outbox commit.
+
 ### Direct reduce fixture
 
 > **Normative definition.**
@@ -256,9 +279,10 @@ TestFixture {
   name: "reduce_direct_positive",
   description: "Reducer processes direct instruction",
   export: "reduce",
+  timeout_ms: 5000,
   input: {
-    protocol_version: "0.1.0",
-    invocation_id: "inv:test/chatbot/u-1:1",
+    protocol_version: "1.0.0",
+    invocation_id: "inv:agent:test/chatbot/u-1:1",
     agent: {
       type: "agent:test/chatbot:1.0.0",
       instance_id: "u-1",
@@ -270,14 +294,19 @@ TestFixture {
       subject: "chatbot",
       correlation_id: "corr-1",
       causation_id: null,
+      delivery_id: "delivery:41ab2e2a8e9d3bf3cd09a83210d94852b664f9d488e6f9e0981edfea425ce173",
       timestamp: "2026-08-08T00:00:00Z",
       data: null
     },
     instruction: {
-      action: "increment",
-      parameters: {},
+      action: {
+        name: "increment",
+        version: null
+      },
+      arguments: {},
       idempotency_key: null,
-      context_refs: []
+      context_refs: [],
+      scheduling: null
     },
     state: {
       counter: 0,
@@ -299,8 +328,8 @@ TestFixture {
     }
   },
   expected_output: {
-    protocol_version: "0.1.0",
-    invocation_id: "inv:test/chatbot/u-1:1",
+    protocol_version: "1.0.0",
+    invocation_id: "inv:agent:test/chatbot/u-1:1",
     expected_state_revision: 1,
     state_patch: {
       set: [
@@ -336,9 +365,10 @@ TestFixture {
   name: "reduce_fsm_continuation_positive",
   description: "Reducer processes FSM continuation",
   export: "reduce",
+  timeout_ms: 5000,
   input: {
-    protocol_version: "0.1.0",
-    invocation_id: "inv:test/chatbot/u-1:2",
+    protocol_version: "1.0.0",
+    invocation_id: "inv:agent:test/chatbot/u-1:2",
     agent: {
       type: "agent:test/chatbot:1.0.0",
       instance_id: "u-1",
@@ -347,9 +377,10 @@ TestFixture {
     signal: {
       type: "effect.result",
       source: "host",
-      subject: "directive:inv:test/chatbot/u-1:1:effect:0",
+      subject: "directive:inv:agent:test/chatbot/u-1:1:effect:0",
       correlation_id: "corr-2",
-      causation_id: "inv:test/chatbot/u-1:1",
+      causation_id: "inv:agent:test/chatbot/u-1:1",
+      delivery_id: "delivery:6996b43e984f265e28598f9542cff4a2d0d405ea5fa41526b3865cd6d1ac8b23",
       timestamp: "2026-08-08T00:00:01Z",
       data: {
         result: "success",
@@ -382,8 +413,8 @@ TestFixture {
     }
   },
   expected_output: {
-    protocol_version: "0.1.0",
-    invocation_id: "inv:test/chatbot/u-1:2",
+    protocol_version: "1.0.0",
+    invocation_id: "inv:agent:test/chatbot/u-1:2",
     expected_state_revision: 2,
     state_patch: {
       set: [
@@ -425,9 +456,10 @@ TestFixture {
   name: "reduce_terminal_positive",
   description: "Reducer returns terminal domain status",
   export: "reduce",
+  timeout_ms: 5000,
   input: {
-    protocol_version: "0.1.0",
-    invocation_id: "inv:test/chatbot/u-1:3",
+    protocol_version: "1.0.0",
+    invocation_id: "inv:agent:test/chatbot/u-1:3",
     agent: {
       type: "agent:test/chatbot:1.0.0",
       instance_id: "u-1",
@@ -438,15 +470,20 @@ TestFixture {
       source: "principal:test/svc:1",
       subject: "chatbot",
       correlation_id: "corr-3",
-      causation_id: "inv:test/chatbot/u-1:2",
+      causation_id: "inv:agent:test/chatbot/u-1:2",
+      delivery_id: "delivery:60798b5aca1806843b15fbd17463024323214981aff4b6cff59fa5e510acd25d",
       timestamp: "2026-08-08T00:00:02Z",
       data: null
     },
     instruction: {
-      action: "complete",
-      parameters: {},
+      action: {
+        name: "complete",
+        version: null
+      },
+      arguments: {},
       idempotency_key: null,
-      context_refs: []
+      context_refs: [],
+      scheduling: null
     },
     state: {
       counter: 2,
@@ -469,8 +506,8 @@ TestFixture {
     }
   },
   expected_output: {
-    protocol_version: "0.1.0",
-    invocation_id: "inv:test/chatbot/u-1:3",
+    protocol_version: "1.0.0",
+    invocation_id: "inv:agent:test/chatbot/u-1:3",
     expected_state_revision: 3,
     state_patch: null,
     directives: [],
@@ -489,6 +526,12 @@ TestFixture {
 }
 ```
 
+Every reduce fixture MUST include the exact deterministic `delivery_id`
+derived from its runtime tenant and signal identity fields. The host harness
+MUST construct each fixture `TurnRequest` through the accepted-envelope
+projection defined by
+[Guest-wire projection](10-signals-causality-routing-and-delivery.md#guest-wire-projection).
+
 ### Migration fixture
 
 > **Normative definition.**
@@ -502,8 +545,9 @@ TestFixture {
   name: "migrate_positive",
   description: "Artifact migrates state between schema versions",
   export: "migrate",
+  timeout_ms: 5000,
   input: {
-    protocol_version: "0.1.0",
+    protocol_version: "1.0.0",
     source_schema_version: "1.0.0",
     target_schema_version: "2.0.0",
     source_state_revision: 1,
@@ -514,7 +558,7 @@ TestFixture {
     migration_id: "mig-1"
   },
   expected_output: {
-    protocol_version: "0.1.0",
+    protocol_version: "1.0.0",
     target_schema_version: "2.0.0",
     target_state_revision: 1,
     target_state: {
@@ -547,6 +591,7 @@ TestFixture {
   name: "decode_malformed_json",
   description: "Host rejects malformed JSON",
   export: "reduce",
+  timeout_ms: 5000,
   input: "invalid json {{{{",
   expected_output: null,
   expected_error_category: "protocol.decode",
@@ -569,9 +614,10 @@ TestFixture {
   name: "schema_mismatch",
   description: "Host rejects state violating schema",
   export: "reduce",
+  timeout_ms: 5000,
   input: {
-    protocol_version: "0.1.0",
-    invocation_id: "inv:test/chatbot/u-1:1",
+    protocol_version: "1.0.0",
+    invocation_id: "inv:agent:test/chatbot/u-1:1",
     agent: {
       type: "agent:test/chatbot:1.0.0",
       instance_id: "u-1",
@@ -583,14 +629,19 @@ TestFixture {
       subject: "chatbot",
       correlation_id: "corr-1",
       causation_id: null,
+      delivery_id: "delivery:41ab2e2a8e9d3bf3cd09a83210d94852b664f9d488e6f9e0981edfea425ce173",
       timestamp: "2026-08-08T00:00:00Z",
       data: null
     },
     instruction: {
-      action: "increment",
-      parameters: {},
+      action: {
+        name: "increment",
+        version: null
+      },
+      arguments: {},
       idempotency_key: null,
-      context_refs: []
+      context_refs: [],
+      scheduling: null
     },
     state: {
       counter: "not_a_number",
@@ -632,10 +683,11 @@ TestFixture {
   name: "duplicate_keys",
   description: "Host rejects inputs with duplicate keys",
   export: "reduce",
+  timeout_ms: 5000,
   input: {
-    "protocol_version": "0.1.0",
-    "protocol_version": "0.2.0",
-    "invocation_id": "inv:test/chatbot/u-1:1",
+    "protocol_version": "1.0.0",
+    "protocol_version": "2.0.0",
+    "invocation_id": "inv:agent:test/chatbot/u-1:1",
     "agent": {
       "type": "agent:test/chatbot:1.0.0",
       "instance_id": "u-1",
@@ -647,14 +699,19 @@ TestFixture {
       "subject": "chatbot",
       "correlation_id": "corr-1",
       "causation_id": null,
+      "delivery_id": "delivery:41ab2e2a8e9d3bf3cd09a83210d94852b664f9d488e6f9e0981edfea425ce173",
       "timestamp": "2026-08-08T00:00:00Z",
       "data": null
     },
     "instruction": {
-      "action": "increment",
-      "parameters": {},
+      "action": {
+        "name": "increment",
+        "version": null
+      },
+      "arguments": {},
       "idempotency_key": null,
-      "context_refs": []
+      "context_refs": [],
+      "scheduling": null
     },
     "state": {
       "counter": 0,
@@ -696,9 +753,10 @@ TestFixture {
   name: "stale_version",
   description: "Host rejects stale state revision",
   export: "reduce",
+  timeout_ms: 5000,
   input: {
-    protocol_version: "0.1.0",
-    invocation_id: "inv:test/chatbot/u-1:1",
+    protocol_version: "1.0.0",
+    invocation_id: "inv:agent:test/chatbot/u-1:1",
     agent: {
       type: "agent:test/chatbot:1.0.0",
       instance_id: "u-1",
@@ -710,14 +768,19 @@ TestFixture {
       subject: "chatbot",
       correlation_id: "corr-1",
       causation_id: null,
+      delivery_id: "delivery:41ab2e2a8e9d3bf3cd09a83210d94852b664f9d488e6f9e0981edfea425ce173",
       timestamp: "2026-08-08T00:00:00Z",
       data: null
     },
     instruction: {
-      action: "increment",
-      parameters: {},
+      action: {
+        name: "increment",
+        version: null
+      },
+      arguments: {},
       idempotency_key: null,
-      context_refs: []
+      context_refs: [],
+      scheduling: null
     },
     state: {
       counter: 0,
@@ -746,11 +809,43 @@ TestFixture {
 }
 ```
 
+### Delivery identity mismatch fixture
+
+> **Normative definition.**
+The delivery identity mismatch fixture changes one hexadecimal digit of an
+otherwise valid reduce fixture's `delivery_id`.
+
+Expected behavior:
+
+- Input: canonical `TurnRequest` with the mutated `delivery_id`.
+- Expected output: null; guest code is not invoked.
+- Expected error: `protocol.semantic.delivery_identity_invalid`.
+
+### Accepted-context projection mismatch fixture
+
+> **Normative definition.**
+The projection mismatch fixture pairs a valid persisted accepted-ingress
+record with a `TurnRequest` whose runtime tenant, principal, trace context, or
+target agent type or instance differs. Each field is mutated in a separate
+case.
+
+Expected behavior:
+
+- Input: accepted record and mismatched projected `TurnRequest`.
+- Expected output: null; guest code is not invoked.
+- Expected error: `protocol.semantic.context_projection_invalid`.
+
 ### Oversized value fixture
 
 > **Normative definition.**
 The oversized value negative fixture validates that the host rejects
 inputs that exceed resource limits.
+
+Expected behavior:
+
+- Input: canonical request exceeding `input.max_bytes`.
+- Expected output: null.
+- Expected error: `identity.limit.input.max_bytes`.
 
 ### Fixture manifest
 
@@ -764,7 +859,7 @@ The manifest is the single source of truth for fixture conformance.
 ```
 FixtureManifest {
   fixtures: TestFixture[],
-  schema_version: "1.0.0",
+  schema_version: "2.0.0",
   created: "2026-08-08T00:00:00Z"
 }
 ```
@@ -781,7 +876,8 @@ Conformance criteria:
 
 - All positive fixtures MUST produce the expected output.
 - All negative fixtures MUST produce the expected error category and code.
-- All fixtures MUST complete within the deadline_ms specified in the fixture.
+- All fixtures MUST complete within the required top-level `timeout_ms`
+  specified in the fixture.
 - All fixtures MUST leave no unauthorized or partial state.
 
 ### Milestone 1 exit report
@@ -797,7 +893,7 @@ The exit report MUST include:
 - Profile inventory: list of all profiles defined and their capabilities.
 - Schema inventory: list of all state schemas defined and their versions.
 - Fixture inventory: list of all fixtures and their conformance status.
-- Unresolved variability: list of any implementation-defined choices or
+- Unresolved variability: list of any required profile selections or
   deferred work that could not be resolved during Milestone 1.
 
 > **Normative definition.**
@@ -827,9 +923,10 @@ export, it MUST reject the request with an appropriate diagnostic.
 ### Dependency unavailable
 
 > **Normative definition.**
-When a required external dependency is unavailable, the host MAY emit a
-`runtime.dependency` diagnostic and MAY retry based on the configured
-retry policy.
+When a required external dependency is unavailable, the host MUST terminate
+the export attempt, publish no output or state change, and emit
+`runtime.dependency.unavailable`. The host MUST NOT retry the dependency or
+the export automatically in this base contract.
 
 ## Diagnostics
 
@@ -853,31 +950,46 @@ This section enumerates the families and codes the host uses.
 |--------|---------|---------------|
 | `protocol.decode` | Input decoding failures | `syntax_error`, `duplicate_key`, `invalid_number` |
 | `protocol.schema` | Schema validation failures | `type_mismatch`, `required_field_missing`, `enum_value_invalid` |
-| `protocol.semantic` | Semantic validation failures | `revision_stale`, `timestamp_invalid`, `idempotency_conflict` |
-| `runtime.resource` | Resource limit violations | `oversized_value`, `memory_limit_exceeded` |
+| `protocol.semantic` | Semantic validation failures | `revision_stale`, `timestamp_invalid`, `idempotency_conflict`, `delivery_identity_invalid`, `context_projection_invalid` |
+| `identity.limit` | Named implementation-limit exhaustion | `input.max_bytes`, `output.max_bytes`, `memory.max_pages`, `time.turn_ms` |
 | `runtime.dependency` | External dependency failures | `unavailable`, `timeout` |
 | `runtime.unauthorized` | Authorization failures | `principal_not_allowed` |
 
-## Implementation-defined choices
+## Fixed host policies, implementation limits, and internal mechanisms
 
-> **Normative implementation-defined choice.**
-The following choices are implementation-defined and do not create
-conformance obligations.
-The Variability register below catalogs all such choices.
+### Dependency retry policy
 
-1. **Retry policy**: The host MAY implement a retry policy for transient
-   dependency failures. The policy parameters (max_retries, backoff_strategy)
-   are implementation-defined.
+Dependency failure behavior is fixed by
+[Dependency unavailable](#dependency-unavailable): one export attempt is made,
+and the host does not retry it automatically.
 
-2. **Resource limits**: The host MAY enforce resource limits (e.g., memory,
-   CPU, wall-clock time). The specific limits are implementation-defined.
+### Guest execution limits
 
-3. **Diagnostic filtering**: The host MAY filter or redact diagnostics
-   before recording them. The filtering rules are implementation-defined.
+Guest execution is subject to the named implementation limits
+`memory.max_pages` and `time.turn_ms` defined by
+[Limit enforcement](02-stable-identities-versions-errors-and-limits.md#limit-enforcement).
+The conformance profile MUST state both ceilings. No separate CPU-unit ceiling
+is defined; CPU consumption is bounded by `time.turn_ms`.
 
-4. **State migration strategy**: The host MAY implement different strategies
-   for state migration (e.g., in-place, copy-on-write). The strategy is
-   implementation-defined.
+Exhausting either limit MUST interrupt the export, publish no output or state
+change, and emit `identity.limit.memory.max_pages` or
+`identity.limit.time.turn_ms`, respectively.
+
+### Diagnostic recording policy
+
+Diagnostic recording is fixed by [Diagnostics](#diagnostics). Redaction is the
+only permitted transformation and does not permit suppression or changes to
+stable diagnostic identity.
+
+### State migration mechanism
+
+The guest SDK computes migrations only through its pure `migrate` export. The
+host MAY use any internal orchestration mechanism around that invocation only
+when it supplies the same canonical request and produces a byte-identical
+canonical `MigrationResult` with identical authorization, commit, rollback,
+and diagnostic observations. A mechanism failure MUST publish no target state
+or partial migration. The mechanism is not a profile selection and MUST NOT be
+exposed in protocol output.
 
 ## Deferred work
 
@@ -897,7 +1009,8 @@ conformance obligation for current implementations:
    phase.
 
 4. **Performance benchmarks**: Performance benchmarks will be developed
-   in future milestones to validate resource limits and retry policies.
+   in future milestones to validate resource limits and fixed
+   dependency-failure behavior.
 
 ## Phase 5 integration tests
 
@@ -915,24 +1028,24 @@ Expected behavior:
 
 - Input: instruction that exceeds deadline_ms.
 - Expected output: null.
-- Expected error: `runtime.resource.timeout`.
+- Expected error: `identity.limit.time.turn_ms`.
 
 The host MUST NOT leave unauthorized or partial state after a timeout.
 
 ### Retry behavior
 
 > **Normative definition.**
-The retry behavior integration test validates that the host retries
-transient dependency failures according to the configured retry policy.
+The retry behavior integration test validates that the host does not retry a
+dependency failure automatically.
 
 Expected behavior:
 
-- Input: instruction requiring external dependency that fails once.
-- Expected output: success after retry.
-- Expected error: null.
+- Input: instruction requiring an unavailable external dependency.
+- Expected output: null after exactly one export attempt.
+- Expected error: `runtime.dependency.unavailable`.
 
-The host MUST NOT leave unauthorized or partial state after exhausting
-retries.
+The host MUST NOT leave unauthorized or partial state after the failed
+attempt.
 
 ### Cross-milestone fixture regression
 
@@ -952,16 +1065,24 @@ Any approved variability MUST be documented in the Milestone 1 exit report.
 
 ## Variability register
 
+This register summarizes the governing clauses linked below; it does not
+define or redeclare permitted variation.
+
+> **Non-normative note.**
+
 | Clause | Type | Selection |
 | --- | --- | --- |
 | Export implementations | Required | Four exports fixed by this chapter |
 | Canonical JSON codec | Required | Rules fixed by this chapter |
-| Diagnostic emission | Implementation-defined | Documented in conformance profile |
-| Diagnostic filtering | Implementation-defined | Documented in conformance profile |
-| Test-fixture loading utilities | Implementation-defined | Documented in conformance profile |
-| Retry policy | Implementation-defined | Documented in conformance profile |
-| Resource limits | Implementation-defined | Documented in conformance profile |
-| State migration strategy | Implementation-defined | Documented in conformance profile |
+| [Fixture timeout](#test-fixture-loading) | Required | Every fixture carries one positive top-level harness timeout |
+| [Initialization directive identity](#initialize-fixture) | Required | Startup id and causation derive from the echoed initialization identity |
+| [Accepted-signal fixture projection](#direct-reduce-fixture) | Required | Every reduce fixture carries the exact derived delivery identity and host-context mapping |
+| [Diagnostic emission](#diagnostics) | MAY | Disposition documented in conformance profile |
+| [Diagnostic filtering](#diagnostic-recording-policy) | Required | Fixed redaction with stable identity preserved |
+| [Test-fixture loading utilities](#test-fixture-loading) | MAY | Disposition documented in conformance profile |
+| [Retry policy](#dependency-retry-policy) | Required | Exactly one attempt; no automatic retry |
+| [Resource limits](#guest-execution-limits) | Implementation limit | `memory.max_pages` and `time.turn_ms` ceilings documented in conformance profile |
+| [State migration mechanism](#state-migration-mechanism) | MAY (internal) | Permitted only under byte-identical and failure-equivalent behavior |
 
 ## Rationale and evidence (non-normative)
 

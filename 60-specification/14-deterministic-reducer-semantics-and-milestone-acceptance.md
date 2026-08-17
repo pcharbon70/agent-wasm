@@ -2,8 +2,8 @@
 title: "Deterministic Reducer Semantics And Milestone Acceptance"
 kind: specification
 created: "2026-08-08"
-status: draft
-spec_version: "0.1.0"
+status: normative
+spec_version: "1.0.0"
 tags:
   - milestone-02
   - phase-05
@@ -18,7 +18,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 5](../.spec/planning/agentic-system/milestone-02-signals-actions-state-and-strategies/phase-05-deterministic-reducer-semantics-and-milestone-acceptance.md)
 of
 [Milestone 2](../.spec/planning/agentic-system/milestone-02-signals-actions-state-and-strategies/README.md)
@@ -88,28 +88,44 @@ ProfileRef {
 ### Turn resolution order
 
 > **Normative definition.**
-The reducer MUST process turns in the following order:
+The host-coordinated reducer boundary MUST process turns in the following
+order. The reducer calculates candidate outputs; only the host validates and
+commits authoritative state:
 
-1. **Signal validation**: Validate each signal's structure and required fields. See [Signal Envelopes Causality Routing And Delivery](10-signals-causality-routing-and-delivery.md).
-2. **Signal routing**: Route signals to appropriate actions or strategy transitions.
+1. **Accepted-signal validation**: Validate the persisted accepted-ingress
+   projection, required signal fields, delivery identity, host context, and
+   selected target. TTL and instance selection have already completed and
+   MUST NOT be reevaluated here. See
+   [Guest-wire projection](10-signals-causality-routing-and-delivery.md#guest-wire-projection).
+2. **Intra-agent dispatch**: Resolve the already-targeted signal to an action
+   or strategy transition. This step MUST NOT select a different agent
+   instance or advance an instance-selector cursor.
 3. **Action/strategy execution**: Execute actions or apply strategy transitions. See [Actions Instructions Validation Plans And Results](11-actions-instructions-validation-plans-and-results.md) and [Directives Strategies Continuations And Terminal States](13-directives-strategies-continuations-and-terminal-states.md).
-4. **Patch production**: Collect state operations from action results or strategy transitions.
+4. **Output production**: Collect state operations and directives from action results or strategy transitions.
 5. **Patch validation**: Validate the combined patch against current state revision. See [State Operations Patches Revisions And Conflicts](12-state-operations-patches-revisions-and-conflicts.md#patch-validation).
-6. **Patch application**: Apply the validated patch to produce new state revision.
-7. **Directive production**: Collect directives from action results. See [Directives Strategies Continuations And Terminal States](13-directives-strategies-continuations-and-terminal-states.md#directive-processing).
-8. **Result construction**: Assemble turn result with state, directives, and diagnostics. See [Turn Lifecycle Protocols And Canonical Encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md#turnresult-fields).
+6. **Directive validation**: Validate every directive, deterministic id,
+   capability, resource, destination, retry class, and result contract. See
+   [Directive processing](13-directives-strategies-continuations-and-terminal-states.md#directive-processing).
+7. **Result construction**: Assemble and canonically validate the turn result
+   with its patch, directives, and diagnostics. See
+   [TurnResult fields](04-turn-lifecycle-protocols-and-canonical-encoding.md#turnresult-fields).
+8. **Host atomic commit**: Apply the validated patch and atomically commit the new
+   state revision, journal facts, and every validated directive outbox entry
+   before publishing the successful result.
 
 > **Normative definition.**
 Each step MUST complete before the next step begins.
-If any step fails, the reducer MUST emit a diagnostic and terminate the turn.
-No partial state changes are permitted.
+If guest execution fails, the reducer reports its diagnostic in the returned
+result or error buffer. If a host-owned validation or commit step fails, the
+host emits the governing diagnostic; reducer code may not have run. Every
+failure terminates the turn and permits no partial state change.
 
 ### Determinism requirement
 
 > **Normative definition.**
 The reducer MUST satisfy the following determinism requirement:
 
-Given identical canonical inputs (signals, state, instructions) and profile,
+Given identical canonical `TurnRequest` values and profile,
 the reducer MUST produce canonically equivalent results.
 
 > **Normative definition.**
@@ -119,31 +135,21 @@ If a Patch specifies a `state_schema_version` that does not match the Reducer's
 `state_schema_version`, the patch MUST be rejected with `state.schema.version_mismatch`.
 
 > **Normative definition.**
-"Canonically equivalent" means:
+"Canonically equivalent" means the complete `TurnResult` is byte-identical
+after the one Canonical JSON encoding defined by chapter 04. This includes
+`protocol_version`, `invocation_id`, `expected_state_revision`, `state_patch`,
+`directives`, `strategy_snapshot`, `domain_status`, and `diagnostics`.
 
-- State patches are byte-identical after canonical JSON encoding.
-- Directives are byte-identical after canonical JSON encoding.
-- Diagnostics are byte-identical after canonical JSON encoding.
-- State revision sequence numbers are identical.
+A request with a different invocation identity is not an identical input and
+is outside this equivalence judgment. Reducer output MUST NOT contain a host
+wall-clock value. Strategy snapshot timestamps are derived from input signal
+timestamps under
+[Strategy lifecycle](13-directives-strategies-continuations-and-terminal-states.md#strategy-lifecycle).
 
 > **Normative definition.**
-The following `TurnResult` fields are excluded from equivalence checks:
-
-- `invocation_id`: Per-invocation identifier, not deterministic across replays.
-- `protocol_version`: May vary between protocol versions.
-- `timestamp`: Wall-clock time, not deterministic.
-
-The following `TurnResult` fields MUST be byte-identical for equivalence:
-
-- `domain_status`
-- `state` (after canonical encoding)
-- `directives` (after canonical encoding)
-- `diagnostics` (after canonical encoding)
-- `strategy_snapshot` (if present, after canonical encoding)
-
-> **Normative implementation-defined choice.**
-Implementation-defined choices (e.g., hash algorithm, conflict resolution)
-MUST be documented in the conformance profile.
+Every required profile selection imported from a governing chapter MUST be
+documented in the conformance profile. Concurrent state requests use fixed
+mailbox and turn-lease serialization and are not a profile selection.
 Different implementations with the same profile MUST produce equivalent results.
 
 ### Representative reducers
@@ -158,8 +164,8 @@ The following representative reducers illustrate the contract:
 
 > **Non-normative note.**
 These reducers are illustrative.
-Implementations MAY define additional reducer types as long as they satisfy
-the determinism requirement and turn resolution order.
+Additional reducer kinds require an explicit versioned extension; the base
+profile contains only the four `ReducerKind` values above.
 
 ## 5.2 Behavior And Integration
 
@@ -168,9 +174,20 @@ the determinism requirement and turn resolution order.
 > **Normative definition.**
 The following metamorphic cases verify deterministic behavior:
 
-1. **Irrelevant field ordering**: Signals with fields in different orders MUST produce identical results.
+1. **Irrelevant construction order**: In-memory signals constructed with
+   fields inserted in different orders MUST canonicalize to identical request
+   bytes and produce identical results. Non-canonical wire input remains
+   invalid.
 2. **Canonical re-encoding**: Re-encoding the turn request via canonical JSON MUST produce identical results.
 3. **Replay from same revision**: Replaying a turn from the same state revision MUST produce identical results.
+4. **Accepted-envelope projection**: Reconstructing a request from the same
+   persisted accepted-ingress record MUST produce identical request bytes and
+   MUST NOT reevaluate TTL or instance selection.
+
+Metamorphic replay runs the pure reducer in an isolated conformance harness
+with the original snapshot restored and without committing either run. It is
+not a second submission of the same invocation to a live host and therefore
+does not bypass duplicate-invocation rejection.
 
 > **Normative definition.**
 Each metamorphic case MUST be verified by the Phase 5 integration tests.
@@ -182,10 +199,16 @@ If any case fails, the reducer is non-conformant.
 The following negative cases verify failure handling:
 
 1. **Stale state**: Turn with state revision older than current MUST be rejected with `state.revision.stale`.
-2. **Ambiguous route**: Signal with no matching action or strategy transition MUST be rejected with `reducer.resolution.routing_ambiguous` (defined in [Turn Lifecycle Protocols And Canonical Encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md#diagnostics)).
+2. **Unmatched route**: A signal with no matching action or strategy transition MUST be rejected with `signal.unmatched` as defined by [Routing outcomes](10-signals-causality-routing-and-delivery.md#routing-outcomes).
 3. **Invalid patch**: Patch that fails validation MUST be rejected with appropriate diagnostic.
 4. **Unauthorized directive**: Directive requiring ungranted capability MUST be rejected with `directive.missing.missing_capability`.
 5. **Corrupt strategy snapshot**: Snapshot that fails validation MUST be rejected with `strategy.snapshot.corruption`.
+6. **Delivery identity mismatch**: A signal whose `delivery_id` does not match
+   its accepted tenant-scoped identity MUST be rejected with
+   `protocol.semantic.delivery_identity_invalid`.
+7. **Projection mismatch**: A request whose tenant, principal, trace context,
+   target agent type, or target instance differs from its accepted record MUST be rejected with
+   `protocol.semantic.context_projection_invalid` before reducer execution.
 
 > **Normative definition.**
 Each negative case MUST be verified by the Phase 5 integration tests.
@@ -199,7 +222,7 @@ The Milestone 2 exit report MUST include:
 1. **Semantic clauses**: Summary of normative requirements satisfied.
 2. **Fixtures**: List of all integration tests with pass/fail status.
 3. **Replay results**: Evidence that canonical re-encoding and replay produce identical results.
-4. **Unresolved variability**: Any implementation-defined choices not yet documented.
+4. **Unresolved variability**: Any required profile selections not yet documented.
 
 > **Normative definition.**
 The exit report MUST be signed off by the milestone owner before Milestone 2 is considered complete.
@@ -220,7 +243,7 @@ without exposing secrets or implementation internal state.
 
 | Family | Purpose | Example codes |
 |--------|---------|---------------|
-| `reducer.resolution` | Turn resolution failures | `signal_invalid`, `routing_ambiguous`, `patch_rejected` |
+| `reducer.resolution` | Reducer loading and output failures | `signal_invalid`, `patch_rejected`, `not_found`, `invalid_descriptor` |
 | `reducer.determinism` | Determinism violations | `result_mismatch`, `encoding_mismatch` |
 | `reducer.replay` | Replay failures | `stale_revision`, `corrupt_snapshot` |
 | `acceptance.exit` | Exit report issues | `fixture_failed`, `variability_unresolved` |
@@ -236,20 +259,29 @@ without exposing secrets or implementation internal state.
 | Exhausted | Resource limits exceeded | Timeout, memory, or iteration limit |
 | Unavailable | Reducer or strategy unavailable | Reducer not found or strategy corrupt |
 
-### Implementation-defined choices
+### Governing fixed semantics and internal mechanisms
 
-> **Normative implementation-defined choice.**
-The following choices are implementation-defined and do not create
-conformance obligations.
-The Variability register below catalogs all such choices.
+1. **Canonical encoding**: Reducer inputs and outputs MUST use
+   [Canonical JSON encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md#canonical-json-encoding).
+   No alternate encoding algorithm is permitted.
 
-1. **Canonical encoding**: The host MAY choose the canonical JSON encoding algorithm. The algorithm MUST produce byte-identical output for canonically equivalent inputs.
+2. **Hash algorithm**: State and revision hashes MUST use the SHA-256
+   calculations in
+   [Next-revision calculation](12-state-operations-patches-revisions-and-conflicts.md#next-revision-calculation).
 
-2. **Hash algorithm**: The host MAY choose the hash algorithm for state and revision computation. The algorithm MUST be documented in the conformance profile.
+3. **Concurrent state requests**: Ordinary turns load state only after lease
+   acquisition; the current turn lease and FIFO maintenance queue serialize
+   all patch commits under
+   [Conflict detection](12-state-operations-patches-revisions-and-conflicts.md#conflict-detection).
 
-3. **Conflict resolution**: The host MAY implement conflict resolution strategies. The strategy is implementation-defined.
-
-4. **Reducer loading**: The host MAY choose how to load and validate reducers. The loading mechanism is implementation-defined.
+4. **Reducer loading**: The host MUST load the reducer identified by `id`,
+   `kind`, `profile`, and `state_schema_version` from the admitted artifact and
+   validate it before turn processing. The host MAY use any internal loading
+   backend only if it returns byte-identical reducer bytes and identical
+   validation, result, and diagnostic observations. A missing reducer MUST
+   fail with `reducer.resolution.not_found`; an invalid reducer descriptor MUST
+   fail with `reducer.resolution.invalid_descriptor`. Neither failure may
+   execute reducer code or publish partial state.
 
 ### Deferred work
 
@@ -276,7 +308,11 @@ is processed successfully through the full resolution order.
 Expected behavior:
 
 - Input: valid turn with signal, action, and state.
-- Expected output: TurnResult with state_patch, directives, diagnostics.
+- Expected output: TurnResult with state_patch, directives, and diagnostics,
+  published only after atomic state, journal, and outbox commit.
+- Expected evidence: the request matches its durable accepted-ingress record
+  and the accepted target and selector state remain unchanged by reducer
+  dispatch.
 - Expected error: null.
 
 ### Metamorphic: field ordering
@@ -287,8 +323,10 @@ does not affect the result.
 
 Expected behavior:
 
-- Input: two turns with signals in different field orders.
-- Expected output: canonically equivalent TurnResults.
+- Input: two in-memory turn values whose signal fields were inserted in
+  different orders, each canonically encoded before invocation.
+- Expected output: identical canonical request bytes and byte-identical
+  TurnResults.
 - Expected error: null.
 
 ### Metamorphic: canonical re-encoding
@@ -312,8 +350,25 @@ revision produces identical results.
 Expected behavior:
 
 - Input: same turn request replayed from same state revision.
-- Expected output: byte-identical TurnResults.
+- Expected output: byte-identical TurnResults from two isolated, noncommitting
+  reducer runs.
 - Expected error: null.
+
+### Metamorphic: accepted-envelope projection
+
+> **Normative definition.**
+The accepted-envelope projection test reconstructs a request twice from the
+same persisted `AcceptedSignalEnvelope`, once after advancing the host wall
+clock and perturbing registry enumeration order.
+
+Expected behavior:
+
+- Expected request: byte-identical canonical `TurnRequest` values.
+- Expected target: the target recorded in the accepted envelope.
+- Expected selector effect: no cursor read or advancement during either
+  reconstruction.
+- Expected output: byte-identical TurnResults from isolated, noncommitting
+  reducer runs.
 
 ### Negative: stale state
 
@@ -326,17 +381,17 @@ Expected behavior:
 - Expected output: null.
 - Expected error: `state.revision.stale`.
 
-### Negative: ambiguous route
+### Negative: unmatched route
 
 > **Normative definition.**
-The negative ambiguous route test validates that a signal with no matching
+The negative unmatched-route test validates that a signal with no matching
 action or strategy is rejected.
 
 Expected behavior:
 
 - Input: signal with no matching reducer or transition.
 - Expected output: null.
-- Expected error: `signal.routing.ambiguous`.
+- Expected error: `signal.unmatched`.
 
 ### Negative: invalid patch
 
@@ -358,7 +413,7 @@ an ungranted capability is rejected.
 Expected behavior:
 
 - Input: turn producing directive requiring ungranted capability.
-- Expected output: null.
+- Expected output: null; no state, journal, or outbox entry commits.
 - Expected error: `directive.missing.missing_capability`.
 
 ### Negative: corrupt strategy snapshot
@@ -372,6 +427,30 @@ Expected behavior:
 - Input: turn with strategy snapshot that fails validation.
 - Expected output: null.
 - Expected error: `strategy.snapshot.corruption`.
+
+### Negative: delivery identity mismatch
+
+> **Normative definition.**
+The negative delivery-identity test mutates one hexadecimal digit in the
+accepted signal's `delivery_id`.
+
+Expected behavior:
+
+- Expected output: null; reducer code is not invoked.
+- Expected error: `protocol.semantic.delivery_identity_invalid`.
+
+### Negative: accepted-context projection mismatch
+
+> **Normative definition.**
+The negative projection test separately changes the runtime tenant, principal,
+trace context, target agent type, and target instance relative to the persisted
+accepted record.
+
+Expected behavior:
+
+- Expected output: null; reducer code is not invoked.
+- Expected error: `protocol.semantic.context_projection_invalid` for every
+  mutation.
 
 ### Cross-milestone fixture regression
 
@@ -395,15 +474,22 @@ Any approved variability MUST be documented in the Milestone 2 exit report.
 
 ## Variability register
 
+This register summarizes the governing clauses linked below; it does not
+define or redeclare permitted variation.
+
+> **Non-normative note.**
+
 | Clause | Type | Selection |
 |--------|------|-----------|
 | Reducer structure | Required | Fields fixed by this chapter |
 | Turn resolution order | Required | 8-step order fixed by this chapter |
 | Determinism requirement | Required | Canonically equivalent results fixed by this chapter |
-| Canonical encoding | Implementation-defined | Documented in conformance profile |
-| Hash algorithm | Implementation-defined | Documented in conformance profile |
-| Conflict resolution | Implementation-defined | Documented in conformance profile |
-| Reducer loading | Implementation-defined | Documented in conformance profile |
+| [Accepted-signal validation](#turn-resolution-order) | Required | Validate recorded delivery identity, host context, and target without reevaluating TTL or selection |
+| [Accepted-envelope replay](#metamorphic-accepted-envelope-projection) | Required | Reuse the durable projection and target; selector state is untouched |
+| [Canonical encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md#canonical-json-encoding) | Required | Rules fixed by the canonical JSON contract |
+| [Hash algorithm](12-state-operations-patches-revisions-and-conflicts.md#next-revision-calculation) | Required | SHA-256 over canonical JSON |
+| [Concurrent state requests](12-state-operations-patches-revisions-and-conflicts.md#conflict-detection) | Required | Ordinary turns load after lease acquisition; FIFO maintenance serialization makes later prebuilt same-base patches stale |
+| [Reducer loading](#governing-fixed-semantics-and-internal-mechanisms) | MAY (internal backend) | Byte-identical reducer and outcome equivalence required |
 
 ## Rationale and evidence (non-normative)
 
@@ -420,7 +506,8 @@ The reducer model provides:
 
 The metamorphic cases provide:
 
-- Verification that implementation-defined choices do not affect results.
+- Verification that fixed mailbox and lease ordering does not affect replay
+  equivalence.
 - Evidence that canonical encoding is stable.
 - Foundation for cross-implementation conformance testing.
 

@@ -2,7 +2,7 @@
 title: "Agent Identity Addressing Ownership And Dependency Relations"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.1.0"
 tags:
   - milestone-06
@@ -19,7 +19,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 1](../.spec/planning/agentic-system/milestone-06-multi-agent-coordination-and-topology/phase-01-agent-identity-addressing-ownership-and-dependency-relations.md)
 of
 [Milestone 6](../.spec/planning/agentic-system/milestone-06-multi-agent-coordination-and-topology/README.md)
@@ -99,18 +99,43 @@ TenantQualifiedAgentAddress {
 TenantId = string (non-empty, validated by
   [Agent Registry Activation Cancellation And Completion](22-agent-registry-activation-cancellation-and-completion.md))
 
-AgentLocalId = string (non-empty, unique within tenant_id,
-  opaque to external consumers; format is implementation-defined)
+AgentLocalId = string (canonical lowercase UUID v4, unique within tenant_id,
+  opaque to external consumers)
+
+PrincipalAddress {
+  kind: "user" | "service" | "plugin-publisher" | "operator"
+      | "effect-worker" | "external-result-source",
+  principal_id: PrincipalId,
+  tenant_id: TenantId?
+}
+
+AddressablePrincipal = TenantQualifiedAgentAddress | PrincipalAddress
+RelationshipEndpoint = AddressablePrincipal
 ```
 
-> **Normative definition.**
+`PrincipalAddress` addresses a non-agent principal from the closed principal
+vocabulary in
+[Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md#principal-forms).
+The `agent` principal kind is intentionally absent: an agent MUST use
+`TenantQualifiedAgentAddress`. A system-scoped principal has `tenant_id: null`;
+a tenant-scoped principal has the authenticated tenant identifier. The
+canonical byte representation of `PrincipalAddress` is the Canonical JSON
+encoding of exactly `kind`, `principal_id`, and `tenant_id` in the structure
+above. An unknown kind, an empty `principal_id`, or an agent represented as a
+`PrincipalAddress` MUST be rejected with
+`agent.identity.malformed.principal-address`.
+
+> **Normative implementation-defined choice.**
 The host MUST derive a canonical string representation of a
 `TenantQualifiedAgentAddress` by concatenating the `tenant_id`, a
 separator character, and the `local_id`, where the separator is an
-implementation-defined character that does not appear in either component.
+implementation-defined choice of either `:` or `/`; the selected character
+MUST NOT appear in either component.
 The canonical representation MUST be deterministic for the same address
 and MUST NOT depend on the order of components (the tenant component is
 always first).
+The host MUST record the selected separator in the conformance profile.
+Observable canonical address text may differ only in the selected separator.
 
 > **Non-normative note.**
 The separator character is typically `:` or `/`, consistent with URI-style
@@ -210,11 +235,10 @@ Agent address assignment MUST follow these rules:
    the lifetime of the agent.
    If an agent is deleted and later recreated with the same logical
    identity, the new instance receives a new address.
-3. **Non-guessability**: The `local_id` component MUST be generated using
-   a method that prevents external actors from predicting valid addresses
-   for other agents.
-   UUID v4, cryptographically random identifiers, or monotonic counters
-   with cryptographic obfuscation are acceptable methods.
+3. **Non-guessability**: The `local_id` component MUST be a canonical
+   lowercase UUID v4 generated from a cryptographically secure random source.
+   Non-canonical UUID text and UUID versions other than version 4 MUST be
+   rejected with `agent.identity.malformed.address-invalid-local-id`.
 4. **Tenant scoping**: The host MUST enforce tenant isolation on address
    assignment.
    A tenant MUST NOT be able to observe or infer the `local_id` values
@@ -291,12 +315,25 @@ constraints, and visibility policy.
 |------|-----------------|-----------|----------------|
 | `parent` | The target agent oversees, supervises, or governs the source agent. | Source -> Target | Target has supervisory authority over source. |
 | `child` | The target agent is governed by, reported to, or subordinate to the source agent. | Source -> Target | Source has governance authority over target. |
-| `owner` | The target agent owns, controls, or is the primary beneficiary of the source agent's outputs. | Source -> Target | Target has ownership authority over source. |
+| `owner` | The target endpoint owns, controls, or is the primary beneficiary of the source agent's outputs. | Source -> Target | Target has ownership authority over source. |
 | `member` | The source agent is a constituent part of a collective or team led by the target agent. | Source -> Target | Target has team-lead authority over source. |
 | `dependency` | The source agent requires capabilities, data, or services provided by the target agent. | Source -> Target | Target has no obligation to serve; source has no entitlement. |
-| `observer` | The source agent observes the state or outputs of the target agent without influencing them. | Source -> Target | Target has no obligation to support observers; source has no authority. |
+| `observer` | The source endpoint observes the state or outputs of the target agent without influencing them. | Source -> Target | Target has no obligation to support observers; source has no authority. |
 | `delegate` | The source agent has delegated a specific task or authority to the target agent. | Source -> Target | Target acts on behalf of source within the delegation scope. |
-| `result-recipient` | The target agent is the designated consumer of the source agent's results. | Source -> Target | Target is entitled to receive results; source is obligated to deliver. |
+| `result-recipient` | The target endpoint is the designated consumer of the source agent's results. | Source -> Target | Target is entitled to receive results; source is obligated to deliver. |
+
+> **Normative definition.**
+Relationship endpoint forms are closed by type:
+
+| Type | Source form | Target form |
+|------|-------------|-------------|
+| `parent`, `child`, `member`, `dependency`, `delegate` | `TenantQualifiedAgentAddress` | `TenantQualifiedAgentAddress` |
+| `owner` | `TenantQualifiedAgentAddress` | `AddressablePrincipal` |
+| `observer` | `AddressablePrincipal` | `TenantQualifiedAgentAddress` |
+| `result-recipient` | `TenantQualifiedAgentAddress` | `AddressablePrincipal` |
+
+An endpoint form not permitted by this matrix MUST be rejected with
+`relationship.record.invalid-endpoint` before relationship state changes.
 
 > **Non-normative note.**
 Relationship types are intentionally asymmetric: `parent` and `child` are
@@ -308,15 +345,28 @@ relationship records.
 > **Non-normative note.**
 The `owner` type is distinct from `parent` because ownership implies
 benefit and control without necessarily implying ongoing supervision.
-A parent agent is actively involved in governance; an owner agent may
+A parent agent is actively involved in governance; an owner endpoint may
 be passive and only claim benefits when produced.
 
-> **Non-normative note.**
-The `delegate` type is scoped: a delegation record SHOULD include (or
-reference) a description of the delegated scope, duration, and any
-limitations on the delegate's authority.
-This specification does not define the delegation scope schema; that is
-an implementation-defined choice documented in the conformance profile.
+> **Normative definition.**
+A `delegate` relationship MUST contain a `delegation_scope` object in its
+`metadata` field with exactly the following members:
+
+| Member | Type | Constraint |
+|--------|------|------------|
+| `operations` | `string[]` | Non-empty, sorted, duplicate-free operation names authorized for the source. |
+| `resources` | `string[]` | Non-empty, sorted, duplicate-free resource identifiers within the source's authority. |
+| `not_before` | `ISO8601` | The delegation is unusable before this instant. |
+| `expires_at` | `ISO8601` | Must be later than `not_before`; the delegation is unusable at or after this instant. |
+| `max_uses` | `u64` | Must be at least 1; each authorized use decrements the remaining count atomically. |
+
+Unknown members are invalid. A missing or malformed scope MUST fail with
+`relationship.delegation-scope-malformed`. An expired scope MUST fail with
+`relationship.delegation-scope-expired`. A scope whose use count is exhausted
+MUST fail with `relationship.delegation-scope-exhausted`. A scope that exceeds
+the source's authority MUST fail with
+`relationship.delegation-scope-unauthorized`. Every such failure occurs without
+changing relationship state.
 
 > **Normative definition.**
 Relationships are directed: a relationship from agent A to agent B with
@@ -334,7 +384,9 @@ is NOT a valid relationship and MUST be rejected at creation time with
 the diagnostic `relationship.self-reference-invalid`.
 
 > **Normative definition.**
-A relationship between agents in different tenants is a cross-tenant
+A relationship is cross-tenant when its endpoint tenant scopes differ. A
+system-scoped `PrincipalAddress` with `tenant_id: null` differs from every
+tenant-scoped endpoint unless an explicit cross-tenant grant authorizes the
 relationship.
 Cross-tenant relationships are subject to the cross-tenant policies
 defined in
@@ -354,8 +406,8 @@ RelationshipType = "parent" | "child" | "owner" | "member"
 RelationshipRecord {
   relationship_id: RelationshipId,
   type: RelationshipType,
-  source: TenantQualifiedAgentAddress,
-  target: TenantQualifiedAgentAddress,
+  source: RelationshipEndpoint,
+  target: RelationshipEndpoint,
   created_by: PrincipalId,
   created_at: ISO8601,
   status: RelationshipStatus,
@@ -372,25 +424,46 @@ Every relationship record MUST include the `relationship_id` field, which
 is globally unique and stable for the relationship's lifetime.
 The `relationship_id` is the primary key for relationship queries,
 modifications, and deletions.
-The format of `relationship_id` is implementation-defined but MUST be
-opaque and non-guessable (same requirements as `AgentLocalId`).
+The `relationship_id` MUST be a canonical lowercase UUID v4 generated from a
+cryptographically secure random source. It is opaque to consumers. A
+non-canonical UUID or any UUID version other than version 4 MUST be rejected
+with `relationship.id-invalid`.
 
 ### Relationship creation authority
 
 > **Normative definition.**
 Relationship creation authority is the permission to create a relationship
-record of a given type between specific source and target agents.
+record of a given type between specific source and target endpoints.
 Creation authority depends on the relationship type, the roles of the
-source and target agents, and the creating principal's identity and
+source and target endpoints, and the creating principal's identity and
 trust tier.
 
 > **Normative definition.**
-For `parent`, `child`, and `owner` relationships, the target agent MUST
+For `parent`, `child`, and `owner` relationships, the target endpoint MUST
 explicitly consent to the relationship before it is admitted.
-Consent is evidenced by the target agent's principal signing a consent
+Consent is evidenced by the target endpoint's controlling principal signing a consent
 record that the host verifies before creating the relationship.
 Without valid consent, the host MUST reject the relationship creation
 request with the diagnostic `relationship.creation.unauthorized-consent`.
+
+> **Normative definition.**
+The sole target-consent bootstrap is the paired relationship creation in an
+atomic child-create transaction under
+[Child-create directives](36-child-lifecycle-cancellation-monitoring-and-restart-policy.md#child-create-directives).
+That transaction creates `child` from parent to prospective child and `parent`
+from prospective child to parent. The existing parent MUST sign ordinary
+target consent for the `parent` relationship. Because the prospective child
+does not yet have an active principal, its target consent for the `child`
+relationship MUST be a `ChildBootstrapConsent` signed by an authenticated
+`user` or `operator` `PrincipalAddress` authorized to create that exact child.
+The consent MUST bind the child-create `directive_id`, parent address,
+prospective child address, artifact digest, manifest digest, both relationship
+directions, issue and expiry instants, and a nonce. It MUST expire no later than
+300 seconds after issue and MUST be consumed exactly once in the same atomic
+commit that creates the child. Reuse, scope mismatch, invalid signature, or
+use outside that transaction MUST fail with
+`relationship.creation.unauthorized-consent` without creating either
+relationship. No conformance profile may add another consent bootstrap.
 
 > **Normative definition.**
 For `member` relationships, the target agent (acting as team lead) MUST
@@ -409,7 +482,7 @@ in `pending` status it indicates a unilateral declaration awaiting target
 response.
 
 > **Normative definition.**
-For `observer` relationships, the source agent MAY create the relationship
+For `observer` relationships, the source endpoint's controlling principal MAY create the relationship
 unilaterally, but the target agent MAY terminate observer relationships
 at any time without cause.
 The host MUST enforce the target's termination right and reject any
@@ -424,7 +497,7 @@ and MUST be enforced by the host during execution.
 > **Normative definition.**
 For `result-recipient` relationships, the source agent MAY create the
 relationship unilaterally to declare its intended result delivery target,
-but the target agent MAY reject or ignore result delivery without
+but the target endpoint's controlling principal MAY reject or ignore result delivery without
 affecting the relationship's existence.
 
 > **Non-normative note.**
@@ -589,16 +662,17 @@ The default visibility policy for relationship records is:
 
 | Viewer | Visible fields |
 |--------|---------------|
-| Source agent | All fields |
-| Target agent | All fields |
+| Source endpoint or its controlling principal | All fields |
+| Target endpoint or its controlling principal | All fields |
 | Creating principal | All fields |
 | Operators | All fields |
 | Other agents in the same tenant | Type, source, target, status (no metadata) |
 | Agents in other tenants | None (relationship is invisible) |
 
 > **Normative definition.**
-The `metadata` field of a relationship record is visible only to the
-source agent, target agent, creating principal, and operators.
+The `metadata` field of a relationship record is visible only to the source and
+target endpoints or their controlling principals, the creating principal, and
+operators.
 Metadata is the appropriate place to store scope descriptions,
 delegation terms, consent records, and other sensitive details that
 should not be exposed to other agents.
@@ -612,8 +686,8 @@ agents that need broader visibility; they MUST still respect the
 visibility policy of the relationships they observe.
 
 > **Normative definition.**
-Cross-tenant visibility: a relationship between agents in different
-tenants is invisible to all principals outside both tenants.
+Cross-tenant visibility: a relationship whose endpoint tenant scopes differ is
+invisible to all principals outside those scopes.
 Principals within one tenant but outside the other MAY see that a
 cross-tenant relationship exists (type, source, target, status) but
 MAY NOT see metadata or infer the nature of the cross-tenant association
@@ -646,7 +720,7 @@ permitted after the relationship has reached `Terminated` status.
 > **Normative definition.**
 A terminated relationship MAY be deleted by:
 
-- Either the source or target agent,
+- The source or target endpoint's controlling principal,
 - The creating principal,
 - An operator.
 
@@ -734,6 +808,13 @@ logical interaction (e.g., a single user request that generates multiple
 agent-to-agent signals).
 The `correlation_id` is set when the interaction begins and is inherited
 by all signals generated within that interaction.
+
+> **Normative definition.**
+`maximum_correlation_id_bytes` is a named implementation limit. It MUST be a
+finite integer of at least 128 and MUST be disclosed in the conformance
+profile; the default is 256 bytes. An otherwise valid signal whose UTF-8
+`correlation_id` exceeds the disclosed limit MUST be rejected with
+`signal.provenance.correlation-id-too-long` before any state mutation or relay.
 
 > **Normative definition.**
 The `causation_id` field identifies the relationship through which the
@@ -963,14 +1044,13 @@ values even though the agent's durable identity has not changed.
 This is expected behavior and is consistent with the eventual
 consistency model described in the conformance profile.
 
-> **Normative implementation-defined choice.**
-The mechanism by which the host combines the durable registry entry with
-the activation/placement projection to produce a `ResolutionState` is
-implementation-defined.
-The implementation MUST document how it handles the case where the
-registry entry is present but no placement is available, and how it
-handles the case where the registry entry is absent but a stale
-placement reference persists.
+> **Normative definition.**
+The mechanism by which the host combines the durable registry entry with the
+activation/placement projection is internal. A registry entry with no current
+placement produces its registry `status` and an absent `placement`; an absent
+registry entry produces `status: "unknown"` and an absent `placement`, even if a
+stale placement reference exists. Every mechanism MUST produce the same
+`ResolutionState` for the same registry and placement observations.
 
 > **Normative definition.**
 Address resolution for a `TenantQualifiedAgentAddress` that does not
@@ -1112,13 +1192,12 @@ current transmission path) is intentional.
 Both are needed for complete provenance: one identifies the source of
 intent, the other identifies the authority used to transmit.
 
-> **Normative implementation-defined choice.**
-The maximum length of the `delegation_chain` field is implementation-defined.
-Implementations MUST document their maximum chain length and MUST
-reject signals whose delegation chain exceeds the documented maximum
+> **Normative definition.**
+`maximum_delegation_chain_length` is a named implementation limit. It MUST be a
+finite integer of at least 128 and MUST be disclosed in the conformance
+profile; the default is 128 elements. The host MUST reject signals whose
+delegation chain exceeds the disclosed limit
 with the diagnostic `signal.provenance.delegation-chain-too-long`.
-The maximum MUST be at least 128 elements and SHOULD be documented as a
-bounded value in the conformance profile.
 
 > **Non-normative note.**
 A bounded delegation chain prevents unbounded signal propagation that
@@ -1349,7 +1428,7 @@ A failure outcome is the structured diagnostic returned when a
 contract, boundary, or invariant defined in this chapter is violated
 or cannot be satisfied.
 Failure outcomes are classified into six categories, each with a distinct
-diagnostic prefix, semantic meaning, and required downstream handling.
+diagnostic family, semantic meaning, and required downstream handling.
 The categories are: malformed, incompatible, conflicting, unauthorized,
 exhausted, and unavailable.
 
@@ -1359,11 +1438,16 @@ relationship record, or address component fails structural validation
 at the boundary of this chapter's contract.
 Malformed inputs are rejected before any state mutation or relationship
 resolution occurs.
-The diagnostic prefix for malformed failures is `agent.identity.malformed`.
+The diagnostic family for malformed failures is
+`identity.validation.agent_identity`.
 The diagnostic MUST identify the specific structural element that failed
-validation (e.g., `agent.identity.malformed.address-invalid-tenant`,
+validation through its domain `code` (e.g.,
+`agent.identity.malformed.address-invalid-tenant`,
 `agent.identity.malformed.address-empty-local-id`,
-`relationship.record.invalid-type`, `signal.provenance.malformed-field`).
+`agent.identity.malformed.principal-address`, `relationship.record.invalid-type`,
+`relationship.record.invalid-endpoint`,
+`relationship.delegation-scope-malformed`,
+`relationship.id-invalid`, or `signal.provenance.malformed-field`).
 
 > **Normative definition.**
 The **incompatible** failure outcome occurs when a request is structurally
@@ -1372,7 +1456,8 @@ system.
 Incompatible inputs are not rejected as malformed because their shape is
 correct; they are rejected because they cannot coexist with existing
 state or with the invariants defined in this chapter.
-The diagnostic prefix for incompatible failures is `agent.identity.incompatible`.
+The diagnostic family for incompatible failures is
+`identity.compatibility.agent_identity`.
 The diagnostic MUST identify the conflicting constraint and the state
 that conflicts with it (e.g., `agent.identity.incompatible.address-tenant-mismatch`,
 `relationship.lifecycle.incompatible-state-transition`).
@@ -1386,10 +1471,11 @@ Conflicting outcomes are distinct from incompatible outcomes: an
 incompatible outcome is a static inconsistency with existing state,
 while a conflicting outcome is a dynamic inconsistency arising from
 concurrent operations.
-The diagnostic prefix for conflicting failures is `agent.identity.conflict`.
-The diagnostic MUST include the conflicting operation identifiers and
-the conflict-resolution action taken (e.g., `agent.identity.conflict.address-assignment-latest-wins`,
-`relationship.operation.conflict-rejected-second`).
+The diagnostic family for conflicting failures is
+`identity.conflict.agent_identity`.
+The diagnostic MUST include the conflicting operation identifiers and the
+fixed conflict-resolution action, such as
+`relationship.operation.conflict-rejected-second`.
 
 > **Normative definition.**
 The **unauthorized** failure outcome occurs when a principal attempts an
@@ -1397,7 +1483,8 @@ operation without the required creation authority, consent, or trust
 tier defined in section 35.1.
 Unauthorized outcomes are the primary enforcement mechanism for the
 governance and authority model.
-The diagnostic prefix for unauthorized failures is `agent.identity.unauthorized`.
+The diagnostic family for unauthorized failures is
+`identity.authorization.agent_identity`.
 The diagnostic MUST identify the relationship type or operation, the
 requesting principal, and the required authority (e.g.,
 `agent.identity.unauthorized.relationship-creation-no-consent`,
@@ -1410,7 +1497,7 @@ proceed.
 Exhausted outcomes are distinct from malformed, incompatible, conflicting,
 and unauthorized outcomes because they indicate a capacity or cardinality
 limit rather than a correctness or authority problem.
-The diagnostic prefix for exhausted failures is `agent.identity.exhausted`.
+The diagnostic family for exhausted failures is `identity.limit.agent_identity`.
 The diagnostic MUST identify the exhausted resource or limit
 (e.g., `agent.identity.exhausted.cardinality-parent-limit`,
 `agent.identity.exhausted.delegation-chain-max-length`,
@@ -1425,7 +1512,7 @@ Unavailable outcomes are distinguished from other failure categories by
 their transience: they MAY succeed on retry, whereas malformed,
 incompatible, conflicting, unauthorized, and exhausted outcomes
 typically require corrective action before retry is meaningful.
-The diagnostic prefix for unavailable outcomes is `agent.identity.unavailable`.
+The diagnostic family for unavailable outcomes is `identity.resource.agent_identity`.
 The diagnostic SHOULD include the estimated or known recovery time or
 action required (e.g., `agent.identity.unavailable.agent-migration-in-progress`,
 `relationship.operation.unavailable-target-suspended`).
@@ -1442,17 +1529,17 @@ implementation-specific error codes.
 ### Failure outcome reference
 
 > **Normative definition.**
-The following table summarizes the six failure outcome categories and
-their primary diagnostic prefixes:
+The following table summarizes the six failure outcome categories and their
+required diagnostic families:
 
-| Category | Diagnostic prefix | Trigger condition | Recovery action |
+| Category | Diagnostic family | Trigger condition | Recovery action |
 |----------|------------------|-------------------|----------------|
-| Malformed | `agent.identity.malformed.*` | Structural validation failure | Correct the input and retry. |
-| Incompatible | `agent.identity.incompatible.*` | Semantic inconsistency with state | Revise the request to align with existing state. |
-| Conflicting | `agent.identity.conflict.*` | Concurrent operation inconsistency | Retry after conflict resolution, or resolve the conflict explicitly. |
-| Unauthorized | `agent.identity.unauthorized.*` | Insufficient authority or consent | Obtain the required authority, consent, or trust tier. |
-| Exhausted | `agent.identity.exhausted.*` | Resource or cardinality limit reached | Reduce the scope of the request or wait for resource release. |
-| Unavailable | `agent.identity.unavailable.*` | Transient inability to serve | Retry after the estimated recovery time, or take the indicated recovery action. |
+| Malformed | `identity.validation.agent_identity` | Structural validation failure | Correct the input and retry. |
+| Incompatible | `identity.compatibility.agent_identity` | Semantic inconsistency with state | Revise the request to align with existing state. |
+| Conflicting | `identity.conflict.agent_identity` | Concurrent operation inconsistency | Retry after conflict resolution, or resolve the conflict explicitly. |
+| Unauthorized | `identity.authorization.agent_identity` | Insufficient authority or consent | Obtain the required authority, consent, or trust tier. |
+| Exhausted | `identity.limit.agent_identity` | Resource or cardinality limit reached | Reduce the scope of the request or wait for resource release. |
+| Unavailable | `identity.resource.agent_identity` | Transient inability to serve | Retry after the estimated recovery time, or take the indicated recovery action. |
 
 > **Non-normative note.**
 The recovery actions above are guidelines, not obligations.
@@ -1473,14 +1560,16 @@ Bounded diagnostics are the contractually observable surface through
 which agents and operators learn about failure outcomes.
 
 > **Normative definition.**
-Every diagnostic emitted by this chapter's contracts MUST include:
-
-1. The failure outcome category (malformed, incompatible, conflicting,
-   unauthorized, exhausted, unavailable).
-2. The diagnostic code from the category's prefix.
-3. The affected agent addresses or relationship IDs (if any), subject
-   to the visibility policy in section 35.1.
-4. A human-readable message that describes the failure in domain terms.
+Every diagnostic emitted by this chapter's contracts MUST use the `Diagnostic`
+structure defined in
+[Turn Lifecycle Protocols And Canonical Encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md#diagnostics).
+Its `family` MUST be the family for the failure category in the table above;
+its `code` MUST be the domain code specified by the failed rule; its `severity`
+MUST be `error`; and its `message` MUST describe the failure in domain terms.
+The `details` object MUST contain `phase`, `contract`, `profile`,
+`failed_boundary`, `failure_category`, and the affected agent addresses,
+principal addresses, or relationship IDs, subject to the visibility policy in
+section 35.1.
 
 > **Normative definition.**
 Bounded diagnostics MUST NOT include:
@@ -1511,18 +1600,20 @@ to prevent timing-based inference.
 > **Normative definition.**
 Diagnostics are emitted as evidence records in the format defined in
 [Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md).
-The evidence record for a diagnostic MUST include the same fields as
-the bounded diagnostic above, plus the standard provenance metadata
+The evidence record for a diagnostic MUST include the complete canonical
+diagnostic above, plus the standard provenance metadata
 (originating agent, originating principal, correlation ID, timestamp).
 Evidence records for diagnostics are subject to the same retention and
 redaction rules as other evidence records in that chapter.
 
-> **Normative implementation-defined choice.**
-The format of the human-readable message field is implementation-defined.
+> **Normative unspecified presentation.**
+The human-readable message wording is bounded unspecified presentation.
 Implementations MUST ensure the message is intelligible to a human
 operator without requiring access to internal documentation, and MUST
 not include implementation-specific jargon that would prevent an
 operator from understanding the failure without additional context.
+Wording may vary, but the message MUST describe the same domain failure named
+by `family` and `code` and MUST NOT add machine-interpreted semantics.
 
 > **Normative implementation-defined choice.**
 The mechanism by which diagnostics are delivered to the requesting
@@ -1532,6 +1623,9 @@ The implementation MUST document its delivery mechanism in the
 conformance profile and MUST ensure that the diagnostic is observable
 by the requesting principal within a bounded time documented in the
 conformance profile.
+Observable delivery channel and latency may differ among synchronous return,
+asynchronous event, and requester-readable log delivery; diagnostic bytes and
+failure semantics MUST NOT differ.
 
 ### Evidence requirements
 
@@ -1578,53 +1672,47 @@ The combination of requesting principal, required authority, and
 relationship type enables auditors to reconstruct every unauthorized
 attempt and verify that it was correctly rejected.
 
-### Implementation-defined operational choices
+### Operational behavior and presentation
 
 > **Normative definition.**
-The following choices are implementation-defined within this chapter.
-Each choice MUST be documented in the conformance profile and MUST
-not change the observable failure outcomes or diagnostic structure.
+The clauses below distinguish the profiled diagnostic-delivery channel from
+fixed retention, conflict, and classification behavior and from bounded
+human-readable presentation. No selection or internal mechanism may change the
+observable failure outcome or canonical diagnostic structure.
 
-> **Normative implementation-defined choice.**
-The maximum number of failure evidence records retained per agent
-or per relationship is implementation-defined.
-Implementations MUST retain evidence for at least as long as the
-evidence retention period documented in
-[Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md)
-and MUST document the retention period in the conformance profile.
+> **Normative definition.**
+Failure evidence MUST be retained for at least the evidence-retention period
+governed by
+[Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md).
+A per-agent or per-relationship count cap MUST NOT remove evidence before that
+period expires.
 
-> **Normative implementation-defined choice.**
-The mechanism by which the host detects and reports conflicting
-operations on the same relationship or agent address is
-implementation-defined.
-Implementations MUST use a conflict-resolution strategy that is
-documented in the conformance profile and MUST ensure that the
-conflict is resolved within a bounded time documented in the conformance
-profile.
-Acceptable strategies include last-writer-wins, first-writer-wins,
-optimistic concurrency with retry, or application-defined resolution.
+> **Normative definition.**
+The host MUST serialize conflicting operations on the same relationship or
+agent address through the governing durable revision check. The first operation
+to commit its expected revision succeeds; every later operation carrying that
+stale revision is rejected without mutation using the applicable
+`identity.conflict.agent_identity` code. Detection mechanisms are internal and
+MUST NOT change which durable commit wins.
 
-> **Normative implementation-defined choice.**
-The threshold for classifying a transient unavailability as a permanent
-failure (i.e., when to transition from `unavailable` to a different
-failure category or to abort the operation entirely) is
-implementation-defined.
-Implementations MUST document the threshold and MUST not transition
-from `unavailable` to a non-transient category without explicit
-operator or policy intervention.
+> **Normative definition.**
+An unavailable failure MUST NOT be reclassified automatically as malformed,
+incompatible, conflicting, unauthorized, or exhausted because time elapsed or
+retries failed. Every retry is evaluated against current observations and
+remains unavailable while the transient dependency is unavailable. Only an
+explicit operator or policy action may stop retries, and that action does not
+change the recorded category of earlier failures.
 
-> **Normative implementation-defined choice.**
-The level of detail included in the `conflicting` diagnostic's
-resolution description is implementation-defined, subject to the
-constraint that the description MUST not reveal the identity of
-operations or principals that the requesting principal has no
-visibility into (as defined in the bounded diagnostics section above).
+> **Normative unspecified presentation.**
+The conflict-resolution description is bounded unspecified presentation: it
+MAY omit or redact operation or principal identities that the requester cannot
+observe, but it MUST identify that the later stale operation was rejected and
+MUST NOT imply a different conflict result.
 
 > **Non-normative note.**
-These implementation-defined choices give hosts flexibility to optimize
-for their specific deployment scenarios (e.g., high-throughput
-multi-tenant systems versus single-tenant embedded systems) while
-keeping the observable failure contract stable.
+The fixed behavior and bounded presentation above keep the observable failure
+contract stable across high-throughput multi-tenant and single-tenant embedded
+deployments.
 
 ### Deferred work
 
@@ -1862,6 +1950,9 @@ the lifecycle model needs a new state or a different timeout strategy.
    a `ResolutionState` with `status` matching the registry entry and
    a placement (if the agent is active) consistent with the host's
    current scheduling.
+7. A user, service, and operator are represented by distinct canonical
+   `PrincipalAddress` values and are not admitted to the agent registry or
+   accepted where `TenantQualifiedAgentAddress` is required.
 
 > **Non-normative note.**
 > Steps 4 through 6 verify the integration between the address registry
@@ -1880,7 +1971,7 @@ the lifecycle model needs a new state or a different timeout strategy.
    is created between two agents in the same tenant, following the
    creation authority rules in section 35.1.
 2. For relationship types requiring consent (`parent`, `child`, `owner`),
-   the target agent's consent is required and verified before the
+   the target endpoint's consent is required and verified before the
    relationship is admitted to `Active` status.
 3. For `member` relationships, the invitation/approval evidence is
    recorded and verified.
@@ -1894,6 +1985,9 @@ the lifecycle model needs a new state or a different timeout strategy.
    [Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md).
 7. A relationship query returns the created relationship consistent
    with the visibility policy in section 35.1.
+8. `owner` and `result-recipient` are also exercised with a non-agent target,
+   and `observer` is exercised with a non-agent source; every endpoint form not
+   admitted by the closed matrix is rejected.
 
 > **Non-normative note.**
 > Each relationship type requires a separate test iteration because
@@ -1952,6 +2046,10 @@ the lifecycle model needs a new state or a different timeout strategy.
 > Each failure test targets one or more failure outcome categories from
 > the taxonomy in section 35.3.
 
+Every failure test MUST verify the canonical Chapter 04 top-level diagnostic
+fields, the category-specific `identity.*` family from section 35.3, the exact
+domain `code`, and the required bounded `details` members.
+
 #### Malformed inputs
 
 > **Normative definition.**
@@ -1972,29 +2070,34 @@ the lifecycle model needs a new state or a different timeout strategy.
 6. A signal with an `originating_agent` that is not a valid
    `TenantQualifiedAgentAddress` is rejected with the diagnostic
    `signal.provenance.originating-agent-unknown`.
+7. An agent address whose `local_id` is not canonical lowercase UUID v4 is
+   rejected with `agent.identity.malformed.address-invalid-local-id`.
+8. A relationship record whose `relationship_id` is not canonical lowercase
+   UUID v4 is rejected with `relationship.id-invalid`.
+9. A `delegate` relationship with a missing member, unknown member, invalid
+   member type, unsorted operation or resource list, or invalid time ordering is
+   rejected with `relationship.delegation-scope-malformed`.
+10. A relationship whose source or target address form is not permitted for its
+    type by the endpoint matrix is rejected with
+    `relationship.record.invalid-endpoint`.
 
-All malformed failures MUST use the `agent.identity.malformed.*`
-diagnostic prefix and MUST NOT mutate any state.
+All malformed failures MUST use the `identity.validation.agent_identity`
+diagnostic family and MUST NOT mutate any state.
 
 #### Incompatible inputs
 
 > **Normative definition.**
 > Incompatible input failure tests verify:
 
-1. A relationship creation request for a `parent` relationship where
-   the target agent already has a `parent` relationship (violating the
-   cardinality limit of 1) is rejected with the diagnostic
-   `agent.identity.incompatible` (or `agent.identity.exhausted.cardinality-parent-limit`,
-   depending on whether the limit is classified as incompatible or
-   exhausted; the implementation MUST document this classification in
-   the conformance profile).
-2. A relationship lifecycle transition that is not permitted by the
+1. A relationship lifecycle transition that is not permitted by the
    state machine in section 35.1 (e.g., transitioning from `Active` to
    `Pending`) is rejected with the diagnostic
    `relationship.lifecycle.incompatible-state-transition`.
-3. A signal with a `causation_id` that references a non-existent or
+2. A signal with a `causation_id` that references a non-existent or
    terminated relationship is rejected with the diagnostic
    `signal.provenance.causation-invalid`.
+3. Creation or use of a `delegate` relationship whose otherwise well-formed
+   scope is expired is rejected with `relationship.delegation-scope-expired`.
 
 #### Stale inputs
 
@@ -2028,13 +2131,20 @@ diagnostic prefix and MUST NOT mutate any state.
 > **Normative definition.**
 > Boundary-limit failure tests verify:
 
-1. A `delegation_chain` exceeding the implementation-defined maximum
-   length (minimum 128 elements as defined in section 35.2) is rejected
+1. A `delegation_chain` exceeding the disclosed
+   `maximum_delegation_chain_length` implementation limit is rejected
    with the diagnostic `signal.provenance.delegation-chain-too-long`.
-2. A `correlation_id` that exceeds implementation-defined size limits
+2. A `correlation_id` that exceeds the disclosed
+   `maximum_correlation_id_bytes` implementation limit
    is rejected with the diagnostic `signal.provenance.correlation-id-too-long`.
 3. A relationship creation request that would violate cardinality limits
    is rejected with the diagnostic `relationship.cardinality-exceeded`.
+4. Use of a `delegate` relationship after `max_uses` reaches zero is rejected
+   with `relationship.delegation-scope-exhausted` without decrementing the
+   counter again or changing relationship state.
+
+All boundary-limit failures MUST use the `identity.limit.agent_identity`
+diagnostic family and MUST NOT mutate state.
 
 > **Non-normative note.**
 > Boundary-limit tests are important because they exercise the edge
@@ -2125,7 +2235,7 @@ diagnostic prefix and MUST NOT mutate any state.
    is rejected with the diagnostic `relationship.creation.unauthorized-consent`.
 2. A `child` relationship creation without the target agent's consent
    is rejected with the diagnostic `relationship.creation.unauthorized-consent`.
-3. An `owner` relationship creation without the target agent's consent
+3. An `owner` relationship creation without the target endpoint's consent
    is rejected with the diagnostic `relationship.creation.unauthorized-consent`.
 4. A `dependency` relationship creation where the target does not
    confirm willingness to serve remains in `Pending` status and does
@@ -2136,6 +2246,16 @@ diagnostic prefix and MUST NOT mutate any state.
    (delegator) agent, and the target (delegate) complies immediately.
 7. A principal lacking the minimum trust tier for a relationship type
    is rejected with the diagnostic `agent.identity.unauthorized.relationship-creation-trust-tier-too-low`.
+8. A `delegate` scope that names an operation or resource outside the source's
+   authority is rejected with `relationship.delegation-scope-unauthorized`
+   without creating or modifying the relationship.
+9. Child creation admits `child` only from parent to child and `parent` only
+   from child to parent; it consumes one valid `ChildBootstrapConsent` for the
+   prospective child and ordinary signed target consent from the existing
+   parent in the same atomic commit.
+10. Reusing or altering a `ChildBootstrapConsent`, or presenting it outside the
+    atomic child-create transaction, is rejected with
+    `relationship.creation.unauthorized-consent` without either relationship.
 
 #### Cardinality limits
 
@@ -2166,9 +2286,9 @@ diagnostic prefix and MUST NOT mutate any state.
 > **Normative definition.**
 > The visibility rule enforcement tests verify:
 
-1. The source agent of a relationship can observe all fields, including
+1. The source endpoint or its controlling principal can observe all fields, including
    metadata.
-2. The target agent of a relationship can observe all fields, including
+2. The target endpoint or its controlling principal can observe all fields, including
    metadata.
 3. A creating principal can observe all fields, including metadata.
 4. An operator can observe all fields, including metadata.
@@ -2211,8 +2331,8 @@ diagnostic prefix and MUST NOT mutate any state.
    the contracts defined in this chapter (milestone 6 Phase 1).
 3. Record any regressions (previously passing fixtures that now fail)
    or approved variability (previously passing fixtures that fail
-   under a documented implementation-defined choice from the
-   variability register in this chapter).
+   under a documented selection licensed by a governing callout and indexed
+   in the [Variability register](#variability-register)).
 4. Regressions MUST be resolved (by fixing the implementation or
    revising the earlier milestone) before this chapter can be promoted
    to `status: normative`.
@@ -2284,18 +2404,22 @@ diagnostic prefix and MUST NOT mutate any state.
 
 ## Variability register
 
-The following table enumerates every implementation-defined choice,
+The following table enumerates every profiled choice,
 MAY permission, permitted variation, and limit defined in this section.
 Each entry references the rule or definition it modifies and states the
 required documentation obligation.
 
+> **Non-normative note.**
+
 | ID | Rule / Definition reference | Variability | Required documentation | Default |
 |----|---------------------------|-------------|----------------------|---------|
-| V-35.1-01 | Canonical address representation (separator character) | The separator character used to concatenate `tenant_id` and `local_id` in the canonical string representation of `TenantQualifiedAgentAddress`. | Conformance profile. | `:` |
-| V-35.1-02 | `local_id` generation method | The method used to generate `local_id` values (UUID v4, cryptographic random, monotonic counter with obfuscation, or other). | Conformance profile. | UUID v4 |
+| V-35.1-01 | [Canonical address representation](#tenant-qualified-agent-addresses) | Select `:` or `/` as the separator used to concatenate `tenant_id` and `local_id`. | Conformance profile. | `:` |
+| V-35.1-02 | [`local_id` generation](#tenant-qualified-agent-addresses) | Canonical lowercase UUID v4 from a cryptographically secure random source is required. | None. | UUID v4 |
+| V-35.1-02A | [Non-agent principal addressing](#tenant-qualified-agent-addresses) | Fixed discriminated `PrincipalAddress`; agents continue to use `TenantQualifiedAgentAddress`. | None. | Canonical JSON bytes of the closed structure. |
+| V-35.1-02B | [Relationship endpoint forms](#relationship-types) | Fixed endpoint matrix by relationship type. | None. | Reject an unlisted source or target form. |
 | V-35.1-03 | Pending relationship timeout | The bounded time after which a pending relationship is automatically terminated. | Conformance profile. | 60 seconds |
 | V-35.1-04 | Stricter cardinality limits | Host-local cardinality limits that are stricter than the defaults in the cardinality table. | Conformance profile. | None (use defaults) |
-| V-35.1-05 | Delegation scope schema | The schema used to describe delegation scope, duration, and limitations in `delegate` relationship metadata. | Conformance profile. | Implementation-defined |
+| V-35.1-05 | [Delegation scope schema](#relationship-types) | The fixed `operations`, `resources`, `not_before`, `expires_at`, and `max_uses` schema is required. | None. | Fixed schema |
 | V-35.1-06 | Archived relationship retention | The retention period for archived (deleted) relationship records. | Conformance profile. | Same as evidence retention |
 | V-35.1-07 | Cross-tenant relationship policy | The specific cross-tenant policies applied to relationship creation, visibility, and resolution. | Conformance profile; must reference
 [Threat Model Principals Trust Classes And Grant Vocabulary](30-threat-model-principals-trust-classes-and-grant-vocabulary.md)
@@ -2303,7 +2427,14 @@ and
 [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md). | Deny by default |
 | V-35.1-08 | Relationship snapshot consistency model | Whether resolution returns a strong-consistency snapshot or a eventually-consistent snapshot of relationship state. | Conformance profile. | Strong consistency |
 | V-35.1-09 | Resolution cache invalidation mechanism | The mechanism used to invalidate resolution cache entries on relationship state changes (immediate, event-driven, TTL-based, or hybrid). | Conformance profile. | Event-driven |
-| V-35.1-10 | Signal provenance validation strictness | Whether provenance validation at reception is hard-fail (reject signal) or soft-fail (log warning, allow signal). | Conformance profile. | Hard-fail |
-| V-35.2-01 | Address resolution combination mechanism | How the host combines the durable registry entry with the activation/placement projection to produce a `ResolutionState`, including handling of missing placement and stale references. | Conformance profile. | Registry-first with placement overlay |
-| V-35.2-02 | Maximum delegation chain length | The maximum number of elements permitted in the `delegation_chain` field before the signal is rejected. | Conformance profile. | 128 |
+| V-35.1-10 | [Signal provenance validation](#signal-provenance-propagation) | Required hard-fail validation for origin mismatch, broken or cyclic chains, and invalid provenance fields. | None. | Reject with the governing domain code and `identity.validation.agent_identity` family. |
+| V-35.2-01 | [Address resolution combination](#address-resolution-and-placement-projections) | Internal mechanism with fixed registry-first missing-placement and stale-reference results. | None. | Registry-first with placement overlay |
+| V-35.2-02 | [Maximum delegation chain length](#signal-provenance-propagation) | Named implementation limit `maximum_delegation_chain_length`, at least 128 elements. | Conformance profile. | 128 |
 | V-35.2-03 | Moved outcome delivery mechanism | How the host signals that an agent's placement has changed since the last resolution (informational diagnostic, explicit placement field, or separate notification). | Conformance profile. | Informational diagnostic on placement-request |
+| V-35.2-04 | [Maximum correlation ID size](#signal-provenance-fields) | Named implementation limit `maximum_correlation_id_bytes`, at least 128 bytes. | Conformance profile. | 256 bytes |
+| V-35.3-01 | [Diagnostic message wording](#bounded-diagnostics) | Human-readable wording may vary but has no machine-interpreted semantics. | None. | Concise domain prose. |
+| V-35.3-02 | [Diagnostic delivery](#bounded-diagnostics) | Synchronous return, asynchronous event, requester-readable log, or a combination. | Conformance profile, including the bounded delivery time. | Synchronous return. |
+| V-35.3-03 | [Failure-evidence retention](#operational-behavior-and-presentation) | Count caps cannot shorten the governing Chapter 34 retention period. | None beyond the governing evidence profile. | Governing evidence retention. |
+| V-35.3-04 | [Conflict resolution](#operational-behavior-and-presentation) | Fixed durable revision ordering; reject the later stale operation. | None. | Reject second. |
+| V-35.3-05 | [Unavailable classification](#operational-behavior-and-presentation) | No automatic category transition. | None. | Remain unavailable while the dependency is unavailable. |
+| V-35.3-06 | [Conflict description](#operational-behavior-and-presentation) | Wording may vary but must state the stale-operation result and preserve visibility redaction. | None. | Redacted domain prose. |

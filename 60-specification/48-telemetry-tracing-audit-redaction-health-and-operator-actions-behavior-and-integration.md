@@ -2,7 +2,7 @@
 title: "Telemetry Tracing Audit Redaction Health And Operator Actions Behavior And Integration"
 kind: specification
 created: "2026-08-10"
-status: draft
+status: normative
 spec_version: "0.2.0"
 tags:
   - milestone-09
@@ -23,7 +23,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 3](../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/phase-03-telemetry-tracing-audit-redaction-health-and-operator-actions.md)
 of
 [Milestone 9](../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/README.md)
@@ -124,15 +124,29 @@ Log emission failures are logged but do not prevent the operational event.
 
 ### 48.2.4 Audit Event Recording Behavior
 
-> **Non-normative note.**
+> **Normative definition.**
 Audit events are recorded with the following behavior:
 
 1. Detect operator or administrative action.
-2. Capture actor, action, resource, and outcome.
-3. Redact sensitive data (credentials, secrets, PII).
-4. Write audit event to immutable log.
-5. Emit audit event to configured exporters (if configured).
-6. Return success or failure diagnostic.
+2. Evaluate authorization and validation without executing the action.
+3. Capture and source-redact actor, action, resource, and attempted outcome.
+4. If source redaction fails, return the applicable safe redaction diagnostic
+   and do not execute or publish the action's effect.
+5. Durably append the `attempted` event to the immutable log.
+6. If the append fails, return `audit.event.record.failed` and do not execute
+   or publish the action's effect.
+7. If authorization or validation denied the action, append a correlated
+   `failure` event, return the original denial diagnostic, and do not execute.
+8. Otherwise execute the action only after the durable append succeeds.
+9. Durably append a correlated terminal `success` or `failure` event.
+10. Emit recorded audit events to configured exporters, if configured.
+11. Return the action result or failure diagnostic.
+
+If the terminal append fails after an effect, the durable attempted event
+remains authoritative evidence. The host MUST emit
+`audit.event.record.failed`, mark audit health `unhealthy`, stop accepting new
+operator or administrative actions, and reconcile the attempted event before
+resuming those actions.
 
 > **Non-normative note.**
 Audit events are:
@@ -142,14 +156,14 @@ Audit events are:
 
 ### 48.2.5 Redaction Behavior
 
-> **Non-normative note.**
+> **Normative definition.**
 Redaction is applied at the following points:
 
 | Point | Redaction Applied |
 | --- | --- |
-| Data capture | Redact credentials, secrets, PII at source. |
-| Data export | Redact sensitive data before export. |
-| Data display | Redact sensitive data in UI or CLI output. |
+| Data capture | Redact credentials, secrets, PII at source before buffering or persistence. |
+| Data export | Reapply redaction before export. |
+| Data display | Reapply redaction in UI or CLI output. |
 
 > **Non-normative note.**
 Redaction rules are applied in the following order:
@@ -160,9 +174,14 @@ Redaction rules are applied in the following order:
 5. User data (not relevant to the operation).
 6. Configuration (sensitive values like database connection strings).
 
+If policy validation or any redaction step fails, the host MUST reject the
+complete candidate record. It MUST NOT buffer, persist, export, display, or
+include any candidate field in a fallback. It emits only the fixed safe
+telemetry failure diagnostic from Section 48.1.5.
+
 ### 48.2.6 Sampling Behavior
 
-> **Non-normative note.**
+> **Normative definition.**
 Sampling is applied based on the configured sampling policy:
 
 | Policy | Behavior |
@@ -173,10 +192,16 @@ Sampling is applied based on the configured sampling policy:
 | `probabilistic` | Randomly sample based on probability. |
 | `header-based` | Sample based on incoming headers. |
 
-> **Non-normative note.**
-Sampling decisions are made at trace start.
-Once sampled, the trace is retained for its full duration.
-Uns sampled traces produce no observability data.
+> **Normative definition.**
+Trace sampling decisions are made at trace start. Log sampling decisions are
+made before source-redacted records enter a buffer. Once sampled, a trace is
+retained for its full duration. Unsampled candidates produce no trace or log
+record. An invalid policy is rejected while the last valid policy remains in
+force; without a last valid policy, the affected family is disabled. A failed
+individual decision drops the candidate with `trace.sample.failed` and MUST
+NOT enable `always-on` fallback. A log decision failure instead emits
+`log.sample.failed`. The default rate limit resets only at UTC second
+boundaries and admits the first 100 candidates in per-family capture order.
 
 ### 48.2.7 Cardinality Enforcement Behavior
 
@@ -185,13 +210,12 @@ Cardinality limits are enforced as follows:
 
 1. Track unique label combinations per metric family.
 2. If limit exceeded:
-   - Drop metric point (with diagnostic).
-   - Bucket label values (e.g., `custom-1234`).
+   - Drop the metric point.
+   - Emit `metrics.cardinality.exceeded`.
 3. Log cardinality enforcement events at `WARN` level.
 
 > **Non-normative note.**
-Cardinality limits are configurable per deployment.
-Operators can adjust limits based on operational needs.
+Cardinality limits are the fixed values in Section 48.1.7.
 
 ### 48.2.8 Retention Enforcement Behavior
 
@@ -200,14 +224,15 @@ Retention is enforced via background jobs:
 
 | Data Type | Enforcement Method |
 | --- | --- |
-| `metrics` | Periodic cleanup job (e.g., daily) deletes data past retention limit. |
-| `traces` | Periodic cleanup job deletes data past retention limit. |
-| `logs` | Periodic cleanup job deletes data past retention limit. |
+| `metrics` | Make data unavailable exactly 30 days after capture. |
+| `traces` | Make data unavailable exactly 7 days after capture. |
+| `logs` | Make data unavailable exactly 14 days after capture. |
 | `audit-events` | No enforcement (indefinite retention). |
 
 > **Non-normative note.**
-Retention enforcement jobs run during low-traffic periods to minimize
-impact on operational performance.
+Cleanup scheduling and storage layout are non-normative internal mechanisms.
+They MAY vary only if data availability at each retention boundary and all
+observable deletion evidence are identical for the same input and clock.
 
 ### 48.2.9 Access Control Enforcement Behavior
 
@@ -243,6 +268,11 @@ Export configuration includes:
 - Authentication credentials (if required).
 - Batch size and flush interval.
 - Retry policy (max retries, backoff duration).
+
+Buffering, batch size, and flush scheduling are non-normative internal
+mechanisms. They MAY vary only if each configured target receives the same
+ordered data and the same retry-limit diagnostics are emitted for the same
+input and dependency outcomes.
 
 ### 48.2.11 Deletion Behavior
 
@@ -284,21 +314,44 @@ Health check results are:
 
 ### 48.2.13 Operator Action Execution Behavior
 
-> **Non-normative note.**
+> **Normative definition.**
 Operator actions are executed with the following behavior:
 
-1. **Authorization**: Check actor role and permissions.
-2. **Validation**: Validate action parameters (e.g., tenant ID, artifact ID).
-3. **Audit**: Record audit event for the action.
-4. **Execution**: Execute the action (e.g., drain, pause, resume).
-5. **Confirmation**: Return success or failure diagnostic.
-6. **Logging**: Log action execution at appropriate level.
+1. **Authorization**: Evaluate actor role and permissions without executing.
+2. **Validation**: Evaluate action parameters without executing.
+3. **Audit intent**: Durably append a source-redacted `attempted` audit event
+   whether the evaluation allowed or denied the action.
+4. **Redaction failure**: If source redaction fails, return the safe redaction
+   diagnostic without executing the action.
+5. **Audit failure**: If the append fails, return
+   `audit.event.record.failed` without executing the action.
+6. **Denied outcome**: If authorization or validation denied the action,
+   append a correlated failure event and return the original denial diagnostic
+   without execution.
+7. **Execution**: Otherwise execute the action (e.g., drain, pause, resume).
+8. **Audit outcome**: Append a correlated terminal audit event.
+9. **Confirmation**: Return success or failure diagnostic.
+10. **Logging**: Log action execution at appropriate level.
 
 > **Non-normative note.**
 Operator actions are:
-- Bounded by timeouts (e.g., drain must complete within 30 seconds).
-- Rate-limited to prevent abuse (e.g., max 10 actions per minute).
+- Cancelled with `operator.action.timeout` if not complete within 30 seconds.
+- Limited to 10 actions per actor in each rolling 60-second interval.
 - Reversible where possible (e.g., pause/resume, quarantine/release).
+
+### 48.2.14 Failure precedence
+
+An observability failure MUST NOT replace an operation's existing canonical
+diagnostic merely because recording or export also failed. The observability
+diagnostic is additional. For an operator or administrative action prevented
+before any effect, the applicable safe redaction diagnostic is canonical when
+audit source redaction failed, and `audit.event.record.failed` is canonical
+when append of an already redacted attempted event is the reason an otherwise
+allowed action cannot proceed. If authorization or validation had already
+denied the action, that original diagnostic remains canonical and an audit
+failure is additional. Other redaction and sampling failures govern only
+publication of their candidate telemetry record and MUST NOT disclose or
+translate the triggering operation's diagnostic.
 
 ## Variability and limits
 
@@ -310,18 +363,22 @@ See [Variability register](#variability-register).
 | --- | --- | --- | --- |
 | Metrics emission asynchrony | Section 48.2.1 | MUST | Must emit metrics asynchronously where possible. |
 | Trace context propagation format | Section 48.2.2 | MAY | Must support W3C Trace Context format. Other formats are permitted. |
-| Log emission destinations | Section 48.2.3 | Implementation-defined | Must document all log emission destinations. |
-| Audit event immutability mechanism | Section 48.2.4 | Implementation-defined | Must document the immutability mechanism (e.g., hashing, append-only log). |
+| Log emission destinations | [Log Emission Behavior](#4823-log-emission-behavior) | MAY | Must emit to standard error; configured exporters are permitted. |
+| Audit event immutability mechanism | [Audit Event Recording Behavior](#4824-audit-event-recording-behavior) | Internal mechanism | May vary only if audit events remain immutable and the same modifications are detected. |
+| Audit precommit failure | [Audit Event Recording Behavior](#4824-audit-event-recording-behavior) | Required | Prevent the operator or administrative effect and return `audit.event.record.failed`. |
 | Redaction order | Section 48.2.5 | Required | Must apply redaction in the order listed in the table. |
+| Redaction failure | Section 48.2.5 | Required | Reject the complete candidate and emit only the fixed safe diagnostic. |
 | Sampling decision point | Section 48.2.6 | MUST | Must make sampling decisions at trace start. |
-| Cardinality limit enforcement | Section 48.2.7 | MUST | Must enforce cardinality limits by dropping or bucketing. |
-| Retention enforcement timing | Section 48.2.8 | Implementation-defined | Must document the timing of retention enforcement jobs. |
+| Sampling fallback | Section 48.2.6 | Prohibited | Retain the last valid policy or disable the family; use the family-specific failure diagnostic and never fall back to `always-on`. |
+| Cardinality limit enforcement | Section 48.2.7 | MUST | Must drop excess metric points and emit `metrics.cardinality.exceeded`. |
+| Retention enforcement mechanism | [Retention Enforcement Behavior](#4828-retention-enforcement-behavior) | Internal mechanism | May vary only if fixed expiration boundaries and observable deletion evidence are identical. |
 | Access control check points | Section 48.2.9 | Required | Must enforce access control at all points listed in the table. |
-| Export batching | Section 48.2.10 | Implementation-defined | Must document batch size and flush interval. |
+| Export batching | [Export Behavior](#48210-export-behavior) | Internal mechanism | May vary only if ordered exports and retry-limit diagnostics are identical. |
 | Manual deletion audit | Section 48.2.11 | MUST | Must log manual deletion as an audit event. |
 | Health check aggregation | Section 48.2.12 | MUST | Must aggregate health checks into overall status. |
-| Operator action timeouts | Section 48.2.13 | Implementation-defined | Must document timeouts for all operator actions. |
-| Operator action rate limits | Section 48.2.13 | Implementation-defined | Must document rate limits for all operator actions. |
+| Operator action timeout | [Operator Action Execution Behavior](#48213-operator-action-execution-behavior) | Required | Cancel each action after exactly 30 seconds. |
+| Operator action rate limit | [Operator Action Execution Behavior](#48213-operator-action-execution-behavior) | Required | Accept at most 10 actions per actor in a rolling 60-second interval. |
+| Failure precedence | Section 48.2.14 | Required | Preserve the operation diagnostic except when audit precommit prevents the action effect. |
 
 ## Rationale and evidence (non-normative)
 

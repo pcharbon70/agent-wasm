@@ -2,7 +2,7 @@
 title: "Telemetry Tracing Audit Redaction Health And Operator Actions Failure Evidence And Operational Notes"
 kind: specification
 created: "2026-08-10"
-status: draft
+status: normative
 spec_version: "0.2.0"
 tags:
   - milestone-09
@@ -23,7 +23,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 3](../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/phase-03-telemetry-tracing-audit-redaction-health-and-operator-actions.md)
 of
 [Milestone 9](../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/README.md)
@@ -66,8 +66,8 @@ Each outcome includes a stable diagnostic code family, cause, and behavior.
 
 | Diagnostic | Cause | Behavior |
 | --- | --- | --- |
-| `metrics.emit.failed` | Metric emission fails (e.g., exporter unavailable, buffer full). | Log failure at `ERROR` level. Continue operational event. |
-| `metrics.cardinality.exceeded` | Metric cardinality limit exceeded. | Drop or bucket metric point. Log at `WARN` level. |
+| `metrics.emit.failed` | Metric emission input is malformed, including an invalid label name, value, or combination, or emission otherwise fails. | Reject the malformed point or log the emission failure at `ERROR` level. Continue the operational event. |
+| `metrics.cardinality.exceeded` | Metric cardinality limit exceeded. | Drop metric point. Log at `WARN` level. |
 | `metrics.export.failed` | Metric export fails (e.g., network error, authentication failure). | Retry with backoff. Log at `ERROR` level if retry limit exceeded. |
 
 #### Trace failures
@@ -75,7 +75,7 @@ Each outcome includes a stable diagnostic code family, cause, and behavior.
 | Diagnostic | Cause | Behavior |
 | --- | --- | --- |
 | `trace.propagation.failed` | Trace context propagation fails (e.g., missing context, invalid format). | Start new trace. Log at `DEBUG` level. |
-| `trace.sample.failed` | Trace sampling decision fails (e.g., invalid policy). | Default to `always-on`. Log at `WARN` level. |
+| `trace.sample.failed` | A trace sampling policy is invalid or an individual trace decision fails. | Reject invalid policy and retain the last valid policy, or disable traces if none exists. Drop a candidate whose individual decision fails. Never enable `always-on` fallback. |
 | `trace.export.failed` | Trace export fails (e.g., network error, authentication failure). | Retry with backoff. Log at `ERROR` level if retry limit exceeded. |
 
 #### Log failures
@@ -83,21 +83,22 @@ Each outcome includes a stable diagnostic code family, cause, and behavior.
 | Diagnostic | Cause | Behavior |
 | --- | --- | --- |
 | `log.emit.failed` | Log emission fails (e.g., stderr error, exporter unavailable). | Continue operational event. Log failure at `ERROR` level. |
-| `log.redaction.failed` | Log redaction fails (e.g., sensitive data not redacted). | Reject log. Log at `ERROR` level. Emit safe fallback log. |
+| `log.sample.failed` | A log sampling policy is invalid or an individual log decision fails. | Reject invalid policy and retain the last valid policy, or disable logs if none exists. Drop a candidate whose individual decision fails. Never enable `always-on` fallback. |
+| `log.redaction.failed` | Log redaction fails (e.g., sensitive data not redacted). | Reject the complete log candidate. Emit only the fixed safe telemetry failure diagnostic without candidate-derived fields. |
 
 #### Audit failures
 
 | Diagnostic | Cause | Behavior |
 | --- | --- | --- |
-| `audit.event.record.failed` | Audit event recording fails (e.g., immutable log write fails). | Log at `ERROR` level. Continue operational event. |
+| `audit.event.record.failed` | Required immutable audit append fails. | Before an operator or administrative effect, reject the action with no effect. After an already recorded attempt and executed effect, stop new audited actions, mark audit health unhealthy, and reconcile before resuming. |
 | `audit.event.export.failed` | Audit event export fails (e.g., network error, authentication failure). | Retry with backoff. Log at `ERROR` level if retry limit exceeded. |
 
 #### Redaction failures
 
 | Diagnostic | Cause | Behavior |
 | --- | --- | --- |
-| `redaction.policy.invalid` | Redaction policy is invalid (e.g., unknown data type, invalid rule). | Use default redaction rules. Log at `WARN` level. |
-| `redaction.apply.failed` | Redaction application fails (e.g., data type not recognized). | Skip redaction for that data type. Log at `WARN` level. |
+| `redaction.policy.invalid` | Redaction policy is invalid (e.g., unknown data type, invalid rule). | Reject the policy and retain the last valid policy. If none exists, disable the affected telemetry family. Do not admit candidate data. |
+| `redaction.apply.failed` | Redaction application fails (e.g., data type not recognized). | Reject the complete candidate record and emit only the fixed safe telemetry failure diagnostic. Do not skip a field or data type. |
 
 #### Health check failures
 
@@ -117,12 +118,24 @@ Each outcome includes a stable diagnostic code family, cause, and behavior.
 | `operator.action.rate-limited` | Operator action rate limit exceeded. | Reject action. Log at `WARN` level. Emit diagnostic with retry-after. |
 | `operator.action.execution.failed` | Operator action execution fails (e.g., drain fails, pause fails). | Log at `ERROR` level. Emit diagnostic with execution error. |
 
+#### Failure precedence
+
+An observability failure is additional to an existing canonical operation
+diagnostic and MUST NOT translate or replace it. If mandatory audit precommit
+prevents an operator or administrative action before any effect, the safe
+redaction diagnostic is canonical for source-redaction failure and
+`audit.event.record.failed` is canonical for append failure after successful
+redaction when the action was otherwise allowed. An authorization or
+validation denial remains canonical if it occurred first; failure to audit
+that denied attempt is additional. Other redaction and sampling failures
+classify only the rejected telemetry candidate.
+
 ### 48.3.2 Bounded Diagnostics and Evidence
 
 > **Non-normative note.**
 Diagnostics are bounded to prevent exposure of secrets, implementation
 internals, or sensitive user data.
-Each diagnostic includes the following fields:
+Each ordinary diagnostic includes the following fields:
 
 | Field | Content | Source |
 | --- | --- | --- |
@@ -137,6 +150,11 @@ Each diagnostic includes the following fields:
 | `hint` | Suggested remediation steps | SDK/CLI/simulator |
 | `reference` | Documentation link for further guidance | SDK/CLI/simulator |
 
+The safe telemetry failure diagnostic used when redaction or sampling cannot
+be trusted is the exact reduced schema in Section 48.1.5. It MUST NOT be
+expanded with `message`, `hint`, `reference`, identifiers, or any field derived
+from the rejected candidate.
+
 > **Non-normative note.**
 Diagnostics MUST NOT include:
 - Raw credential values or secret references.
@@ -148,26 +166,29 @@ Evidence is retained for operational debugging and compliance auditing.
 Evidence is retrievable via the `evidence inspect` CLI command or SDK
 function with appropriate access controls.
 
-### 48.3.3 Implementation-Defined Choices
+### 48.3.3 Conformance Summary
 
 > **Non-normative note.**
-The following choices are implementation-defined and must be documented
-in the conformance profile.
+The following table summarizes fixed behavior, explicitly permitted formats,
+and equivalence-constrained internal mechanisms from the governing contract.
 
 | Choice | Description | Default |
 | --- | --- | --- |
 | Metric format | Metric export format (OTLP, Prometheus, StatsD, etc.). | OTLP. |
 | Trace format | Trace context format (W3C Trace Context, etc.). | W3C Trace Context. |
 | Log format | Log output format (JSON, text, syslog, etc.). | JSON. |
-| Audit immutability mechanism | Mechanism for audit event immutability (hashing, append-only log, etc.). | Implementation-defined. |
+| Audit immutability mechanism | Mechanism for audit event immutability (hashing, append-only log, etc.). | Internal; must provide identical immutability and tamper detection. |
 | Redaction levels | Redaction levels applied (source, destination, display). | Source and destination. |
-| Sampling policy | Default sampling policy (`always-on`, `always-off`, `rate-limit`, etc.). | `rate-limit` with 100 per second. |
-| Cardinality limits | Cardinality limits per label family. | As defined in Section 48.1.7. |
-| Retention periods | Retention periods per data type. | As defined in Section 48.1.8. |
-| Export targets | Configured export targets (OTLP, Prometheus, StatsD, etc.). | Implementation-defined. |
+| Sampling policy | Default sampling policy (`always-on`, `always-off`, `rate-limit`, etc.). | First 100 candidates in each UTC-aligned one-second family bucket. |
+| Sampling failure fallback | Behavior when policy or decision fails. | Retain last valid policy or disable family; drop failed candidate; never `always-on`. |
+| Redaction failure behavior | Behavior when policy validation or application fails. | Reject complete candidate and emit only safe reduced diagnostic. |
+| Audit append failure | Behavior when mandatory audit intent cannot be persisted. | Reject action before effect; stop audited actions on terminal append failure pending reconciliation. |
+| Cardinality limits | Cardinality limits per label family. | Fixed as defined in Section 48.1.7. |
+| Retention periods | Retention periods per data type. | Fixed as defined in Section 48.1.8. |
+| Export targets | Supported export targets. | OTLP required; Prometheus, StatsD, and CloudWatch independently optional. |
 | Health check endpoints | Health check endpoint configuration (HTTP, gRPC, etc.). | HTTP. |
-| Operator action timeouts | Timeouts per operator action. | Implementation-defined. |
-| Operator action rate limits | Rate limits per operator action. | Implementation-defined. |
+| Operator action timeout | Timeout for every operator action. | 30 seconds. |
+| Operator action rate limit | Per-actor operator action limit. | 10 actions per rolling 60 seconds. |
 
 ### 48.3.4 Deferred Work
 
@@ -221,7 +242,10 @@ See [Variability register](#variability-register).
 | Diagnostic field set | Section 48.3.2 | Required | Must include all fields listed in the bounded diagnostics table. |
 | Diagnostic redaction | Section 48.3.2 | Required | Must redact secrets, stack traces, and irrelevant user data. |
 | Actionable failure fields | Section 48.3.2 | Required | Must include `hint` and `reference` fields. |
-| Implementation-defined choices documentation | Section 48.3.3 | Required | Must document all implementation-defined choices in the conformance profile. |
+| Safe telemetry failure fields | Section 48.3.2 | Required exception | Must contain only the reduced Section 48.1.5 fields and no candidate-derived value. |
+| Redaction and sampling failure | Section 48.3.1 | Required | Must reject the candidate; must not skip redaction or enable `always-on`. |
+| Audit record failure | Section 48.3.1 | Required | Must prevent an audited action when the required pre-effect append fails. |
+| Conformance summary | Section 48.3.3 | Required | Must preserve fixed behavior and equivalence constraints. |
 | Deferred work enforcement | Section 48.3.4 | MUST | Must NOT implement deferred work without evidence from the corresponding future phase. |
 
 ## Rationale and evidence (non-normative)
@@ -236,7 +260,7 @@ context for operational debugging.
 Actionable failures include hints and references to enable operators to
 resolve issues without consulting support.
 
-Implementation-defined choices are documented to enable conformance
+Fixed behavior and explicitly bounded internal mechanisms enable conformance
 verification and interoperability.
 Deferred work is explicitly identified to prevent scope creep and ensure
 that future phases build on the verified foundation of Phase 3.

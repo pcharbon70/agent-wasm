@@ -2,8 +2,8 @@
 title: "Agent Manifests Artifacts Schemas And Registries"
 kind: specification
 created: "2026-08-08"
-status: draft
-spec_version: "0.2.0"
+status: normative
+spec_version: "1.0.0"
 tags:
   - milestone-01
   - phase-03
@@ -20,7 +20,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 3](../.spec/planning/agentic-system/milestone-01-contracts-profiles-and-artifacts/phase-03-agent-manifests-artifacts-schemas-and-registries.md)
 of
 [Milestone 1](../.spec/planning/agentic-system/milestone-01-contracts-profiles-and-artifacts/README.md)
@@ -29,10 +29,11 @@ Contracts, Profiles, And Artifacts.
 It defines immutable executable artifacts and reviewable manifests that can
 be resolved without instantiating guest code.
 
-Version `0.2.0` replaces the `0.1.0` manifest contract for AI-capable
-artifacts. It adds logical model requirements and model-slot declarations;
-concrete providers, models, endpoints, connections, and credentials remain
-deployment configuration and are not artifact declarations.
+Version `1.0.0` replaces the `0.2.0` manifest contract. It unifies action
+metadata in one `ActionDescriptor` and retains logical model requirements and
+model-slot declarations; concrete providers, models, endpoints, connections,
+and credentials remain deployment configuration and are not artifact
+declarations.
 
 This chapter is normative by default within its stated scope.
 Material visibly marked non-normative does not create conformance
@@ -68,16 +69,32 @@ The canonical representation is:
 > **Normative definition.**
 
 ```
-canonical = concatenate(
-  sort_keys(manifest_json),
-  sorted_module_bytes_by_name
+digest_manifest = remove_fields(
+  manifest_json,
+  ["artifact_digest", "provenance.signatures"]
 )
-digest = hash(canonical)
-> **Normative definition.**
-
+canonical = concatenate_length_prefixed(
+  utf8("agent-wasm-artifact-v1"),
+  utf8("sha256"),
+  canonical_json(digest_manifest),
+  for each module in ascending UTF-8 name order:
+    utf8(module.name),
+    module.bytes
+)
+digest = SHA-256(canonical)
+artifact_digest = "artifact:sha256:" + lowercase_hex(digest)
 ```
 
-The hash function MUST be SHA-256 or stronger.
+Every component in `concatenate_length_prefixed` is preceded by its unsigned
+64-bit big-endian byte length. The module name participates in the preimage.
+`canonical_json` is defined by
+[Canonical JSON encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md#canonical-json-encoding).
+
+The base profile MUST use SHA-256. `artifact_digest` and signature references
+are excluded from the digest preimage so digest and signature calculation are
+not self-referential. They remain admission metadata bound to the calculated
+digest. An explicit versioned extension is required for another digest
+algorithm or preimage format.
 
 ### Artifact digests
 
@@ -87,17 +104,14 @@ Artifact digests use the following format:
 
 ```
 artifact:<algorithm>:<hex-digest>
-> **Normative definition.**
-
 ```
 
 Examples:
 
 - `artifact:sha256:a1b2c3d4e5f6...`
-- `artifact:sha512:9f8e7d6c5b4a...`
 
-The digest algorithm MUST be recorded in the canonical representation and
-used for all digest comparisons.
+The digest algorithm MUST be `sha256` for the base profile and MUST be used for
+all digest comparisons.
 
 ### Media types
 
@@ -114,7 +128,7 @@ The following media types are used for artifacts and manifests:
 
 Build provenance records the circumstances under which an artifact was
 produced.
-The following provenance fields are REQUIRED:
+The following provenance fields MUST be present:
 
 | Field | Description |
 | --- | --- |
@@ -133,9 +147,12 @@ Optional fields MAY include:
 
 ### Signature references
 
-Signature references identify cryptographic signatures over the artifact
-canonical representation.
-The host MAY verify signatures at admission time.
+Signature references identify cryptographic signatures over the calculated
+artifact digest bytes.
+The host MUST verify every supplied signature at admission time. An unsigned
+artifact remains structurally valid unless an explicit admission policy
+requires a signature. An unsupported signature algorithm is incompatible and
+a failed signature is invalid; neither case may admit the artifact.
 
 Signature reference structure:
 
@@ -146,33 +163,41 @@ Signature reference structure:
   "algorithm": "ed25519 | rsa-pss | ecdsa-p256",
   "key_id": "string",
   "signature": "base64-encoded",
-  "timestamp": "ISO 8601"
+  "timestamp": "ISO 8601",
+  "expires_at": "ISO 8601 | null"
 }
-> **Normative definition.**
-
 ```
 
-The host MUST NOT rely on signatures for security; signatures provide
-provenance and non-repudiation only.
+`timestamp` is the canonical signing time and MUST NOT be later than artifact
+admission time. When `expires_at` is non-null, it MUST be later than
+`timestamp`; admission at or after `expires_at` MUST reject the artifact with
+`artifact.signature.expired`. A null `expires_at` means the signature has no
+metadata expiry. Key revocation and trust policy may still reject a
+cryptographically valid unexpired signature, but MUST NOT classify it as
+expired.
+
+Signature verification establishes artifact integrity and publisher-key
+provenance only. It MUST NOT by itself authorize capabilities, establish
+publisher trust, or replace policy admission.
 
 ## AgentManifest
 
 ### Manifest fields
 
-The `AgentManifest` describes an artifact's capabilities and is REQUIRED
-for all artifacts.
-The following fields are REQUIRED:
+The `AgentManifest` describes an artifact's capabilities and MUST accompany
+all artifacts.
+The following fields MUST be present:
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `artifact_digest` | `artifact:<algo>:<hex>` | Digest of this artifact |
+| `artifact_digest` | `artifact:sha256:<hex>` | Digest of this artifact |
 | `protocol_version` | `string` | Host--guest protocol version |
 | `manifest_version` | `string` | Manifest schema version |
 | `name` | `string` | Human-readable artifact name |
 | `version` | `string` | Semantic version of this artifact |
 | `publisher` | `string` | Publisher identity |
 | `description` | `string` | Human-readable description |
-| `actions` | `Action[]` | Exported actions |
+| `actions` | `ActionDescriptor[]` | Exported action contracts |
 | `routes` | `Route[]` | Declared routes |
 | `state_schemas` | `StateSchema[]` | Declared state schemas |
 | `strategies` | `Strategy[]` | Declared strategies |
@@ -182,30 +207,67 @@ The following fields are REQUIRED:
 | `migrations` | `Migration[]` | State migration definitions |
 | `provenance` | `Provenance` | Build provenance record |
 
-### Action definition
+For this contract, `manifest_version` and `protocol_version` MUST both be
+`1.0.0`. Other versions require successful compatibility negotiation before
+the manifest is admitted.
 
-An action declares a named operation with input and output schemas.
+### Action descriptor
+
+An action descriptor is the single manifest representation of a named
+operation. Chapter 11 imports this type directly and does not define a second
+action representation.
 
 > **Normative definition.**
 
 ```
-Action {
+ActionDescriptor {
   name: string,
   version: string,
   description: string,
-  input_schema: SchemaRef,
-  output_schema: SchemaRef,
-  capabilities: Capability[],
-  handlers: {
+  input_schema: SchemaRef?,
+  output_schema: SchemaRef?,
+  state_access: StateAccess,
+  directive_kinds: DirectiveKind[],
+  required_grants: GrantRef[],
+  deterministic: bool,
+  timeout_ms: int?,
+  handler: {
     kind: "reducer" | "host_function",
     entry: string
   }
 }
-> **Normative definition.**
 
+StateAccess {
+  read: string[],
+  write: string[],
+  delete: string[]
+}
+
+DirectiveKind {
+  type: string,
+  required_capabilities: CapabilityRef[]
+}
+
+CapabilityRef {
+  name: string,
+  version: string?
+}
+
+GrantRef {
+  principal: string?,
+  capability: CapabilityRef,
+  resource: string?,
+  conditions: JsonObject?
+}
 ```
 
-Actions are resolved by the host; guest code does not invoke actions directly.
+Every field is required except fields marked nullable. `deterministic` MUST be
+`true` in the base profile. `timeout_ms`, when present, MUST be positive and
+MUST NOT exceed `time.turn_ms`. Every `StateAccess` entry is an exact canonical
+JSON Pointer under Chapter 12; wildcards and implementation-specific path
+languages are invalid. Every `DirectiveKind.type` MUST be one of Chapter 13's
+six directive kinds. Actions are resolved by the host; guest code does not
+invoke actions directly.
 
 ### Route definition
 
@@ -351,8 +413,11 @@ Migration {
 
 ```
 
-Migrations are executed by the host during state upgrades.
-Guest code does not execute migrations.
+Migrations are orchestrated by the host during state upgrades. After separate
+maintenance authorization, the host invokes the artifact's pure `migrate`
+export, validates its `MigrationResult`, and atomically commits or rejects the
+candidate state. Guest code computes the candidate transformation but never
+authorizes or commits a migration.
 
 ## Schemas
 
@@ -375,16 +440,13 @@ Examples:
 
 ### Canonical schema hashing
 
-Schema hashes are computed over the canonical JSON representation.
-Canonical JSON is defined by sorting keys lexicographically, formatting
-numbers without trailing zeros, and using double quotes for strings.
+Schema hashes are computed over the
+[Canonical JSON encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md#canonical-json-encoding).
 
 > **Normative definition.**
 
 ```
-schema_hash = hash(canonical_json(schema))
-> **Normative definition.**
-
+schema_hash = lowercase_hex(SHA-256(canonical_json(schema)))
 ```
 
 Schema hashes are used for:
@@ -489,7 +551,10 @@ Artifact and manifest validation proceeds in the following order:
 
 1. **Bytes integrity:** Verify module bytes decode as valid Wasm.
 2. **Digest verification:** Compute digest and compare to declared digest.
-3. **Signature verification:** Verify signatures if present; missing signatures are acceptable, but failed verification is a rejection.
+3. **Signature verification:** Validate signing and expiry timestamps and
+   verify every supplied signature; missing signatures are acceptable unless
+   explicit admission policy requires one, but unsupported, expired, or failed
+   signatures are a rejection.
 4. **Feature profile:** Check required Wasm features against host support.
 5. **Manifest structure:** Validate manifest JSON schema and field types.
 6. **Manifest compatibility:** Check version fields against host supported range.
@@ -499,6 +564,16 @@ Artifact and manifest validation proceeds in the following order:
 Rejection at any step HALTS further validation.
 Partial validation results are NOT committed.
 
+### Artifact admission limits
+
+Artifact admission uses the named defaults in
+[Limit categories](02-stable-identities-versions-errors-and-limits.md#limit-categories):
+`artifact.max_bytes`, `manifest.max_actions`, `manifest.max_routes`,
+`manifest.max_schemas`, `schema.max_depth`, `schema.max_fields`, and
+`time.artifact_validation_ms`. A host may configure only a lower positive
+ceiling under the governing implementation-limit rule. Exhaustion MUST use
+`identity.limit.<limit_identifier>`.
+
 ### Cache keys
 
 Compiled artifact cache keys include:
@@ -506,16 +581,14 @@ Compiled artifact cache keys include:
 > **Normative definition.**
 
 ```
-cache_key = hash(
+cache_key = lowercase_hex(SHA-256(canonical_json([
   runtime_family,
   runtime_version,
   target_arch,
   target_features,
   artifact_digest,
   validation_policy
-)
-> **Normative definition.**
-
+])))
 ```
 
 Cache entries are invalidated when:
@@ -527,25 +600,28 @@ Cache entries are invalidated when:
 
 Cache hits MUST be verified against the current validation policy before use.
 
-## Implementation-defined choices and deferred work
+## Fixed choices, internal mechanisms, and deferred work
 
-### Implementation-defined choices
+### Fixed choices and internal mechanisms
 
-| Choice | Domain | Required documentation |
-| --- | --- | --- |
-| Digest algorithm | Artifacts | SHA-256, SHA-512, or stronger; documented in conformance profile |
-| Signature verification | Artifacts | Which algorithms are verified; verification policy |
-| Alias resolution | Registries | Resolution strategy and expiration handling |
-| Registry backend | Registries | Database, storage format, and replication strategy |
-| Cache invalidation policy | Caching | Invalidation triggers and TTL if used |
-| Schema migration execution | Schemas | Migration execution order and rollback policy |
-| Provenance storage | Provenance | Provenance retention and archival strategy |
+The base artifact digest is the SHA-256 construction in
+[Artifact structure](#artifact-structure). Every supplied signature is
+verified. An alias MUST resolve to exactly one currently approved digest;
+missing, expired, revoked, or ambiguous aliases are rejected. Cache entries
+are invalidated only by the fixed triggers in [Cache keys](#cache-keys); a
+time-based cache eviction MAY discard an entry but MUST NOT change admission
+or resolution results.
+
+Registry, cache, and provenance-storage backends are internal mechanisms and
+MAY vary only when canonical bytes, alias results, admission order,
+availability guarantees, and diagnostics are identical. Migration execution
+uses the authorized guest calculation and host-owned atomic validation and
+commit defined in [Migration definition](#migration-definition).
 
 ### Deferred work
 
 | Item | Target | Reason |
 | --- | --- | --- |
-| Artifact signature verification | Milestone 5 | Requires provenance and trust model |
 | Registry replication | Milestone 9 | Requires production platform and deployment |
 | Schema migration UI | Milestone 9 | Requires developer experience and tooling |
 | Artifact dependency resolution | Milestone 5 | Requires capability and plugin system |
@@ -561,11 +637,10 @@ this chapter:
 1. Canonical JSON representation is insufficient for large schemas; binary
     encoding is required for performance; addressed by Binary encoding deferred to
     [Milestone 8](04-turn-lifecycle-protocols-and-canonical-encoding.md) (Binary encoding row).
-2. SHA-256 digest collisions are demonstrated at scale; stronger hash required.
-3. Signature verification is essential for security; cannot be deferred to
-   Milestone 5.
-4. Alias resolution introduces ambiguity; digest-only lookup is required.
-5. Schema migration execution is too complex for host; requires guest
+2. SHA-256 digest collisions are demonstrated at scale; a versioned digest
+   extension is required.
+3. Alias resolution introduces ambiguity; digest-only lookup is required.
+4. Schema migration execution is too complex for host; requires additional guest
     cooperation.
 
 > **Non-normative note.**
@@ -591,12 +666,18 @@ them in the specified order, and cache compiled results.
 The test MUST verify that:
 
 1. Artifact digests are computed correctly and match declared values.
+   Replacing only `artifact_digest` or signature references MUST NOT change the
+   digest preimage; changing any included manifest field, module name, or module
+   byte MUST change the calculated digest.
 2. Manifests are validated for structure, compatibility, and policy.
 3. Schemas are validated for field types, initial state, and migrations.
 4. Cache keys are computed correctly and cache hits are verified.
 5. Provenance records are recorded and retained.
 6. Every model slot is unique, portable, and free of concrete provider,
    endpoint, or credential material.
+7. Every supplied signature is verified and any unsupported or invalid
+   signature rejects admission. A signature with non-null `expires_at` is
+   accepted strictly before that instant and rejected at or after it.
 
 ### Malformed artifacts
 
@@ -628,7 +709,9 @@ The test MUST verify that:
 The host MUST detect and reject stale or outdated artifacts.
 The test MUST verify that:
 
-1. Artifacts with expired signatures are rejected (if signature verification is enabled).
+1. Artifacts admitted at or after a non-null signature `expires_at` are
+   rejected with `artifact.signature.expired`; a null `expires_at` is not
+   expired by age alone.
 2. Artifacts with revoked aliases are rejected with an `artifact.alias.revoked` diagnostic.
 3. Cache entries with outdated validation policies are rejected.
 
@@ -646,19 +729,22 @@ The test MUST verify that:
 The host MUST enforce limits on artifact size and manifest complexity.
 The test MUST verify that:
 
-1. Artifacts exceeding `artifact.max_bytes` are rejected with a
-   `artifact.limit.max_bytes` diagnostic.
-2. Manifests with excessive actions, routes, or schemas are rejected with a
-   `artifact.limit.complexity` diagnostic.
-3. Schemas with excessive nesting or field count are rejected.
+1. Artifacts exceeding `artifact.max_bytes` are rejected with
+   `identity.limit.artifact.max_bytes`.
+2. Manifests exceeding the action, route, or schema ceilings are rejected with
+   `identity.limit.manifest.max_actions`,
+   `identity.limit.manifest.max_routes`, or
+   `identity.limit.manifest.max_schemas`, respectively.
+3. Schemas exceeding the nesting or field ceilings are rejected with
+   `identity.limit.schema.max_depth` or `identity.limit.schema.max_fields`.
 
 ### Timeout and cancellation
 
 The host MUST enforce time limits during artifact validation.
 The test MUST verify that:
 
-1. Validation exceeding `time.artifact_validation_ms` is interrupted with a
-   `artifact.timeout.validation` diagnostic.
+1. Validation exceeding `time.artifact_validation_ms` is interrupted with
+   `identity.limit.time.artifact_validation_ms`.
 2. Cancellation during artifact loading is handled gracefully.
 
 ### Unavailable dependencies
@@ -681,36 +767,46 @@ Any regression MUST be recorded with its approval status.
 
 ## Variability register
 
+This register summarizes the governing clauses linked below; it does not
+define or redeclare permitted variation.
+
+> **Non-normative note.**
+
 | Clause | Type | Selection |
 | --- | --- | --- |
 | Artifact structure | Required | Wasm bytes + manifest + optional signatures |
-| Digest algorithm | Required | SHA-256; stronger algorithms MAY be used |
+| Digest algorithm | Required | SHA-256 with the fixed length-prefixed preimage |
 | Media types | Required | Fixed by this chapter |
 | Build provenance | Required | Fields fixed by this chapter |
-| Signature verification | SHOULD NOT | Provenance only; not a security mechanism |
+| [Optional provenance fields](#build-provenance) | MAY | Builder, dependency, and signature metadata may accompany required provenance |
+| Signature verification | Required when supplied | Every supplied signature is verified; unsigned artifacts require no signature absent explicit policy |
+| [Signature metadata expiry](#signature-references) | MAY per signature | Null never expires by age; non-null expires exactly at `expires_at` |
 | Manifest fields | Required | Fixed by this chapter |
-| Action definition | Required | Fields fixed by this chapter |
+| Action descriptor | Required | Single manifest type imported by Chapter 11; fields fixed by this chapter |
 | Route definition | Required | Fields fixed by this chapter |
 | State schema definition | Required | Fields fixed by this chapter |
 | Strategy definition | Required | Fields fixed by this chapter |
 | Model requirement definition | Required | Logical slots and portable feature constraints; concrete selection prohibited |
+| [Optional model requirements](#model-requirement-definition) | MAY | Optional slots may remain unbound but fail if used while unbound |
 | Capability definition | Required | Fields fixed by this chapter |
 | Migration definition | Required | Fields fixed by this chapter |
 | Schema identifiers | Required | Format fixed by this chapter |
 | Schema hashing | Required | Canonical JSON + SHA-256 |
 | Schema ownership | Required | Fixed by this chapter |
 | Schema compatibility | Required | Semantic versioning rules |
+| [Higher MINOR schema versions](#schema-compatibility) | MAY | Accept only optional additions |
 | Registry lookup | Required | Digest primary; aliases optional |
+| [Alias expiration and revocation](#registry-lookup) | MAY | Registry owners may expire or revoke aliases without changing digest identity |
 | Registry record | Required | Fields fixed by this chapter |
 | Validation order | Required | 8-step order fixed by this chapter |
+| [Artifact admission limits](#artifact-admission-limits) | Implementation limits | Fixed defaults; only lower positive disclosed ceilings are permitted |
 | Cache keys | Required | Components fixed by this chapter |
-| Digest algorithm choice | Implementation-defined | Documented in conformance profile |
-| Signature verification policy | Implementation-defined | Documented in conformance profile |
-| Alias resolution strategy | Implementation-defined | Documented in conformance profile |
-| Registry backend | Implementation-defined | Documented in conformance profile |
-| Cache invalidation policy | Implementation-defined | Documented in conformance profile |
-| Schema migration execution | Implementation-defined | Documented in conformance profile |
-| Provenance storage | Implementation-defined | Documented in conformance profile |
+| [Digest construction](#artifact-structure) | Required | SHA-256 over the fixed non-self-referential preimage |
+| [Signature verification](#signature-references) | Required when supplied | Unsupported or failed signatures reject admission |
+| [Alias resolution](#registry-lookup) | Required | Resolve to exactly one approved digest or reject |
+| [Registry, cache, and provenance backends](#fixed-choices-and-internal-mechanisms) | MAY (internal) | Observable admission and resolution behavior remains identical |
+| [Cache invalidation](#cache-keys) | Required | Fixed semantic triggers; time-based eviction may only discard reusable work |
+| [Schema migration execution](#migration-definition) | Required | Authorized guest calculation followed by host validation and atomic commit |
 
 ## Rationale and evidence (non-normative)
 

@@ -2,7 +2,7 @@
 title: "Revisioned Snapshots Journals History And Storage Contracts"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.1.0"
 tags:
   - milestone-04
@@ -20,7 +20,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 1](../.spec/planning/agentic-system/milestone-04-durable-state-effects-and-recovery/phase-01-revisioned-snapshots-journals-history-and-storage-contracts.md)
 of
 [Milestone 4](../.spec/planning/agentic-system/milestone-04-durable-state-effects-and-recovery/README.md)
@@ -167,7 +167,10 @@ PolicyEvidenceKind {
 ```
 
 `TurnResult` is defined in [Turn Lifecycle Protocols And Canonical Encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md).
-`Directive` is defined in [Directives Strategies Continuations And Terminal States](13-directives-strategies-continuations-and-terminal-states.md).
+`Directive` is defined in
+[Directives](04-turn-lifecycle-protocols-and-canonical-encoding.md#directives),
+with processing semantics in
+[Directive processing](13-directives-strategies-continuations-and-terminal-states.md#directive-processing).
 
 | Field | Type | Required | Purpose |
 |-------|------|----------|---------|
@@ -186,6 +189,13 @@ PolicyEvidenceKind {
 The journal is append-only.
 The host MUST NOT modify, delete, or reorder journal entries.
 The host MUST reject any attempt to modify the journal with `storage.journal.modified`.
+
+> **Normative definition.**
+Journal compaction is limited to rewriting the physical storage representation.
+After compaction, every logical journal entry MUST remain available with
+byte-identical canonical content, the same entry identity and order, and the
+same query, audit, reconstruction, and replay behavior. Compaction MUST NOT
+delete, merge, summarize, or replace a logical audit-journal entry.
 
 > **Normative definition.**
 Each journal entry MUST be written atomically.
@@ -349,7 +359,8 @@ The host MUST provide the following transactional storage interfaces:
 3. **Snapshot**: Create a new snapshot with the next revision number.
 4. **Journal scan**: Scan journal entries within a revision range or time range.
 5. **Checkpoint**: Mark a point in the journal for quick recovery.
-6. **Retention**: Apply retention policies to old snapshots and journal entries.
+6. **Retention**: Apply retention policies to eligible snapshots and derived
+   projections while preserving every logical audit-journal entry indefinitely.
 
 > **Normative definition.**
 Each storage interface MUST support the following isolation levels:
@@ -376,8 +387,9 @@ The host MUST provide consistent reads for the following operations:
 
 > **Normative definition.**
 The host MUST reject reads for non-existent snapshots with `storage.snapshot.not_found`.
-The host MUST reject reads for journal entries that have been garbage collected
-with `storage.journal.garbage_collected`.
+Every committed logical audit-journal entry MUST remain readable. An unavailable
+entry is corruption or storage unavailability, not a permitted retention outcome,
+and MUST use `storage.journal.corruption` or `storage.unavailable`, respectively.
 
 ### Optimistic conflict detection
 
@@ -498,7 +510,6 @@ history and storage contracts:
 | `storage.snapshot.conflict` | Optimistic concurrency conflict |
 | `storage.journal.modified` | Attempt to modify append-only journal |
 | `storage.journal.corruption` | Journal entry checksum verification failed |
-| `storage.journal.garbage_collected` | Journal entry has been garbage collected |
 | `storage.unavailable` | Storage backend unavailable |
 
 > **Normative definition.**
@@ -509,15 +520,23 @@ boundary without exposing secrets.
 ### Bounded diagnostics
 
 > **Normative definition.**
-The host MUST emit bounded diagnostics for each failure outcome.
-The diagnostics MUST include:
+The host MUST emit bounded diagnostics for each failure outcome using exactly
+the `Diagnostic` top-level structure in
+[Diagnostics](04-turn-lifecycle-protocols-and-canonical-encoding.md#diagnostics).
+The domain error from the table above is `code`, `severity` is `error`, and
+`details` contains `phase`, `contract`, `profile`, `failed_boundary`, `context`,
+`entity_identifiers`, `timestamp`, and `retryable`. Entity identifiers contain
+only the applicable tenant, agent, snapshot, or entry identifiers.
 
-1. **Error code**: The specific error code from the table above.
-2. **Context**: The operation that failed (e.g., snapshot read, journal write).
-3. **Entity identifiers**: The tenant ID, agent ID, snapshot ID, or entry ID
-   involved (without exposing sensitive data).
-4. **Timestamp**: The time the error occurred.
-5. **Retryable**: Whether the operation can be retried.
+| Family | Domain codes |
+|--------|--------------|
+| `identity.validation.storage_contract` | `storage.journal.modified` |
+| `identity.compatibility.storage_contract` | `storage.snapshot.lifecycle_inconsistent`, `storage.snapshot.incompatible_schema`, `storage.snapshot.incompatible_artifact` |
+| `identity.conflict.storage_contract` | `storage.snapshot.duplicate`, `storage.snapshot.conflict` |
+| `identity.resource.storage_contract` | `storage.snapshot.not_found`, `storage.unavailable` |
+| `identity.storage.storage_contract` | `storage.snapshot.corruption`, `storage.journal.corruption` |
+
+No additional top-level diagnostic member is permitted.
 
 > **Normative definition.**
 The host MUST NOT expose internal implementation details, secrets, or
@@ -528,13 +547,23 @@ sensitive data in diagnostics.
 > **Normative implementation-defined choice.**
 The following choices are implementation-defined and MUST be documented in the
 conformance profile:
+Each selection is one of the alternatives or bounded domains stated below.
+Observable checksum values, retention availability, retry timing, and storage
+resource consumption may differ according to the recorded selections.
 
-1. **Storage backend**: The chosen storage backend and its durability guarantees.
-2. **Hash algorithm**: The hash algorithm used for checksums.
-3. **Retention period**: The journal and snapshot retention period.
-4. **Retry strategy**: The retry strategy for transient failures.
-5. **Garbage collection**: The garbage collection strategy for old snapshots
-   and journal entries.
+1. **Storage backend**: A transactional database, an object store paired with a
+   durable journal, or an append-only durable log, with its durability
+   guarantees.
+2. **Hash algorithm**: SHA-256, SHA-384, SHA-512, or BLAKE3 for checksums.
+3. **Retention period**: Snapshot retention where the snapshot lifecycle permits
+   deletion, plus retention of derived conversation and reconstruction
+   projections. Audit-journal entries have no finite retention period.
+4. **Retry strategy**: No retry, fixed-delay retry, or exponential-backoff retry
+   for transient failures, subject to the governing attempt and duration limits.
+5. **Garbage collection**: Reference counting, mark-and-sweep, or
+   lifecycle-triggered deletion for snapshots and
+   derived projections whose governing lifecycle permits deletion. Logical
+   audit-journal entries are never garbage collected.
 
 ### Deferred work
 
@@ -545,7 +574,8 @@ The following work is deferred to later phases or host implementations:
    versions.
 2. **Storage backend migration**: The migration strategy between storage
    backends.
-3. **Journal compaction**: The compaction strategy for the audit journal.
+3. **Journal compaction optimization**: Alternative physical compaction
+   techniques that preserve the fixed logical behavior defined above.
 4. **Snapshot compression**: The compression strategy for old snapshots.
 
 ### Results invalidating earlier milestones
@@ -555,8 +585,9 @@ The following results from Phase 1 MAY invalidate earlier milestone assumptions:
 
 1. **Storage requirements**: If the storage requirements exceed the capacity
    planned in earlier milestones, the capacity plan MUST be revised.
-2. **Journal growth**: If the journal grows faster than expected, the retention
-   policy and storage capacity MUST be revised.
+2. **Journal growth**: If the journal grows faster than expected, storage
+   capacity or the physical compaction strategy MUST be revised without
+   deleting or changing logical audit-journal entries.
 3. **Checksum algorithm**: If the chosen checksum algorithm has known weaknesses,
    the algorithm MUST be changed.
 
@@ -572,7 +603,8 @@ affected milestone MUST be revised and re-validated.
 The Phase 1 integration tests MUST verify the following objectives:
 
 1. **Canonical successful flow**: The host creates, reads, updates, and deletes
-   snapshots and journal entries correctly.
+   eligible snapshots correctly while creating, reading, and physically
+   compacting journal storage without deleting logical audit-journal entries.
 2. **Failure handling**: The host handles malformed, incompatible, stale,
    duplicate, and boundary-limit inputs correctly.
 3. **Transient failure recovery**: The host recovers from timeout, cancellation,
@@ -598,8 +630,12 @@ The following tests MUST verify the canonical successful flow:
 5. **Journal scan**: Scan journal entries within a revision range and verify
    the results.
 6. **Snapshot deletion**: Delete a snapshot and verify it is removed.
-7. **Journal compaction**: Compact the journal and verify the results are
-   consistent.
+7. **Journal compaction**: Compact the physical journal representation and
+   verify that every logical entry remains byte-identical, in the same order,
+   and produces identical audit, query, reconstruction, and replay results.
+8. **Audit-journal retention**: Apply the shortest supported snapshot and
+   derived-projection retention periods and verify that every logical
+   audit-journal entry remains readable and unchanged.
 
 > **Normative definition.**
 Each test MUST record the following evidence:
@@ -628,8 +664,8 @@ The following tests MUST verify failure handling:
    the error code.
 
 > **Normative definition.**
-Each test MUST verify that the error code and diagnostic message match the
-expected values.
+Each test MUST verify the exact Chapter 04 diagnostic shape, assigned family,
+domain `code`, `severity: "error"`, message, and required bounded details.
 
 ### Transient failure recovery tests
 
@@ -685,12 +721,18 @@ gates.
 
 ## Variability register
 
+The register below indexes profile selections and other variability governed by
+the linked clauses. It does not independently license variation.
+
+> **Non-normative note.**
+
 | Item | Permission | Recommendation | Constraint |
 |------|------------|----------------|------------|
-| Hash algorithm for checksums | Use any cryptographically secure hash | SHA-256 or stronger | Must be constant within a deployment |
-| State-schema migration | Deferred to host implementation | Document migration strategy | No automatic migration without consent |
-| Journal retention period | Implementation-defined | Document in conformance profile | Must comply with regulatory requirements |
-| Snapshot garbage collection | Implementation-defined | Document retention policy | Must preserve audit journal for cancelled/completed agents |
-| Storage backend | Choose any backend | Document in conformance profile | Must support ACID transactions |
-| Retry strategy | Implementation-defined | Exponential backoff | Must limit retries and back off |
-| Conflict resolution | Implementation-defined | Abort and retry | Must not silently overwrite data |
+| [Hash algorithm for checksums](#checksum-computation) | Use any cryptographically secure hash | SHA-256 or stronger | Must be constant within a deployment |
+| [State-schema migration](#state-schema-version) | Deferred to host implementation | Document migration strategy | No automatic migration without consent |
+| [Snapshot and derived-projection retention](#implementation-defined-choices) | Implementation-defined | Document in conformance profile | Must not delete snapshots whose lifecycle requires preservation or any logical audit-journal entry |
+| [Snapshot and derived-projection garbage collection](#implementation-defined-choices) | Implementation-defined | Document retention policy | Must preserve every logical audit-journal entry indefinitely |
+| [Journal compaction](#append-only-turn-journal) | Internal mechanism | Physical rewrite only | Must preserve byte-identical logical entries, identity, order, queries, audit, reconstruction, and replay |
+| [Storage backend](#backend-neutral-durability) | Choose any backend | Document in conformance profile | Must support ACID transactions |
+| [Retry strategy](#unavailable-store) | Implementation-defined | Exponential backoff | Must limit retries and back off |
+| [Conflict resolution](#optimistic-conflict-detection) | Required | Abort and retry | Must not silently overwrite data |

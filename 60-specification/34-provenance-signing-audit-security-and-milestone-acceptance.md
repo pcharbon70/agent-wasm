@@ -2,7 +2,7 @@
 title: "Provenance Signing Audit Security And Milestone Acceptance"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.1.0"
 tags:
   - milestone-05
@@ -18,7 +18,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 5](../.spec/planning/agentic-system/milestone-05-capabilities-plugins-security-and-tenancy/phase-05-provenance-signing-audit-security-and-milestone-acceptance.md)
 of
 [Milestone 5](../.spec/planning/agentic-system/milestone-05-capabilities-plugins-security-and-tenancy/README.md)
@@ -33,6 +33,19 @@ Material visibly marked non-normative does not create conformance
 obligations.
 Promotion to `status: normative` requires evidence from the Phase 5
 integration tests and a passing cross-milestone fixture run.
+
+> **Normative definition.**
+Within the artifact-admission boundary defined by this chapter, the signature
+rules below explicitly replace the optional signature-admission behavior in
+[Chapter 03 Signature references](03-agent-manifests-artifacts-schemas-and-registries.md#signature-references)
+and
+[Chapter 03 Validation order](03-agent-manifests-artifacts-schemas-and-registries.md#validation-order).
+Chapter 03 continues to define the parseable provenance representation, so an
+RSA-PSS or ECDSA-P256 reference may be decoded as historical metadata, but it
+is not admissible here. Every artifact presented to this admission boundary
+MUST carry an Ed25519 signature. A missing signature, a non-Ed25519 signature,
+or an invalid Ed25519 signature MUST fail with
+`artifact.admission.signature-invalid` before the artifact is loaded or cached.
 
 ### Milestone acceptance criteria
 
@@ -49,7 +62,7 @@ Phase 5 MILESTONE ACCEPTANCE requires:
 4. **Evidence recording**: All integration test evidence MUST be recorded
    as machine-readable YAML reports in the `50-journal/` directory.
 5. **Conformance profile**: The conformance profile MUST document all
-   implementation-defined choices listed in this chapter.
+   profile selections declared by visible callouts in this chapter.
 
 > **Normative definition.**
 Phase 5 FAILS MILESTONE ACCEPTANCE if:
@@ -102,35 +115,37 @@ graph, and a compiler or PDK provenance claim that must be verified.
 The host MUST verify every artifact against each of the following
 admission checks.
 Failure of any single check MUST cause the host to reject the artifact
-with the diagnostic `artifact.admission.failed` and MUST NOT load the
-artifact into any instance pool, agent pin, or cache.
+with the check-specific diagnostic below and MUST NOT load the artifact into
+any instance pool, agent pin, or cache.
 
 | Check | Verifiable claim | Failure diagnostic |
 |-------|-----------------|-------------------|
-| **Digest integrity** | The artifact's cryptographic digest matches the digest recorded in its manifest or attestation. | `artifact.digest-mismatch` |
-| **Signature validity** | The artifact's signature (code-signing, build-signing, or attestation signature) is valid and signed by a publisher identity the host trusts. | `artifact.signature-invalid` |
-| **Publisher identity** | The signing identity maps to a known publisher in the host's trust store and has not been revoked. | `artifact.publisher-untrusted` |
-| **Build provenance** | The build record identifies the compiler, PDK version, build environment, and build timestamp claimed by the publisher. | `artifact.build-provenance-invalid` |
-| **Dependency resolution** | Every dependency declared in the artifact's manifest resolves to a verified, non-revoked artifact in the host's dependency cache. | `artifact.dependency-unresolved` |
-| **Compiler and PDK match** | The artifact was built with a compiler and PDK version that the host policy declares compatible. | `artifact.compiler-incompatible` |
-| **Revocation check** | The artifact and its signing identity are not present in any active revocation list maintained by the host or by upstream trust authorities. | `artifact.revoked` |
+| **Digest integrity** | The artifact's cryptographic digest matches the digest recorded in its manifest or attestation. | `artifact.admission.digest-mismatch` |
+| **Signature validity** | The required Ed25519 signature is present and cryptographically valid. | `artifact.admission.signature-invalid` |
+| **Publisher identity** | The signing identity maps to a known publisher in the host's trust store and has not been revoked. | `artifact.admission.publisher-untrusted` |
+| **Build provenance** | The build record identifies the compiler, PDK version, build environment, and build timestamp claimed by the publisher. | `artifact.admission.build-provenance-invalid` |
+| **Dependency resolution** | Every dependency declared in the artifact's manifest resolves to a verified, non-revoked artifact in the host's dependency cache. | `artifact.admission.dependency-unresolved` |
+| **Compiler and PDK match** | The artifact was built with a compiler and PDK version that the host policy declares compatible. | `artifact.admission.compiler-incompatible` |
+| **Revocation check** | The artifact and its signing identity are not present in any active revocation list maintained by the host or by upstream trust authorities. | `artifact.admission.revoked` |
 
 > **Normative definition.**
-The digest integrity check uses a cryptographic hash algorithm declared
-in the host conformance profile.
-The host MUST compute the digest over the exact bytes of the artifact
-file and compare it against the digest value recorded in the artifact's
-manifest or attestation.
+The digest integrity check MUST use the fixed SHA-256 artifact identity
+construction defined by
+[Artifact structure](03-agent-manifests-artifacts-schemas-and-registries.md#artifact-structure).
+The host MUST compute that digest over the canonical length-prefixed artifact
+preimage and compare it against the `artifact:sha256:<hex>` value recorded in
+the artifact's manifest or attestation.
 A byte-for-byte mismatch, regardless of cause, MUST fail this check.
 
 > **Normative definition.**
-The signature validity check requires the artifact to carry a signature
+The signature validity check requires the artifact to carry an Ed25519 signature
 produced by a key pair whose public component is registered in the host's
 publisher trust store.
 The host MUST verify the signature over the artifact's digest, not over
 the raw bytes, to prevent signature rebinding attacks.
-The exact signature scheme (Ed25519, RSA-PSS, ECDSA, or another scheme)
-is an implementation-defined choice documented in the conformance profile.
+Ed25519 is the only conforming artifact signature scheme. The host MUST reject
+an artifact that omits a signature or declares or uses any other signature
+scheme with `artifact.admission.signature-invalid`.
 
 > **Normative definition.**
 The publisher identity check maps the signing key to a publisher record
@@ -198,7 +213,7 @@ activation and instance mode policies defined in
 ```
 ArtifactAdmissionRequest {
   artifact_id: ArtifactId,
-  artifact_digest: Digest,
+  artifact_digest: ArtifactDigest,
   artifact_signature: Signature?,
   attestation: Attestation?,
   manifest: ArtifactManifest,
@@ -207,8 +222,7 @@ ArtifactAdmissionRequest {
 }
 
 ArtifactId = string
-Digest = { algorithm: HashAlgorithm, value: bytes }
-HashAlgorithm = "sha256" | "sha384" | "sha512" | "blake3"
+ArtifactDigest = string
 Signature = bytes
 Attestation = bytes
 PublisherId = string
@@ -221,6 +235,10 @@ AdmissionContext {
 
 TrustTier = "untrusted" | "sandboxed" | "semi-trusted" | "trusted" | "operator"
 ```
+
+`ArtifactDigest` MUST be the canonical `artifact:sha256:<hex>` identity
+defined by
+[Artifact digests](03-agent-manifests-artifacts-schemas-and-registries.md#artifact-digests).
 
 Every artifact admission request MUST include the request structure
 defined above.
@@ -237,7 +255,7 @@ If the signature is absent or invalid, the `publisher_hint` field is
 ignored.
 If the signature is valid but the signing identity does not match the
 `publisher_hint`, the host MUST emit the diagnostic
-`artifact.publisher-hint-mismatch` in addition to the standard admission
+`artifact.admission.publisher-hint-mismatch` in addition to the standard admission
 result.
 
 > **Non-normative note.**
@@ -247,12 +265,16 @@ the artifact's own metadata is incomplete or ambiguous.
 It does not substitute for cryptographic verification.
 
 > **Normative implementation-defined choice.**
-The host defines the exact format and storage mechanism for the publisher
-trust store, revocation lists, compatibility policy records, and
-dependency cache.
+The host selects one of a transactional database, append-only durable log, or
+content-addressed object store with transactional index as the
+implementation-defined storage mechanism for the publisher trust store,
+revocation lists, compatibility policy records, and dependency cache.
 These data structures MUST support concurrent read access and MUST
 document their maximum size, expiration policy, and update protocol in
 the conformance profile.
+Observable cache expiry, capacity rejection, and query latency may differ
+according to the recorded selections; trust, revocation, and compatibility
+decisions MUST NOT differ for the same records.
 
 ### Host-owned evidence recording
 
@@ -313,8 +335,8 @@ record that supports the violation or detection, following the same
 principles as the `evidence_hash` field in bounded diagnostics defined
 in
 [Synchronous Host Functions WASI Restrictions And Tenant Isolation](33-synchronous-host-functions-wasi-restrictions-and-tenant-isolation.md#bounded-diagnostics-and-evidence).
-The exact hashing algorithm and evidence record format are
-implementation-defined choices documented in the conformance profile.
+These fields MUST use the hashing algorithm and evidence record format selected
+for [Chapter 33 bounded diagnostics](33-synchronous-host-functions-wasi-restrictions-and-tenant-isolation.md#bounded-diagnostics-and-evidence).
 
 > **Normative definition.**
 
@@ -392,11 +414,11 @@ The provenance chain MUST support forensic queries such as:
 - "Show all admissions of artifact Z, including failures."
 - "Show all artifacts in the dependency graph of artifact W."
 
-> **Normative implementation-defined choice.**
-The host defines the exact storage mechanism for the provenance chain
-(database schema, log structure, or graph database).
-The mechanism MUST support efficient forensic queries and MUST be
-documented in the conformance profile.
+> **Normative definition.**
+The provenance-chain storage mechanism is internal. Whether implemented as a
+database schema, log structure, or graph database, it MUST return the same
+records and links for every forensic query and MUST preserve the immutable
+chain defined above.
 
 > **Non-normative note.**
 Evidence immutability is the primary defense against audit tampering.
@@ -406,10 +428,15 @@ The integrity check mechanism (append-only log, Merkle tree, cryptographic
 hash chain, or equivalent) is implementation-defined.
 
 > **Normative implementation-defined choice.**
-The host defines the exact storage mechanism for evidence records
-(database, file system, object store, or distributed log), the
-integrity check mechanism, the retention period, and the query interface.
+The host selects one of a database, file system, object store, or distributed log as
+the implementation-defined evidence store and an append-only log, Merkle tree,
+or cryptographic hash chain as its integrity mechanism. The retention period is
+a finite whole-day period no shorter than the governing policy minimum, and the
+query interface is synchronous or asynchronous.
 These choices MUST be documented in the conformance profile.
+Observable query latency and evidence availability after the minimum retention
+period may differ according to the recorded selections; evidence bytes,
+integrity verdicts, and availability during the minimum period MUST NOT differ.
 
 ### Evidence redaction
 
@@ -509,10 +536,14 @@ Changes to the redaction policy MUST be recorded as `policy.revision`
 evidence records.
 
 > **Normative implementation-defined choice.**
-The host defines the exact field patterns used to identify fields in
-each redaction category, the format of stable references, and the
-mechanism used to enforce access policy at query time.
+The host selects one of keyword matching, schema annotations, or both as the
+implementation-defined field-detection strategy; `marker`, `hash`, or `pointer`
+as the stable-reference format; and direct evaluation or policy-versioned cache
+evaluation as the query-time enforcement mechanism.
 These choices MUST be documented in the conformance profile.
+Observable redacted fields, reference text, and query latency may differ
+according to the recorded selections. Every selection MUST still enforce the
+recorded access matrix and invalidate stale policy results before use.
 
 > **Non-normative note.**
 Field patterns for secrets MAY use keyword matching (e.g., `*key*`,
@@ -536,27 +567,24 @@ A step that fails MUST abort the flow and produce an
 | Step | Action | On failure |
 |------|--------|------------|
 | 1 | Validate `ArtifactAdmissionRequest` structure. | Emit `artifact.admission.malformed` diagnostic. Emit `artifact.rejected` record. |
-| 2 | Compute artifact digest using declared `HashAlgorithm`. | Emit `artifact.admission.digest-computation-failed` diagnostic. Emit `artifact.rejected` record. |
-| 3 | Verify digest integrity against manifest/attestation. | Emit `artifact.digest-mismatch` diagnostic. Emit `artifact.rejected` record. |
-| 4 | Verify artifact signature if present. | Emit `artifact.signature-invalid` diagnostic. Emit `artifact.rejected` record. |
-| 5 | Resolve publisher identity from signature. | Emit `artifact.publisher-untrusted` diagnostic. Emit `artifact.rejected` record. |
-| 6 | Query revocation lists for artifact and publisher. | Emit `artifact.revoked` diagnostic. Emit `artifact.rejected` record. |
-| 7 | Validate build provenance fields. | Emit `artifact.build-provenance-invalid` diagnostic. Emit `artifact.rejected` record. |
-| 8 | Resolve and verify all declared dependencies. | Emit `artifact.dependency-unresolved` diagnostic. Emit `artifact.rejected` record. |
-| 9 | Check compiler and PDK compatibility policy. | Emit `artifact.compiler-incompatible` diagnostic. Emit `artifact.rejected` record. |
+| 2 | Compute the fixed SHA-256 artifact digest over the canonical artifact preimage. | Emit `artifact.admission.digest-computation-failed` diagnostic. Emit `artifact.rejected` record. |
+| 3 | Verify digest integrity against manifest/attestation. | Emit `artifact.admission.digest-mismatch` diagnostic. Emit `artifact.rejected` record. |
+| 4 | Verify the required Ed25519 artifact signature. | Emit `artifact.admission.signature-invalid` diagnostic. Emit `artifact.rejected` record. |
+| 5 | Resolve publisher identity from signature. | Emit `artifact.admission.publisher-untrusted` diagnostic. Emit `artifact.rejected` record. |
+| 6 | Query revocation lists for artifact and publisher. | Emit `artifact.admission.revoked` diagnostic. Emit `artifact.rejected` record. |
+| 7 | Validate build provenance fields. | Emit `artifact.admission.build-provenance-invalid` diagnostic. Emit `artifact.rejected` record. |
+| 8 | Resolve and verify all declared dependencies. | Emit `artifact.admission.dependency-unresolved` diagnostic. Emit `artifact.rejected` record. |
+| 9 | Check compiler and PDK compatibility policy. | Emit `artifact.admission.compiler-incompatible` diagnostic. Emit `artifact.rejected` record. |
 | 10 | Record `artifact.admitted` evidence with full admission result. | N/A (this is the success terminal step). |
 
 > **Non-normative note.**
-Steps 3 through 9 are independent checks and MAY be executed in parallel
-by a conforming implementation, provided the final admission result is
-deterministic and the evidence record reflects the complete set of
-checks performed.
-Sequential execution is the reference behavior; parallel execution is
-an optimization that must not change observable outcomes.
+The fixed order makes the first failing check and its diagnostic reproducible.
+An implementation may optimize work inside one check, but a later check does
+not begin before the preceding check succeeds.
 
 > **Normative definition.**
 If the `publisher_hint` field is present and the signing identity does
-not match it, the host MUST emit the `artifact.publisher-hint-mismatch`
+not match it, the host MUST emit the `artifact.admission.publisher-hint-mismatch`
 diagnostic but MUST NOT fail the admission flow on this mismatch alone.
 The diagnostic is recorded in the `artifact.admitted` evidence record's
 `detail` field for the `publisher_hint` check.
@@ -570,11 +598,17 @@ re-performing checks 2 through 9, provided the cache entry is still
 valid (not expired, not revoked, and not superseded by a policy revision).
 
 > **Normative implementation-defined choice.**
-The host defines the cache validity policy, including maximum entry age,
-conditions for cache invalidation beyond revocation, and the behavior
+The implementation-defined cache validity mode is either no reuse,
+age-bounded reuse with a finite positive whole-second maximum entry age, or
+policy-revision-bounded reuse. It includes conditions for invalidation beyond
+revocation and the behavior
 when a cached artifact's publisher is later revoked (existing instances
 are not affected per
 [Revocation check](#artifact-admission-verification)).
+The selected cache validity policy MUST be documented in the conformance
+profile.
+Observable cache-hit latency and revalidation frequency may differ by mode;
+admission decisions for the same current trust and policy state MUST NOT differ.
 
 ### Evidence recording flow
 
@@ -603,8 +637,8 @@ normal record creation.
 The alert path records the event, notifies the operator, and MAY
 initiate containment actions such as instance quarantine or tenant
 suspension.
-The exact containment actions are implementation-defined choices
-documented in the conformance profile.
+Any containment action MUST come from the catalog declared by the profiled
+alert mechanism in [Evidence recording flow](#evidence-recording-flow).
 
 > **Non-normative note.**
 The security alert path for isolation violations and residue detection
@@ -614,9 +648,15 @@ Without it, a cross-tenant leak would be visible only in retrospective
 forensic analysis.
 
 > **Normative implementation-defined choice.**
-The host defines the alert notification mechanism (email, webhook,
-dashboard event, or other), the containment action catalog, and the
+The host defines the alert notification mechanism (email, webhook, or
+dashboard event), the containment action catalog, and the
 escalation policy for different severity levels.
+These selections MUST be documented in the conformance profile.
+The notification channel is one of email, webhook, or dashboard event, and the
+containment catalog is a non-empty finite set drawn from instance quarantine,
+tenant suspension, and credential revocation. Observable notification channel
+and containment action may differ according to the recorded selections; every
+security event MUST still be recorded and delivered to an operator.
 
 ### Evidence redaction flow
 
@@ -658,9 +698,15 @@ high query throughput SHOULD cache redacted views with a policy-version
 stamp and invalidate the cache on policy changes.
 
 > **Normative implementation-defined choice.**
-The host defines the query interface for evidence records, the caching
-strategy for redacted views, and the cache invalidation protocol on
-policy changes.
+The query interface for evidence records, the caching strategy for redacted
+views, and the cache invalidation protocol on policy changes are
+implementation-defined. Any selection MUST apply the current access policy at
+query time, invalidate stale views before serving a policy revision, and
+produce the same authorized redacted fields and stable references.
+These selections MUST be documented in the conformance profile.
+The query interface is either synchronous request/response or asynchronous
+export, and caching is either disabled or keyed by policy version. Observable
+query latency and delivery mode may differ; authorized field content MUST NOT.
 
 ### Security exercises
 
@@ -682,8 +728,8 @@ implementation MUST detect every attack vector defined below.
 [Synchronous Host Functions WASI Restrictions And Tenant Isolation](33-synchronous-host-functions-wasi-restrictions-and-tenant-isolation.md). | Truncate or reject at invocation time; record `invocation.failed` with `failure_type: output-oversize`. | Invocation boundary, output validation (see
 [Extism Invocation Boundary Instances And Output Validation](20-extism-invocation-boundary-instances-and-output-validation.md)). |
 | **Invalid UTF-8** | An artifact produces an invocation output containing invalid UTF-8 byte sequences in a field declared as UTF-8. | Reject output at invocation time; record `invocation.failed` with `failure_type: invalid-utf8`. | Output validation, UTF-8 conformance. |
-| **Forged identity** | An attacker submits an artifact with a signature produced by a key that impersonates a trusted publisher. | Reject with `artifact.signature-invalid` or `artifact.publisher-untrusted`. | Signature validity, publisher identity. |
-| **Stale grant** | An artifact's publisher was revoked between the artifact's build and its admission attempt. | Reject with `artifact.revoked`. | Revocation check. |
+| **Forged identity** | An attacker submits an artifact with a signature produced by a key that impersonates a trusted publisher. | Reject an invalid signature with `artifact.admission.signature-invalid`; reject a valid signature from an untrusted key with `artifact.admission.publisher-untrusted`. | Signature validity, publisher identity. |
+| **Stale grant** | An artifact's publisher was revoked between the artifact's build and its admission attempt. | Reject with `artifact.admission.revoked`. | Revocation check. |
 | **Route confusion** | An artifact exploits ambiguous routing between agent, tenant, and system invocation paths to obtain capabilities it should not receive. | Reject capability grant with `grant.denied` and record `tenant.isolation.violation`. | Grant policy, tenant isolation. |
 | **Output injection** | A malicious artifact attempts to inject tenant-specific data into another tenant's evidence records through a shared artifact. | Reject cross-tenant write; record `tenant.isolation.violation` and emit the security alert path. | Tenant isolation, evidence recording. |
 
@@ -695,7 +741,10 @@ An import is considered malicious if it references a module, function,
 or memory region that the host's capability policy does not grant to
 the artifact's trust tier.
 The exact mechanism for declaring permitted imports (allowlist, denylist,
-or capability-attenuation policy) is implementation-defined.
+or capability-attenuation policy) is internal. For the same artifact, trust
+tier, and active capability policy, every mechanism MUST expose exactly the
+same permitted imports and MUST reject every ungranted import with the same
+diagnostic and without loading the artifact.
 
 > **Non-normative note.**
 Malicious imports are the most common attack vector in WebAssembly
@@ -712,8 +761,8 @@ An artifact that produces output exceeding the limit MUST NOT be
 allowed to consume unbounded host resources.
 The host MUST either truncate the output to the limit and emit a
 diagnostic or reject the invocation entirely.
-The choice between truncation and rejection is an implementation-defined
-choice documented in the conformance profile.
+The exercise MUST apply the truncation-or-rejection disposition recorded by the
+[invocation-context output-limit profile](33-synchronous-host-functions-wasi-restrictions-and-tenant-isolation.md#invocation-context-binding).
 
 > **Normative definition.**
 The invalid UTF-8 exercise tests that the host validates UTF-8
@@ -817,7 +866,7 @@ conforming implementation MUST pass every exercise defined below.
 | **Pool reset** | A compromised instance in a shared pool retains state after reset. | Detect residue post-reset with `residue.detected`; escalate to operator. | Instance pool, reset semantics. |
 | **Cancellation races** | An artifact exploits a race between invocation cancellation and state commit to leave partial state. | Detect partial state with `residue.detected`; roll back to pre-invocation state. | Cancellation, atomicity. |
 | **Capability revocation** | An artifact retains capabilities after its grant is revoked mid-invocation. | Detect retained capabilities; revoke them; record `tenant.isolation.violation`. | Capability policy, revocation. |
-| **Compromised plugin upgrade** | A malicious plugin upgrade replaces a trusted plugin in an agent's pin without re-admission. | Detect unverified upgrade; reject with `artifact.admission.failed`; require full re-admission. | Artifact admission, agent pin lifecycle. |
+| **Compromised plugin upgrade** | A malicious plugin upgrade replaces a trusted plugin in an agent's pin without re-admission. | Detect the unverified upgrade; reject it with `artifact.admission.not-verified`; require full re-admission. | Artifact admission, agent pin lifecycle. |
 | **Audit tampering** | An attacker modifies or deletes evidence records after writing. | Detect modification with `evidence.integrity-violation`; emit security alert; quarantine affected records. | Evidence integrity, audit log. |
 
 > **Normative definition.**
@@ -829,8 +878,8 @@ tenant's state before and after an invocation.
 If any state change is observed in a tenant's scope that is not
 attributable to that tenant's own invocation, the host MUST emit
 `residue.detected`.
-The exact mechanism for detecting tenant residue (state snapshots,
-capability auditing, or equivalent) is implementation-defined.
+The exercise MUST use the residue-verification mechanism recorded for the
+[Chapter 33 test-residue contract](33-synchronous-host-functions-wasi-restrictions-and-tenant-isolation.md#test-residue).
 
 > **Non-normative note.**
 Tenant residue is the most dangerous isolation failure because it
@@ -999,6 +1048,8 @@ The matrix MUST be machine-readable (YAML, JSON, or equivalent) and
 MUST be includable in the phase's evidence bundle.
 The exact format is an implementation-defined choice documented in
 the conformance profile.
+Observable serialization bytes and field order may differ between YAML and
+JSON; matrix rows, values, and acceptance decisions MUST NOT differ.
 
 > **Non-normative note.**
 The threat-to-control matrix is distinct from the bounded diagnostics
@@ -1025,14 +1076,14 @@ section.
    [Artifact admission verification](#artifact-admission-verification).
 2. **Digest mismatch**: The artifact's computed digest does not match
    the recorded digest.
-3. **Signature invalid**: The artifact's signature is cryptographically
-   invalid, expired, or produced by an unknown key.
+3. **Signature invalid**: The required Ed25519 signature is missing, malformed,
+   expired, cryptographically invalid, or uses another scheme.
 4. **Publisher untrusted**: The signing identity does not map to a
    known, active publisher in the trust store.
 5. **Publisher hint advisory**: The `publisher_hint` field does not match
    the identity derived from the artifact's signature.
    This is an advisory outcome per [Artifact admission verification](#artifact-admission-verification);
-   the host MUST emit `artifact.publisher-hint-mismatch` but MUST NOT fail admission.
+   the host MUST emit `artifact.admission.publisher-hint-mismatch` but MUST NOT fail admission.
 6. **Build provenance invalid**: The build record is missing required
    fields or contains values that fail validation.
 7. **Dependency unresolved**: A declared dependency cannot be resolved
@@ -1046,6 +1097,10 @@ section.
     cache.
 12. **Trust store failure**: The host cannot read its publisher trust
     store or revocation lists.
+13. **Digest computation failure**: The host cannot compute the fixed SHA-256
+    digest over the canonical artifact preimage.
+14. **Not verified**: The exact artifact digest has no successful admission
+    record at a boundary that requires prior admission.
 
 > **Normative definition.**
 Each failure outcome MUST be mapped to a specific error code and
@@ -1057,7 +1112,9 @@ The following error codes are defined for artifact admission failures:
 | Error Code | Description |
 |------------|-------------|
 | `artifact.admission.digest-mismatch` | The artifact's computed digest does not match the recorded digest |
-| `artifact.admission.signature-invalid` | The artifact's signature is cryptographically invalid, expired, or produced by an unknown key |
+| `artifact.admission.digest-computation-failed` | The host cannot compute the fixed SHA-256 digest over the canonical artifact preimage |
+| `artifact.admission.not-verified` | The exact artifact digest has no successful admission record at a boundary that requires prior admission |
+| `artifact.admission.signature-invalid` | The required Ed25519 signature is missing, malformed, expired, cryptographically invalid, or uses another scheme |
 | `artifact.admission.publisher-untrusted` | The signing identity does not map to a known, active publisher in the trust store |
 | `artifact.admission.publisher-hint-mismatch` | The `publisher_hint` field does not match the signing identity (advisory only) |
 | `artifact.admission.build-provenance-invalid` | The build record is missing required fields or contains values that fail validation |
@@ -1143,19 +1200,24 @@ The following error codes are defined for evidence redaction failures:
 > **Normative definition.**
 The host MUST emit a bounded diagnostic for every failure outcome
 listed in the previous subsections.
-A bounded diagnostic is a structured report that contains exactly
-the following fields:
+A bounded diagnostic has exactly the Chapter 04 `Diagnostic` top-level fields.
+The stable error identifier is `code`; `severity` is `error`, except
+`artifact.admission.publisher-hint-mismatch` is `warning`; and `details`
+contains `phase`, `contract`, `profile`, `failed_boundary`, `invocation_id`,
+`tenant_id`, and `evidence_hash`. Conditional identifiers have JSON `null` when
+not applicable.
 
-| Field | Required | Content |
-|-------|----------|---------|
-| `error_code` | Yes | Stable diagnostic identifier following the naming conventions defined in this section. |
-| `phase` | Yes | The phase name, `phase-05-provenance-signing-audit-security-and-milestone-acceptance`. |
-| `contract` | Yes | The subsection of this chapter where the failure boundary was crossed. |
-| `profile` | Yes | The instance mode, tenant scope, or capability scope in effect at the time of failure. |
-| `failed_boundary` | Yes | A human-readable description of the specific invariant or bound that was violated. |
-| `invocation_id` | Conditional | Present if the failure occurred during an invocation; omitted for load-time or registration-time failures. |
-| `tenant_id` | Conditional | Present if the failure is tenant-scoped; omitted if the failure is system-scoped. |
-| `evidence_hash` | Yes | A cryptographic hash of the minimal evidence record that supports the diagnostic. |
+| Family | Domain codes |
+|--------|--------------|
+| `identity.validation.provenance` | `artifact.admission.malformed`, `artifact.admission.digest-mismatch`, `artifact.admission.digest-computation-failed`, `artifact.admission.signature-invalid`, `artifact.admission.publisher-hint-mismatch`, `artifact.admission.build-provenance-invalid`, `artifact.admission.dependency-cycle`, `redaction.policy-error`, `redaction.reference-format-error` |
+| `identity.compatibility.provenance` | `artifact.admission.not-verified`, `artifact.admission.dependency-unresolved`, `artifact.admission.compiler-incompatible`, `artifact.admission.incompatible-version` |
+| `identity.authorization.provenance` | `artifact.admission.publisher-untrusted`, `artifact.admission.revoked`, `artifact.admission.unauthorized`, `redaction.access-evaluation-error` |
+| `identity.conflict.provenance` | `artifact.admission.conflicting` |
+| `identity.limit.provenance` | `artifact.admission.exhausted` |
+| `identity.resource.provenance` | `artifact.admission.trust-store-failure`, `artifact.admission.unavailable`, `evidence.alert-path-failure`, `redaction.query-interface-failure` |
+| `identity.storage.provenance` | `artifact.admission.cache-failure`, `evidence.write-failure`, `evidence.integrity-violation`, `evidence.retention-policy-violation`, `evidence.audit-log-failure`, `evidence.index-failure`, `redaction.cache-invalidation-failure` |
+
+No additional top-level diagnostic member is permitted.
 
 > **Normative definition.**
 The diagnostic MUST NOT contain any of the following:
@@ -1178,39 +1240,34 @@ redaction rules are consistent.
 > **Normative implementation-defined choice.**
 The following choices are implementation-defined and MUST be documented
 in the conformance profile.
+Each selection is one of the alternatives or bounded domains stated below.
+Observable evidence hashes, storage/query latency, redacted fields, alert
+channels, and post-minimum retention availability may differ according to the
+recorded selections; artifact admission and authorization decisions MUST NOT
+differ for the same inputs and current policy state.
 
-1. **Error code catalog**: The exact error code catalog for the
-   `artifact.admission.<subtype>`, `evidence.<subtype>`, and
-   `redaction.<subtype>` naming conventions.
-
-2. **Signature scheme**: The cryptographic signature scheme used for
-   artifact signature verification.
-   Baseline conformance REQUIRES support for Ed25519.
-   Conformance profiles MAY require additional schemes (e.g., RSA-PSS, ECDSA)
-   for specific deployment models.
-
-3. **Hash algorithm**: The hash algorithm used for digest computation
-   and evidence hashing.
+1. **Evidence hash algorithm**: The hash algorithm used for evidence hashing.
+   This choice does not alter the fixed SHA-256 artifact digest construction.
    Baseline conformance REQUIRES support for SHA-256, SHA-384, SHA-512,
    and BLAKE3.
    Conformance profiles MAY restrict to a subset for specific deployment models.
 
-4. **Evidence storage**: The storage mechanism, integrity check
+2. **Evidence storage**: The storage mechanism, integrity check
    mechanism, and retention period for evidence records.
    Baseline conformance REQUIRES normative minimum retention periods
    aligned with common regulations (e.g., GDPR, SOC2, ISO 27001).
 
-5. **Redaction field patterns**: The exact field patterns used to
+3. **Redaction field patterns**: The exact field patterns used to
    identify fields in each redaction category.
 
-6. **Redaction cache strategy**: The caching strategy for redacted
+4. **Redaction cache strategy**: The caching strategy for redacted
    views and the invalidation protocol on policy changes.
 
-7. **Security alert mechanism**: The alert notification mechanism and
+5. **Security alert mechanism**: The alert notification mechanism and
    containment action catalog for isolation violations and residue
    detection.
 
-8. **Publisher trust store format**: The exact format and update
+6. **Publisher trust store format**: The exact format and update
    protocol for the publisher trust store and revocation lists.
 
 ### Test evidence recording
@@ -1400,19 +1457,15 @@ and constrained modes.
 2. **Publisher hint mismatch**: Submit an `ArtifactAdmissionRequest`
    with a `publisher_hint` that does not match the signing identity.
    The host MUST admit the artifact (assuming all other checks pass),
-   emit a `publisher-hint-mismatch` diagnostic in the evidence record,
+   emit an `artifact.admission.publisher-hint-mismatch` diagnostic in the evidence record,
    and NOT fail admission on this mismatch alone.
 3. **Cached artifact reuse**: Submit a second `ArtifactAdmissionRequest`
    for an artifact already cached from the first admission.
    The host MUST skip redundant verification checks and admit the
    artifact using the cached entry.
-4. **Deterministic outcomes under parallel execution**: Submit an
-   `ArtifactAdmissionRequest` and verify that checks 3 through 9 produce
-   a deterministic admission result regardless of execution order.
-   Parallel execution is an allowed optimization per
-   [Artifact admission verification](#artifact-admission-verification);
-   it must not change observable outcomes, but the test must not measure
-   whether parallelism is actually used.
+4. **Ordered failure selection**: Submit requests that would fail multiple
+   checks and verify that checks execute in the fixed order and only the first
+   failing check's admission diagnostic and rejection evidence are emitted.
 
 #### Evidence recording success
 
@@ -1456,32 +1509,53 @@ Failure handling tests verify that every failure outcome defined in
 [Failure outcomes for evidence recording](#failure-outcomes-for-evidence-recording),
 and [Failure outcomes for evidence redaction](#failure-outcomes-for-evidence-redaction)
 produces a stable diagnostic and leaves no unauthorized state.
+Every failure test MUST verify the exact Chapter 04 top-level shape, the
+assigned `identity.*.provenance` family, the expected domain `code`, the fixed
+severity, and every required `details` member.
 
 1. **Malformed request**: Submit a malformed `ArtifactAdmissionRequest`
    and verify the `artifact.admission.malformed` diagnostic.
 2. **Digest mismatch**: Submit an artifact with an incorrect digest
-   in the manifest and verify the `artifact.digest-mismatch` diagnostic.
+   in the manifest and verify the `artifact.admission.digest-mismatch` diagnostic.
 3. **Invalid signature**: Submit an artifact with a cryptographically
-   invalid signature and verify the `artifact.signature-invalid`
+   invalid Ed25519 signature and verify the
+   `artifact.admission.signature-invalid`
    diagnostic.
-4. **Unknown publisher**: Submit an artifact signed by an unknown key
-   and verify the `artifact.publisher-untrusted` diagnostic.
-5. **Revoked artifact**: Submit an artifact whose digest is on the
-   revocation list and verify the `artifact.revoked` diagnostic.
-6. **Missing dependency**: Submit an artifact with an unresolved
-   dependency and verify the `artifact.dependency-unresolved` diagnostic.
-7. **Incompatible compiler**: Submit an artifact built with an
-   unsupported compiler and verify the `artifact.compiler-incompatible`
+4. **Missing signature**: Submit an otherwise valid unsigned artifact and
+   verify `artifact.admission.signature-invalid` before loading or caching.
+5. **Non-Ed25519 signature**: Submit otherwise valid artifacts carrying valid
+   RSA-PSS and ECDSA-P256 signatures and verify
+   `artifact.admission.signature-invalid` for each.
+6. **Unknown publisher**: Submit an artifact with a valid Ed25519 signature
+   from an unknown key and verify the
+   `artifact.admission.publisher-untrusted` diagnostic.
+7. **Revoked artifact**: Submit an artifact whose digest is on the
+   revocation list and verify the `artifact.admission.revoked` diagnostic.
+8. **Missing dependency**: Submit an artifact with an unresolved
+   dependency and verify the `artifact.admission.dependency-unresolved` diagnostic.
+9. **Incompatible compiler**: Submit an artifact built with an
+   unsupported compiler and verify the `artifact.admission.compiler-incompatible`
    diagnostic.
-8. **Evidence write failure**: Simulate a durable storage failure
+10. **Evidence write failure**: Simulate a durable storage failure
    during evidence writing and verify the `evidence.write-failure`
    diagnostic and that no downstream action proceeds without the
    record.
-9. **Redaction policy error**: Submit a malformed redaction policy
+11. **Redaction policy error**: Submit a malformed redaction policy
    and verify the `redaction.policy-error` diagnostic.
-10. **Access evaluation error**: Simulate an ambiguous consumer
-    classification during a constrained-mode query and verify the
-    `redaction.access-evaluation-error` diagnostic.
+12. **Access evaluation error**: Simulate an ambiguous consumer
+     classification during a constrained-mode query and verify the
+     `redaction.access-evaluation-error` diagnostic.
+13. **Digest computation failure**: Inject a failure while computing the
+     fixed SHA-256 artifact digest and verify
+    `artifact.admission.digest-computation-failed` before loading or caching.
+14. **Invalid build provenance**: Omit a required build provenance field and
+    verify `artifact.admission.build-provenance-invalid`.
+15. **Dependency cycle**: Submit a cyclic dependency graph and verify
+    `artifact.admission.dependency-cycle`.
+16. **Dependency cache failure**: Make the dependency cache unavailable and
+    verify `artifact.admission.cache-failure`.
+17. **Trust store failure**: Make the publisher trust store unavailable and
+    verify `artifact.admission.trust-store-failure`.
 
 ### Adversarial isolation tests
 
@@ -1503,7 +1577,7 @@ executed; a single failed exercise blocks phase promotion.
    the capability policy defined in
    [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md).
    The host MUST reject at admission with
-   `artifact.dependency-unresolved` or `artifact.signature-invalid`.
+   `artifact.admission.dependency-unresolved`.
 2. **Oversized output**: Submit an artifact whose invocation output
    exceeds the output size limit and verify that the host truncates
    or rejects and records `invocation.failed` with `failure_type:
@@ -1513,11 +1587,12 @@ executed; a single failed exercise blocks phase promotion.
    `invocation.failed` diagnostic with `failure_type: invalid-utf8`.
 4. **Forged identity**: Submit an artifact with a signature produced
    by a key that impersonates a trusted publisher.
-   The host MUST reject with `artifact.signature-invalid` or
-   `artifact.publisher-untrusted`.
+   The host MUST reject an invalid signature with
+   `artifact.admission.signature-invalid` or a valid signature from an
+   untrusted key with `artifact.admission.publisher-untrusted`.
 5. **Stale grant**: Submit an artifact whose publisher was revoked
    between the artifact's build and its admission attempt.
-   The host MUST reject with `artifact.revoked`.
+   The host MUST reject with `artifact.admission.revoked`.
 6. **Route confusion**: Submit an artifact that attempts to exploit
    ambiguous routing between agent, tenant, and system invocation
    paths to obtain unauthorized capabilities.
@@ -1549,7 +1624,7 @@ executed; a single failed exercise blocks phase promotion.
 5. **Compromised plugin upgrade**: Replace a trusted plugin in an
    agent's pin with an unverified copy without going through the
    admission flow.
-   The host MUST reject with `artifact.admission.failed` and require
+   The host MUST reject with `artifact.admission.not-verified` and require
    full re-admission.
 6. **Audit tampering**: Modify an evidence record after writing and
    verify the `evidence.integrity-violation` diagnostic and the
@@ -1712,13 +1787,15 @@ a paper exercise.
 ## Variability register
 
 The following table enumerates every `MAY`, `SHOULD`, `SHOULD NOT`,
-implementation limit, and implementation-defined choice in this chapter.
+implementation limit, and profiled choice in this chapter.
 Each row references the normative text that licenses the variation.
+
+> **Non-normative note.**
 
 | Item | License | Type | Bound / Choice | Profile requirement |
 |------|---------|------|----------------|--------------------|
-| Hash algorithm | [Digest integrity](#artifact-admission-verification) | Implementation-defined | `sha256`, `sha384`, `sha512`, or `blake3` | Publish selected algorithm. |
-| Signature scheme | [Signature validity](#artifact-admission-verification) | Implementation-defined | Ed25519, RSA-PSS, ECDSA, or equivalent | Publish selected scheme and key sizes. |
+| Evidence hash algorithm | [Implementation-defined choices](#implementation-defined-choices) | Implementation-defined | `sha256`, `sha384`, `sha512`, or `blake3`; does not alter artifact identity | Publish selected evidence algorithm. |
+| Signature scheme | [Signature validity](#artifact-admission-verification) | Required scoped replacement of Chapter 03 admission behavior | Ed25519 only; a signature is required | Reject missing or other schemes with `artifact.admission.signature-invalid`. |
 | Publisher trust store format | [Publisher identity](#artifact-admission-verification) | Implementation-defined | File, database, or distributed store | Publish format, update protocol, and maximum size. |
 | Revocation list update semantics | [Revocation check](#artifact-admission-verification) | Implementation-defined | Immediate or batched propagation | Publish propagation delay. |
 | Dependency cache policy | [Cached artifact reuse](#artifact-admission-verification) | Implementation-defined | Max age, invalidation triggers | Publish policy and invalidation conditions. |
@@ -1733,6 +1810,5 @@ Each row references the normative text that licenses the variation.
 | Containment actions | [Evidence recording flow](#evidence-recording-flow) | Implementation-defined | Quarantine, suspend, or other | Publish action catalog. |
 | Large payload size limit | [Large payloads](#evidence-redaction) | Implementation limit | Byte threshold | Publish threshold. |
 | Operator large payload threshold | [Large payloads](#evidence-redaction) | Implementation limit | Byte threshold for operator-only access | Publish threshold. |
-| Admission parallelism | [Artifact admission flow](#artifact-admission-flow) | Implementation-defined | Sequential or parallel checks 3-9 | Publish execution model. |
 | Maximum artifact size | [Boundary and limit tests](#boundary-and-limit-tests) | Implementation limit | Byte threshold | Publish threshold. |
 | Maximum dependency count | [Boundary and limit tests](#boundary-and-limit-tests) | Implementation limit | Count threshold | Publish threshold. |

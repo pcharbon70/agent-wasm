@@ -2,7 +2,7 @@
 title: "Provider-Neutral Model Requests Responses Streaming And Usage Phase 1 Integration Tests"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.2.0"
 tags:
   - milestone-07
@@ -23,7 +23,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 1](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/phase-01-provider-neutral-model-requests-responses-streaming-and-usage.md)
 of
 [Milestone 7](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/README.md).
@@ -66,12 +66,14 @@ The integration harness MUST contain:
 3. A user-controlled external custodian containing a unique sentinel
    credential that is never supplied to the host process.
 4. A provider-workload-identity custodian fixture with no long-lived user key.
-5. A fake provider supporting streaming, idempotency reconciliation,
+5. A local unauthenticated model connection with `custody_mode: none` and no
+   custodian, lease, or handle.
+6. A fake provider supporting streaming, idempotency reconciliation,
    cancellation, usage, and injected failures.
-6. Instrumentation for guest I/O, host and Port process memory snapshots,
+7. Instrumentation for guest I/O, host and Port process memory snapshots,
    state, journals, outbox, logs, traces, diagnostics, crash artifacts, network
    destinations, and support bundles.
-7. A policy engine that records independent `ModelAccess` and
+8. A policy engine that records independent `ModelAccess` and
    `CredentialUse` decisions.
 
 Test fixtures MUST use isolated tenants and deterministic clocks and identities.
@@ -107,6 +109,7 @@ The sentinel credential MUST exist only inside the custodian fixture.
 | `P1-SF-024` | Workload-identity custodian executes a typed request. | Request succeeds without a long-lived user provider key. |
 | `P1-SF-025` | Custodian rotates its credential behind a stable authorized connection. | New request succeeds without plugin reinstall or credential change in the host. |
 | `P1-SF-026` | Plugin is installed with an unbound optional slot and never uses it. | Plugin enables and operates without resolving that slot. |
+| `P1-SF-027` | User binds a slot to the local unauthenticated connection. | Request records the exact connection revision, creates no credential use, and admits result and usage with a matching `NoCredentialReceipt`. |
 
 ### Malformed and incompatible input
 
@@ -149,6 +152,8 @@ request occurs before a durable request is valid and authorized.
 | `P1-FH-027` | Custodian receipt has an invalid digest, signature, or request correlation. | `credential.receipt.invalid` |
 | `P1-FH-028` | Previously accepted credential-use nonce is replayed. | `credential.use.replay` |
 | `P1-FH-029` | Plugin upgrade changes a model requirement without reconfiguration. | `model.binding.stale` |
+| `P1-FH-030` | Binding or durable request omits or changes the pinned connection revision or credential lease. | `model.connection.revision_mismatch` |
+| `P1-FH-031` | Authenticated request returns `NoCredentialReceipt`, or a local receipt names another connection revision. | `model.receipt.invalid_no_credential` |
 
 ### Credential non-exposure and egress tests
 
@@ -200,6 +205,11 @@ required.
 | [Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md) | Evidence is bounded, tenant-isolated, and tamper-evident. |
 | [Threads Checkpoints Memory Approvals Quotas And Secret Leases Phase 4 Integration Tests](44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-phase-4-integration-tests.md) | Custodian, lease, handle, receipt, revocation, and non-exposure fixtures agree. |
 
+The cross-milestone fixture MUST verify that authenticated model connections
+populate `credential_lease_id` with the exact Section 44 `lease_id` and that
+only `custody_mode: none`
+uses `NoCredentialReceipt`.
+
 ### Evidence requirements
 
 Every test MUST record test id, objective, setup digest, relevant artifact and
@@ -217,13 +227,19 @@ occurrences, and signed evidence is complete.
 
 ## Variability register
 
+The following table summarizes internal harness techniques. Harness technique
+does not vary the required observations or pass criteria.
+
+> **Non-normative note.**
+
 | Item | Permission | Recommendation | Constraint |
 | --- | --- | --- | --- |
-| Fake providers and custodians | Implementation-defined | Deterministic local fixtures | Must exercise real process and transport boundaries |
-| Memory and artifact inspection mechanism | Implementation-defined | Inspect host and native-worker artifacts after success and injected crashes | Must cover all declared product outputs |
+| Fake providers and custodians | Internal test mechanism | Deterministic local fixtures | Must exercise real process and transport boundaries and produce reproducible outcomes |
+| Memory and artifact inspection mechanism | Internal test mechanism | Inspect host and native-worker artifacts after success and injected crashes | Must cover all declared product outputs and detect the same sentinel occurrences |
 | Test parallelism | Optional | Parallelize isolated tenants only | Shared binding, quota, or custodian tests must serialize |
-| Timing bounds | Implementation-defined | Publish deterministic test-clock limits | Timeout tests must remain bounded |
+| Timing control | Internal test mechanism | Use the required deterministic clock | Repeated runs with the same inputs must cross each timeout boundary at the same simulated instant |
 | Sentinel encoding scan | Required | Raw, base64, hex, URL-encoded, and structured variants | Architectural non-transfer assertion is also required |
+| Local no-credential fixture | Required | In-process deterministic local model | Must expose no custodian, lease, handle, or authenticated provider operation and must emit the exact no-credential receipt variant |
 
 ## Rationale and evidence (non-normative)
 

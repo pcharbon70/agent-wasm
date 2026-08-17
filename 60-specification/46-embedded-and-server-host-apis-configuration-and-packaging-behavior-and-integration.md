@@ -2,7 +2,7 @@
 title: "Embedded And Server Host APIs Configuration And Packaging Behavior And Integration"
 kind: specification
 created: "2026-08-10"
-status: draft
+status: normative
 spec_version: "0.2.0"
 tags:
   - milestone-09
@@ -20,7 +20,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 1](../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/phase-01-embedded-and-server-host-apis-configuration-and-packaging.md)
 of
 [Milestone 9](../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/README.md)
@@ -91,6 +91,12 @@ Configuration sources are:
 | Remote configuration | 40 | Dynamic configuration from a remote source. |
 | Runtime injection | 50 | Configuration injected via dependency injection. |
 
+The host MUST support default values, configuration files, and environment
+variables. It MAY support command-line arguments, remote configuration, and
+runtime injection. Every supported source class MUST use the precedence shown
+above; configuration MUST NOT remap those values. An unknown source class MUST
+be rejected with `config.validation.failed`.
+
 > **Non-normative note.**
 Configuration sources are applied in order of increasing precedence.
 Later sources override earlier sources for the same key.
@@ -129,7 +135,11 @@ Secret reference format:
 > **Non-normative note.**
 Configuration values that require secrets are marked with a
 `__secret__` prefix or use a dedicated secrets section.
-The host MUST NOT log or expose secret values in diagnostics.
+The host MUST NOT log or expose secret values, reference paths or keys,
+reference versions, or resolved-store metadata in diagnostics or any other
+host output. `config.secret.resolve.failed` MAY identify the containing
+configuration field location and secret-store type, but MUST NOT include the
+reference content.
 
 ### 46.2.5 Profile Selection
 
@@ -201,6 +211,16 @@ Diagnostics MUST NOT include:
 Diagnostics are retrievable via the `diagnostic.get` operation with
 appropriate access controls.
 
+### 46.2.8 Cross-chapter secret-failure precedence
+
+`config.secret.resolve.failed` applies only to resolution of Chapter 46 host
+configuration references during configuration and initialization. Credential
+lease, handle, custodian, and use failures governed by Chapter 44 retain their
+exact Chapter 44 diagnostics. A host API or transport wrapper MUST NOT
+translate a Chapter 44 credential failure into `config.secret.resolve.failed`.
+The non-exposure rules in Sections 46.1.7 and 46.2.7 constrain either failure
+family.
+
 ## Variability and limits
 
 See [Variability register](#variability-register).
@@ -210,15 +230,17 @@ See [Variability register](#variability-register).
 | Item | Location | Nature | Constraint |
 | --- | --- | --- | --- |
 | Server transport types | Section 46.2.1 | MAY | Must implement HTTP/REST. Other transports are permitted. |
-| Configuration source types | Section 46.2.2 | MAY | Must support file and environment variable sources. |
+| Configuration source types | [Configuration Sources](#4622-configuration-sources) | Required minimum | Must support defaults, files, and environment variables; command-line, remote, and runtime injection are optional closed source classes. |
 | Configuration file formats | Section 46.2.2 | MAY | Must support JSON. YAML and TOML are permitted. |
-| Configuration default precedence | Section 46.2.2 | Implementation-defined | Must document the default precedence range. |
+| Configuration precedence | [Configuration Sources](#4622-configuration-sources) | Required | Each supported source class must use its fixed value of 0, 10, 20, 30, 40, or 50 in increasing order. |
 | Configuration validation strictness | Section 46.2.3 | MAY | Must validate schema and required fields. Other checks are permitted. |
 | Secret store types | Section 46.2.4 | MAY | Must support environment variable secrets. Other stores are permitted. |
-| Profile selection mechanism | Section 46.2.5 | Implementation-defined | Must support environment variable selection. Explicit name is permitted. |
+| Profile selection precedence | [Profile Selection](#4625-profile-selection) | Required | Explicit profile name overrides `AGENT_WASM_PROFILE`, which overrides `default`. |
 | Runtime adapter types | Section 46.2.6 | MAY | Must support at least one Extism runtime. Other runtimes are permitted. |
 | Storage adapter types | Section 46.2.6 | MAY | Must support at least one durable storage adapter. |
 | Diagnostic redaction rules | Section 46.2.7 | Required | Must redact secrets and implementation internals. |
+| Secret-reference failure detail | Sections 46.2.4 and 46.2.7 | Required | May identify the containing configuration field location and store type; must not expose paths, keys, versions, or resolved-store metadata. |
+| Secret-failure precedence | Section 46.2.8 | Required | Preserve Chapter 44 credential diagnostics; use `config.secret.resolve.failed` only for Chapter 46 configuration reference resolution. |
 
 ## Rationale and evidence (non-normative)
 

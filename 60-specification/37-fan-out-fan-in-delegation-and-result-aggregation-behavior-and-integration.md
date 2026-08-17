@@ -2,7 +2,7 @@
 title: "Fan-Out Fan-In Delegation And Result Aggregation Behavior And Integration"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.1.0"
 tags:
   - milestone-06
@@ -20,7 +20,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 3](../.spec/planning/agentic-system/milestone-06-multi-agent-coordination-and-topology/phase-03-fan-out-fan-in-delegation-and-result-aggregation.md)
 of
 [Milestone 6](../.spec/planning/agentic-system/milestone-06-multi-agent-coordination-and-topology/README.md)
@@ -78,13 +78,21 @@ An aggregation policy determines how child results are combined into a
 single aggregated result for a fan-out plan.
 The following five aggregation policies are defined by this chapter:
 
+The aggregation cutoff is the plan's `deadline` for `cancel-all` and
+`allow-partial`. For `wait-completion`, if any child remains unfinished at the
+deadline, the maximum-wait interval starts at that deadline and the cutoff
+extends until the earlier of all pending children reaching a terminal state or
+the disclosed maximum-wait implementation limit expiring.
+Threshold-based policies MUST complete before the cutoff when their termination
+condition is met.
+
 | Policy | Aggregation behavior | Termination condition |
 |--------|---------------------|----------------------|
-| `all` | Collect all child results until the plan's `deadline` expires. | Plan `deadline` expires. |
-| `quorum` | Collect child results until `quorum_threshold` successful results are received. | `quorum_threshold` successful results received. |
-| `first-success` | Accept the first successful result; discard subsequent results. | First successful result received. |
-| `best-effort` | Collect all child results and select the best according to an implementation-defined quality metric. | Plan `deadline` expires. |
-| `ordered` | Collect child results in the order specified by the parent plan's `work_items` list, regardless of submission order. | All child results received or plan `deadline` expires. |
+| `all` | Collect every result received by the aggregation cutoff. | All work items reach a terminal state or the aggregation cutoff is reached. |
+| `quorum` | Collect child results until `quorum_threshold` successful results are received. | `quorum_threshold` successful results are received, or the plan fails when the aggregation cutoff is reached without quorum. |
+| `first-success` | Accept the first successful result; discard subsequent results. | First successful result is received, or the plan fails when the aggregation cutoff is reached without a success. |
+| `best-effort` | Collect results through the aggregation cutoff and select one by the fixed status, work-item-index, sequence-number, and result-id ordering defined below. | All work items reach a terminal state or the aggregation cutoff is reached. |
+| `ordered` | Collect child results in the order specified by the parent plan's `work_items` list, regardless of submission order. | All work items reach a terminal state or the aggregation cutoff is reached. |
 
 > **Non-normative note.**
 The five aggregation policies provide flexibility for different use cases.
@@ -97,8 +105,8 @@ quality varies (such as distributed sampling); `ordered` is appropriate
 for tasks where result order matters (such as distributed sorting).
 
 > **Normative definition.**
-The `all` aggregation policy collects all child results until the plan's
-`deadline` expires.
+The `all` aggregation policy collects all child results until all work items
+reach a terminal state or the aggregation cutoff is reached.
 The host MUST aggregate all received results, including partial results,
 into the final aggregated result.
 The host MUST NOT discard any results unless the plan's `cancellation_policy`
@@ -143,19 +151,21 @@ considered failed.
 
 > **Normative definition.**
 The `best-effort` aggregation policy uses a two-phase process.
-Phase one (collection): the host collects all child results until the
-plan's `deadline` expires.
-Phase two (selection): the host selects the best result according to an
-implementation-defined quality metric documented in the conformance profile;
-the selected result becomes the aggregated output and all other results
-are discarded; failed results are excluded from selection.
+Phase one (collection): the host collects child results until all work items
+reach a terminal state or the aggregation cutoff is reached.
+Phase two (selection): the host excludes failed results, orders the remaining
+results by successful status before partial status, then by ascending
+`work_item_index`, ascending `sequence_number`, and lexicographically ascending
+`result_id`, and selects the first result. The selected result becomes the
+aggregated output and all other results are discarded. If no successful or
+partial result exists, the plan fails.
 
 > **Non-normative note.**
 The `best-effort` policy ensures that the best available result is
 used; it is appropriate for tasks where quality varies (such as
 distributed sampling or distributed inference).
-The quality metric must be documented in the conformance profile and
-must be deterministic to ensure reproducible aggregation.
+The fixed ordering makes selection reproducible without deployment-specific
+quality scoring.
 
 > **Normative definition.**
 The `ordered` aggregation policy collects child results in the order
@@ -259,8 +269,16 @@ The host MUST handle child timeout according to the following rules:
    cancel the child agent and emit a `fanout.work-item.timeout` event.
 3. If the plan's `cancellation_policy` is `wait-completion`, the host
    MUST continue waiting for the child agent to complete its work item
-   until the child agent completes or the host's maximum wait timeout
-   expires.
+   until the child agent completes or the host's maximum-wait implementation
+   limit expires. The host MUST NOT finalize aggregation solely because the
+   original deadline passed; it MUST continue evaluating the aggregation policy
+   through the extended cutoff. A threshold-based policy still completes when
+   its threshold is met.
+   A result whose durable commit precedes the corresponding
+   `fanout.work-item.exhausted-wait` event MUST be included according to the
+   aggregation policy. On expiry, the host MUST emit that event for each child
+   still unfinished, exclude those unfinished results, and finalize
+   aggregation.
 4. If the plan's `cancellation_policy` is `allow-partial`, the host
    MUST allow the child agent to continue executing but MUST NOT
    include its result in the aggregated result if it completes after
@@ -272,9 +290,8 @@ completeness and timeliness.
 `cancel-all` ensures that no children outlive the deadline; `wait-completion`
 allows children to complete but may delay aggregation; `allow-partial`
 allows children to complete but excludes late results from aggregation.
-The maximum wait timeout for `wait-completion` must be documented in
-the conformance profile and MUST be longer than the maximum expected
-work item execution time.
+The maximum wait for `wait-completion` is a positive implementation limit
+published in the conformance profile.
 
 #### Partial failure
 
@@ -295,8 +312,9 @@ The host MUST handle partial failure according to the following rules:
    result; the host MUST NOT discard failed results unless the plan's
    `cancellation_policy` is `cancel-all` and the plan is cancelled.
 4. If the aggregation policy is `best-effort`, the host MUST aggregate
-   all received results and select the best according to the quality
-   metric; failed results are excluded from selection.
+   all received results, exclude failed results, and select exactly one result
+   using the fixed status, `work_item_index`, `sequence_number`, and
+   `result_id` ordering in [Aggregation policies](#aggregation-policies).
 5. If the aggregation policy is `ordered`, the host MUST aggregate
    child results in the order of their `work_item_index`; failed results
    are recorded as null placeholders.
@@ -319,10 +337,10 @@ The host MUST handle conflicting results according to the following rules:
 1. If the results have the same `result_id`, the host MUST reject the
    second result with the diagnostic `fanout.result.duplicate`.
 2. If the results have different `result_id` values but the same
-   `work_item_id` and the same `result_data` hash, the host MUST reject
+   `work_item_id` and the same result payload hash, the host MUST reject
    the second result with the diagnostic `fanout.result.duplicate-content`.
 3. If the results have different `result_id` values, the same `work_item_id`,
-   but different `result_data` hashes, the host MUST record both results
+   but different result payload hashes, the host MUST record both results
    and emit a `fanout.result.conflict` event; the host MUST NOT discard
    either result.
 

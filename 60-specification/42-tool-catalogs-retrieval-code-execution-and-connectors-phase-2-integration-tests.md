@@ -2,7 +2,7 @@
 title: "Tool Catalogs Retrieval Code Execution And Connectors Phase 2 Integration Tests"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.2.0"
 tags:
   - milestone-07
@@ -21,7 +21,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 2](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/phase-02-tool-catalogs-retrieval-code-execution-and-connectors.md)
 of
 [Milestone 7](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/README.md)
@@ -155,12 +155,15 @@ that the host behaves correctly according to the operation.
 | `P2-SF-024` | Execute a code execution request with a timeout and verify that the execution completes before the timeout. |
 | `P2-SF-025` | Execute a code execution request with artifacts=true and verify that output artifacts are captured. |
 | `P2-SF-026` | Execute a code execution request with a sandbox and verify that sandbox restrictions are enforced. |
+| `P2-SF-CODE-001` | Execute a request with an active network-class `network_tool`, its matching capability and resource authority, a positive budget, and one destination in the durable descriptor-and-policy intersection; verify that only that exact destination succeeds. |
+| `P2-SF-CODE-002` | Execute a request with `network_tool: null`, `max_network_requests: 0`, and empty `authorized_network_destinations`; verify that execution succeeds with sandbox networking disabled. |
 
 > **Non-normative note.**
-Tests `P2-SF-019` through `P2-SF-026` validate the full code execution
+Tests `P2-SF-019` through `P2-SF-026` and `P2-SF-CODE-001` through
+`P2-SF-CODE-002` validate the full code execution
 flow defined in section 42.2.
-Each test validates one of the eight code execution operations and verifies
-that the host behaves correctly according to the operation.
+The tests verify durable execution, isolation, resource, timeout, artifact,
+sandbox, and network-authorization behavior.
 
 #### Connector flow tests
 
@@ -239,6 +242,8 @@ state or leave partial state in the durable journal.
 | Test ID | Description | Expected diagnostic |
 |---------|-------------|---------------------|
 | `P2-FH-016` | Tool execution request whose `agent_address` does not have the required capability. | `tool.execution.denied_capability` |
+| `P2-FH-016A` | Code execution requests network access without both a network-class tool and the matching `tool.<name>.network` capability. | `tool.execution.denied_capability` |
+| `P2-FH-016B` | Code execution supplies a network tool and budget but descriptor and policy resources have an empty destination intersection. | `tool.execution.denied_capability` |
 | `P2-FH-017` | Tool execution request that accesses cross-tenant data. | `tool.execution.cross-tenant-data` |
 | `P2-FH-018` | Tool execution request using an unauthorized connector. | `tool.execution.unauthorized_connector` |
 
@@ -252,9 +257,12 @@ policy and compromise system security.
 
 | Test ID | Description | Expected diagnostic |
 |---------|-------------|---------------------|
-| `P2-FH-019` | Tool execution request that would exceed the implementation-defined maximum number of concurrent tool executions. | `tool.execution.exhausted-concurrency` |
-| `P2-FH-020` | Code execution request that would exceed the implementation-defined maximum number of concurrent code executions. | `tool.execution.exhausted-code` |
+| `P2-FH-019` | Tool execution request that would exceed the published concurrent-tool implementation limit under [Limits and modes](42-tool-catalogs-retrieval-code-execution-and-connectors-failure-evidence-and-operational-notes.md#implementation-limits-and-closed-deployment-modes). | `tool.execution.exhausted-concurrency` |
+| `P2-FH-020` | Code execution request that would exceed the published concurrent-code implementation limit under [Limits and modes](42-tool-catalogs-retrieval-code-execution-and-connectors-failure-evidence-and-operational-notes.md#implementation-limits-and-closed-deployment-modes). | `tool.execution.exhausted-code` |
 | `P2-FH-021` | Tool execution request that would exceed the agent's capability budget. | `tool.execution.quota_exhausted` |
+| `P2-FH-LIM-001` | Retrieval request that would exceed the published concurrent-retrieval implementation limit. | `tool.execution.exhausted-retrieval` |
+| `P2-FH-LIM-002` | Tool descriptor or code-execution request whose timeout exceeds the published timeout implementation limit. | `tool.execution.exhausted-timeout` |
+| `P2-FH-LIM-003` | Code request whose memory budget exceeds the published sandbox-memory implementation limit. | `tool.execution.exhausted-memory` |
 
 > **Non-normative note.**
 The exhausted input tests validate the resource limit enforcement layer
@@ -262,19 +270,18 @@ that guards the atomic commit protocol.
 Without these tests, exhausted requests could cause resource exhaustion
 and compromise system stability.
 
-#### Unavailable input tests
+#### Unavailable and runtime sandbox tests
 
 | Test ID | Description | Expected diagnostic |
 |---------|-------------|---------------------|
 | `P2-FH-022` | Tool execution request for a tool that is not active in the framework plugin registry. | `tool.execution.unavailable_tool` |
 | `P2-FH-023` | Tool execution request for a connector that is not active in the connector registry. | `tool.execution.unavailable_connector` |
-| `P2-FH-024` | Code execution request that exceeds sandbox memory limits. | `tool.execution.sandbox_failure` |
+| `P2-FH-024` | Code execution passes network admission and then attempts an exact canonical destination outside `authorized_network_destinations`, including a changed host, scheme, or port, or exceeds its network budget. | `tool.execution.sandbox_failure`; no network contact occurs |
+| `P2-FH-024A` | A descriptor supplies a wildcard or trailing-dot DNS name, non-canonical IPv4 or IPv6 text, bracketed or zone-qualified IPv6, port zero, or a port range. | `tool.descriptor.malformed-destination`; descriptor is rejected before catalog admission. |
 
 > **Non-normative note.**
-The unavailable input tests validate the framework plugin and connector
-lookup layers that guard the atomic commit protocol.
-Without these tests, unavailable requests could bypass the registries
-and compromise system consistency.
+These tests validate framework-plugin and connector lookup and distinguish
+post-admission sandbox enforcement from capability denial.
 
 #### Credential custody tests
 
@@ -314,8 +321,8 @@ and retry under various scenarios.
 
 | Test ID | Description |
 |---------|-------------|
-| `P2-TO-001` | Execute a tool and verify that the tool completes before the implementation-defined timeout expires. |
-| `P2-TO-002` | Execute a tool and verify that the tool is cancelled with `tool.execution.timeout` if it exceeds the implementation-defined timeout. |
+| `P2-TO-001` | Execute a tool and verify completion before its validated descriptor `timeout_ms`. |
+| `P2-TO-002` | Execute a tool and verify cancellation with `tool.execution.timeout` when it exceeds its validated descriptor `timeout_ms`. |
 | `P2-TO-003` | Execute a tool with a custom timeout and verify that the tool completes before the custom timeout. |
 | `P2-TO-004` | Execute a tool with a custom timeout and verify that the tool is cancelled with `tool.execution.timeout` if it exceeds the custom timeout. |
 | `P2-TO-005` | Execute a tool and verify that cancellation leaves no partial state in the durable journal. |
@@ -328,10 +335,10 @@ behavior defined in section 42.3.
 
 | Test ID | Description |
 |---------|-------------|
-| `P2-TO-006` | Execute a retrieval request and verify that the retrieval completes before the implementation-defined timeout expires. |
-| `P2-TO-007` | Execute a retrieval request and verify that the retrieval is cancelled with `tool.execution.timeout` if it exceeds the implementation-defined timeout. |
-| `P2-TO-008` | Execute a retrieval request with a custom timeout and verify that the retrieval completes before the custom timeout. |
-| `P2-TO-009` | Execute a retrieval request with a custom timeout and verify that the retrieval is cancelled with `tool.execution.timeout` if it exceeds the custom timeout. |
+| `P2-TO-006` | Execute a retrieval request and verify completion before the fixed 60-second timeout. |
+| `P2-TO-007` | Execute a retrieval request and verify cancellation with `tool.execution.timeout` after the fixed 60-second timeout. |
+| `P2-TO-008` | Attempt to select a retrieval timeout other than 60 seconds and verify that it does not alter the fixed timeout. |
+| `P2-TO-009` | Attempt to alter the retrieval timeout through deployment configuration and verify cancellation still occurs at 60 seconds. |
 | `P2-TO-010` | Execute a retrieval request and verify that cancellation leaves no partial state in the durable journal. |
 
 > **Non-normative note.**
@@ -342,8 +349,8 @@ behavior defined in section 42.3.
 
 | Test ID | Description |
 |---------|-------------|
-| `P2-TO-011` | Execute a code execution request and verify that the code completes before the implementation-defined timeout expires. |
-| `P2-TO-012` | Execute a code execution request and verify that the code is cancelled with `tool.execution.timeout` if it exceeds the implementation-defined timeout. |
+| `P2-TO-011` | Execute a code execution request and verify completion before its validated `timeout_ms`. |
+| `P2-TO-012` | Execute a code execution request and verify cancellation with `tool.execution.timeout` when it exceeds its validated `timeout_ms`. |
 | `P2-TO-013` | Execute a code execution request with a custom timeout and verify that the code completes before the custom timeout. |
 | `P2-TO-014` | Execute a code execution request with a custom timeout and verify that the code is cancelled with `tool.execution.timeout` if it exceeds the custom timeout. |
 | `P2-TO-015` | Execute a code execution request and verify that cancellation leaves no partial state in the durable journal. |
@@ -431,7 +438,7 @@ registry, mailboxes, and durable journal.
 > **Normative definition.**
 Integration test evidence is the durable, auditable record that the Phase 2
 integration tests were executed and the results.
-Evidence is the primary input for promotion from `status: draft` to
+Evidence is the primary input for promotion from `status: candidate` to
 `status: normative`.
 
 > **Normative definition.**
@@ -464,7 +471,8 @@ evidence record has not been tampered with after creation.
 The `approved_variability` field enables operators to document and
 retroactively approve intentional deviations from the baseline, which
 is important for cross-milestone compatibility testing where some
-variations are acceptable (such as implementation-defined bounded times).
+variations are acceptable only when they preserve declared bounded times and
+all normative observations.
 
 > **Normative definition.**
 A run of all Phase 2 integration tests passes if and only if:
@@ -480,7 +488,7 @@ A run of all Phase 2 integration tests passes if and only if:
    [Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md).
 
 > **Normative definition.**
-Promotion from `status: draft` to `status: normative` requires:
+Promotion from `status: candidate` to `status: normative` requires:
 
 1. A passing run of all Phase 2 integration tests as defined above.
 2. A passing run of all cross-milestone compatibility tests as defined
@@ -524,9 +532,7 @@ chapters:
 
 ## Variability register
 
-The following table lists every implementation-defined choice,
-non-normative disposition, and permitted presentation documented in this
-chapter.
+The following table summarizes the variability documented in this chapter.
 
 | Item | Location | Nature | Constraint |
 |------|----------|--------|------------|
@@ -539,3 +545,4 @@ chapter.
 | Regression baseline selection | Section 42.4 | MAY | Must use most recent normative baseline. Documented in conformance profile. |
 | Custodian fixture transport | Section 42.4 | MAY | Must exercise the product's real authenticated custody boundary. |
 | Sentinel encoding scan | Section 42.4 | MUST | Must cover raw, base64, hex, URL-encoded, and structured forms and accompany the non-transmission proof. |
+| Network destination fixture | Section 42.4 | MUST | Must prove exact scheme, canonical host, and port matching and prove denial before contact for every non-member. |

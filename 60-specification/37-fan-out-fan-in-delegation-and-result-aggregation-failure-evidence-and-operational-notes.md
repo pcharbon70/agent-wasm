@@ -2,7 +2,7 @@
 title: "Fan-Out Fan-In Delegation And Result Aggregation Failure Evidence And Operational Notes"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.1.0"
 tags:
   - milestone-06
@@ -20,7 +20,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 3](../.spec/planning/agentic-system/milestone-06-multi-agent-coordination-and-topology/phase-03-fan-out-fan-in-delegation-and-result-aggregation.md)
 of
 [Milestone 6](../.spec/planning/agentic-system/milestone-06-multi-agent-coordination-and-topology/README.md)
@@ -28,8 +28,7 @@ of
 Multi-Agent Coordination And Topology.
 It establishes the failure evidence and operational notes for fan-out
 fan-in delegation and result aggregation, including failure outcomes,
-bounded diagnostics, evidence emission, and implementation-defined
-choices.
+bounded diagnostics, evidence emission, and profiled configuration.
 
 This chapter is normative by default within its stated scope.
 Material visibly marked non-normative does not create conformance
@@ -105,7 +104,7 @@ which is consistent with the atomic commit protocol defined in
 
 | Diagnostic | Cause | Host behavior |
 |------------|-------|---------------|
-| `fanout.plan.incompatible` | Fan-out plan directive with `lifecycle_policy` that does not name a defined policy. | Reject directive; do NOT create partial plan state. |
+| `fanout.plan.incompatible` | Fan-out plan `result_contract` names a schema version unsupported by the admitted work-item manifests. | Reject directive; do NOT create partial plan state. |
 | `fanout.plan.incompatible-manifest-artifact` | Child work item with `manifest` digest that does not correspond to `artifact` digest. | Reject work item; do NOT create partial work item state. |
 | `fanout.plan.incompatible-plan` | Child work item with `plan_id` that does not resolve to an active plan. | Reject work item; do NOT create partial work item state. |
 | `fanout.result.incompatible-contract` | Child result that does not satisfy the parent plan's `result_contract`. | Reject result; do NOT aggregate. |
@@ -124,8 +123,8 @@ which is consistent with the validation rules defined in
 | `fanout.plan.duplicate-plan-id` | Fan-out plan directive with `plan_id` that matches an already-admitted plan. | Reject directive; do NOT create partial plan state. |
 | `fanout.work-item.duplicate-work-item-id` | Two child work item directives with the same `work_item_id` submitted for the same plan. | Reject second directive; do NOT create partial work item state. |
 | `fanout.result.duplicate` | Child result with `result_id` that matches a previously-aggregated result. | Reject result; do NOT aggregate. |
-| `fanout.result.duplicate-content` | Child result with `work_item_id` and `result_data` hash that match a previously-aggregated result. | Reject result; do NOT aggregate. |
-| `fanout.result.conflict` | Child result with different `result_id` values, same `work_item_id`, but different `result_data` hashes. | Record both results; emit `fanout.result.conflict` event. |
+| `fanout.result.duplicate-content` | Child result with `work_item_id` and result payload hash that match a previously-aggregated result. | Reject result; do NOT aggregate. |
+| `fanout.result.conflict` | Child result with different `result_id` values, the same `work_item_id`, but different result payload hashes. | Record both results; emit `fanout.result.conflict` event. |
 | `fanout.result.late` | Child result submitted after aggregation has completed. | Reject result; do NOT aggregate. |
 | `fanout.result.causal-attachment.immutable` | Attempt to modify causal attachment metadata after it has been recorded in the durable journal. | Reject modification; do NOT alter the original causal attachment record. |
 
@@ -154,9 +153,11 @@ state, which is consistent with the capability policy defined in
 
 | Diagnostic | Cause | Host behavior |
 |------------|-------|---------------|
-| `fanout.plan.exhausted-concurrency` | Fan-out plan directive would exceed the implementation-defined maximum concurrency per plan. | Reject directive; do NOT create partial plan state. |
+| `fanout.plan.exhausted-concurrency` | Fan-out plan directive would exceed the disclosed maximum concurrency implementation limit under [Implementation limits](#implementation-limits). | Reject directive; do NOT create partial plan state. |
+| `fanout.plan.exhausted-work-items` | Fan-out plan directive would exceed the disclosed maximum work-items implementation limit under [Implementation limits](#implementation-limits). | Reject directive; do NOT create partial plan state. |
 | `fanout.work-item.exhausted-concurrency` | Child work item would exceed the parent plan's `concurrency_bound`. | Reject work item; do NOT create partial work item state. |
-| `fanout.plan.exhausted-results` | Fan-out plan has reached the implementation-defined maximum number of results. | Reject result; do NOT aggregate. |
+| `fanout.plan.exhausted-results` | Fan-out plan has reached the disclosed maximum-results implementation limit under [Implementation limits](#implementation-limits). | Reject result; do NOT aggregate. |
+| `fanout.work-item.exhausted-wait` | Waiting for a child under `wait-completion` reached the disclosed maximum-wait implementation limit. | Record the exhaustion event; exclude that unfinished result; include results committed before the event; finalize aggregation after all exhausted children are recorded. |
 
 > **Non-normative note.**
 Exhausted outcomes are caused by resource limits.
@@ -189,18 +190,23 @@ Evidence is recorded in the durable audit log as defined in
 [Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md).
 
 > **Normative definition.**
-Every diagnostic MUST include the following fields:
+Every diagnostic MUST use exactly the Chapter 04 `Diagnostic` top-level
+structure. The listed fan-out diagnostic is `code`, `severity` is `error`, and
+`details` contains `phase`, `section`, `contract`, `profile`,
+`failed_boundary`, `timestamp`, `retryable`, `plan_id`, `work_item_id`, and
+`result_id`; inapplicable identifiers are JSON `null`.
 
-| Field | Content | Source |
-|-------|---------|--------|
-| `diagnostic` | The failure diagnostic code (e.g., `fanout.plan.malformed`). | Host runtime. |
-| `phase` | The phase that produced the diagnostic (`Phase 3`). | Host runtime. |
-| `section` | The section that produced the diagnostic (e.g., `37.3`). | Host runtime. |
-| `contract` | The contract that produced the diagnostic (e.g., `Fan-Out Fan-In Delegation And Result Aggregation`). | Host runtime. |
-| `profile` | The conformance profile that produced the diagnostic. | Host runtime. |
-| `failed_boundary` | The failed boundary (e.g., `fanout.plan.create`, `fanout.work-item.execute`). | Host runtime. |
-| `timestamp` | The ISO 8601 timestamp of diagnostic emission. | Host clock. |
-| `message` | A human-readable description of the failure. | Host runtime. |
+| Failure category | Family |
+|------------------|--------|
+| Malformed | `identity.validation.fanout` |
+| Incompatible | `identity.compatibility.fanout` |
+| Conflicting | `identity.conflict.fanout` |
+| Unauthorized | `identity.authorization.fanout` |
+| Exhausted | `identity.limit.fanout` |
+| Unavailable | `identity.resource.fanout` |
+
+The code has the family of the failure-outcome table containing it. No
+additional top-level diagnostic member is permitted.
 
 > **Non-normative note.**
 The bounded diagnostic format ensures that diagnostics are consistent,
@@ -231,27 +237,25 @@ the evidence record has not been tampered with after creation.
 This is consistent with the provenance and audit contract defined in
 [Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md).
 
-### Implementation-defined choices
+### Implementation limits
 
 > **Normative definition.**
-The following implementation-defined choices are documented by this section.
-Host implementations MUST document these choices in the conformance
-profile.
+The following resource ceilings are implementation limits. A conforming host
+MUST publish each positive limit in its conformance profile and MUST use the
+listed diagnostic when otherwise valid work exceeds it.
 
-| Choice | Description | Constraint |
-|--------|-------------|------------|
-| Maximum concurrency per plan | The maximum number of child agents that may execute concurrently for a single fan-out plan. | Must be at least 1 and at most the implementation-defined maximum. Must be documented in the conformance profile. |
-| Maximum work items per plan | The maximum number of work items that may be included in a single fan-out plan. | Must be at least 1 and at most the implementation-defined maximum. Must be documented in the conformance profile. |
-| Maximum results per plan | The maximum number of results that may be submitted for a single fan-out plan. | Must be at least 1 and at most the implementation-defined maximum. Must be documented in the conformance profile. |
-| Quality metric for `best-effort` | The implementation-defined quality metric used to select the best result for `best-effort` aggregation. | Must be deterministic and documented in the conformance profile. |
-| Maximum wait timeout for `wait-completion` | The maximum time the host waits for a child agent to complete its work item when the plan's `cancellation_policy` is `wait-completion`. | Must be longer than the maximum expected work item execution time. Must be documented in the conformance profile. |
+| Limit | Constraint | Exhaustion diagnostic |
+|-------|------------|-----------------------|
+| Maximum concurrency per plan | Positive integer disclosed in the conformance profile. | `fanout.plan.exhausted-concurrency` |
+| Maximum work items per plan | Positive integer disclosed in the conformance profile. | `fanout.plan.exhausted-work-items` |
+| Maximum results per plan | Positive integer disclosed in the conformance profile. | `fanout.plan.exhausted-results` |
+| Maximum wait for `wait-completion` | Positive duration disclosed in the conformance profile. | `fanout.work-item.exhausted-wait` |
 
 > **Non-normative note.**
-The implementation-defined choices above provide flexibility for
-different deployment scenarios while ensuring that constraints are
-documented and auditable.
-Host implementations MUST document these choices in the conformance
-profile so that operators can understand the system's behavior.
+Implementation limits allow bounded deployments to refuse otherwise valid
+work without changing aggregation semantics. The fixed `best-effort` ordering
+is defined under
+[Aggregation policies](37-fan-out-fan-in-delegation-and-result-aggregation-behavior-and-integration.md#aggregation-policies).
 
 ### Deferred work
 

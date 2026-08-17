@@ -2,7 +2,7 @@
 title: "Direct FSM Tool-Loop And Planning Strategies Contract And Data Model"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.1.0"
 tags:
   - milestone-07
@@ -20,7 +20,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 3](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/phase-03-direct-fsm-tool-loop-and-planning-strategies.md)
 of
 [Milestone 7](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/README.md)
@@ -111,7 +111,7 @@ Every direct strategy instance MUST include the following fields:
 | `result_id` | The `ResultId` of the result being processed. | Host runtime |
 | `continuation` | The continuation state after processing (null if terminal). | Host runtime |
 | `iteration` | The iteration counter for bounded execution. | Host runtime |
-| `budget_remaining` | The remaining budget (turns, tokens, cost) for this iteration. | Host runtime |
+| `budget_remaining` | The remaining turn, token, tool, cost, time, iteration, and recursion budgets. | Host runtime |
 | `timestamp` | The ISO 8601 timestamp of the strategy transition. | Host clock |
 
 > **Normative definition.**
@@ -164,6 +164,9 @@ The FSM strategy MUST handle the following events:
 | Event | Cause | Next state (if guard passes) |
 |-------|-------|------------------------------|
 | `plan_submitted` | A new plan directive is submitted. | `idle` -> `planning` |
+| `tool_requested` | A validated tool request is durably committed. | `planning` -> `waiting_for_tool` |
+| `model_requested` | A validated model request is durably committed. | `planning` -> `waiting_for_model` |
+| `approval_requested` | A validated approval request is durably committed. | `planning` -> `waiting_for_human` |
 | `tool_completed` | A tool execution completes. | `waiting_for_tool` -> `planning` |
 | `tool_failed` | A tool execution fails. | `waiting_for_tool` -> `planning` |
 | `tool_cancelled` | A tool execution is cancelled. | `waiting_for_tool` -> `planning` |
@@ -172,13 +175,6 @@ The FSM strategy MUST handle the following events:
 | `model_failed` | A model response fails. | `waiting_for_model` -> `planning` |
 | `model_cancelled` | A model response is cancelled. | `waiting_for_model` -> `planning` |
 | `model_unavailable` | A model response cannot be completed. | `waiting_for_model` -> `planning` |
-
-> **Normative definition.**
-The `tool_unavailable` and `model_unavailable` events are FSM events that
-drive the state transition to `planning`.
-The host MAY retry the tool/model request or terminate based on configuration,
-but the FSM transition is always to `planning`.
-The failure outcomes for these events are documented in Section 43.3.
 | `human_input` | Human provides input or approval. | `waiting_for_human` -> `planning` |
 | `human_rejected` | Human rejects the plan. | `waiting_for_human` -> `planning` |
 | `human_cancelled` | Human cancels the plan. | `waiting_for_human` -> `terminated` |
@@ -197,6 +193,11 @@ The failure outcomes for these events are documented in Section 43.3.
 | `missing_result_detected` | A required result is missing. | Any -> `terminated` |
 | `model_drift_detected` | The model drifts from the expected behavior. | Any -> `terminated` |
 
+The `tool_unavailable` and `model_unavailable` events always transition to
+`planning`; any retry is then governed by the canonical Chapter 42 or Chapter
+41 diagnostic and retry classification. This FSM MUST NOT translate or widen
+those retry rules.
+
 > **Normative definition.**
 The FSM strategy MUST include the following snapshot fields:
 
@@ -211,6 +212,12 @@ The FSM strategy MUST include the following snapshot fields:
 | `iteration` | The current iteration counter. | Host runtime |
 | `budget_remaining` | The remaining budget. | Host runtime |
 | `history` | The history of state transitions (bounded). | Host runtime |
+| `progress_revision` | Monotonic counter incremented only by a progress event defined below. | Host runtime |
+| `nonprogress_state` | State observed by the non-progress counter, or null before first entry. | Host runtime |
+| `nonprogress_entry_count` | Consecutive entries into `nonprogress_state` at one `progress_revision`. | Host runtime |
+| `last_tool_id` | Most recently requested `tool_id`, or null. | Host runtime |
+| `last_tool_result_digest` | Digest of the most recent admitted result for `last_tool_id`, or null. | Host runtime |
+| `repeated_tool_request_count` | Consecutive requests for `last_tool_id` without a different result digest. | Host runtime |
 | `timestamp` | The ISO 8601 timestamp of the snapshot. | Host clock |
 
 > **Normative definition.**
@@ -225,6 +232,31 @@ The FSM strategy MUST enforce the following snapshot migration rules:
 4. **Snapshot history**: The FSM maintains a bounded history of state transitions to detect non-progress loops.
 
 5. **Snapshot rotation**: When the history exceeds the maximum size, the oldest entries are dropped.
+
+> **Normative definition.**
+A progress event is exactly one of: advancing `plan_index`; replacing the plan
+with a different durable `plan_id`; admitting a previously unseen valid tool,
+model, or human result signal for `waiting_for_id`; or committing a terminal
+outcome. Retry attempts, repeated observations, timestamps, diagnostics,
+evidence emission, and budget deduction are not progress events.
+
+On entry into a state, the host sets `nonprogress_entry_count` to `1` when the
+state differs from `nonprogress_state` or `progress_revision` changed since the
+previous entry. Otherwise it increments the count by one. It then stores the
+entered state as `nonprogress_state` and the observed progress revision with
+the history entry. A progress event increments `progress_revision` exactly
+once. The fifth entry with unchanged state and progress revision emits
+`nonprogress_loop_detected`.
+
+For repeated-tool counting, tool sameness means equal `tool_id`. Result
+sameness means equal digest of the canonical normalized result bytes; no
+admitted result is represented by null. On each `tool_requested`, the host sets
+`repeated_tool_request_count` to `1` if `tool_id` changed or the latest result
+digest differs from `last_tool_result_digest`; otherwise it increments the
+count. It then stores the current tool id and latest result digest in
+`last_tool_id` and `last_tool_result_digest`. The fifth request emits
+`repeated_tool_request_detected`. Counter fields MUST survive snapshot and
+restore unchanged.
 
 ### Bounded tool-loop state
 
@@ -258,7 +290,7 @@ The bounded tool-loop MUST enforce the following tool selection strategy:
 
 2. **Capability matching**: The selected tool must have the required capabilities and be available in the current tenant scope.
 
-3. **Budget awareness**: The selected tool must fit within the remaining budget (turns, tokens, cost, time).
+3. **Budget awareness**: The selected tool must fit within the remaining budget (turns, tokens, tools, cost, time).
 
 4. **Deduplication**: The tool-loop avoids requesting the same tool repeatedly in a non-progress loop.
 
@@ -269,6 +301,7 @@ The bounded tool-loop MUST enforce the following iteration budgets:
 |-------------|---------|---------|-------------|
 | `turns` | 100 | 1000 | Host policy |
 | `tokens` | 10000 | 100000 | Host policy |
+| `tools` | 50 | 500 | Host policy |
 | `cost` | 1.0 | 10.0 | Host policy |
 | `time` | 60 | 600 | Host policy |
 | `iterations` | 10 | 100 | Host policy |
@@ -317,3 +350,12 @@ The bounded tool-loop MUST terminate under the following conditions:
 - **Recommendation**: The host SHOULD implement the priority queue strategy stated in this chapter.
 - **Permitted presentation**: The host MAY log tool selection decisions for observability.
 - **Limit**: The host MUST enforce capability matching and budget awareness.
+
+### 43.1.4 Loop counter semantics
+
+- **Requirement**: Progress events, state equality, tool equality, result
+  equality, reset behavior, and the threshold of 5 are fixed by the snapshot
+  and counter rules above.
+- **Permitted presentation**: The host MAY display the counters and
+  non-authority-bearing result digest.
+- **Limit**: Configuration MUST NOT alter the counter algorithm or threshold.

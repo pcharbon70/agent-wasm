@@ -2,7 +2,7 @@
 title: "Fan-Out Fan-In Delegation And Result Aggregation Phase 3 Integration Tests"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.1.0"
 tags:
   - milestone-06
@@ -20,7 +20,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 3](../.spec/planning/agentic-system/milestone-06-multi-agent-coordination-and-topology/phase-03-fan-out-fan-in-delegation-and-result-aggregation.md)
 of
 [Milestone 6](../.spec/planning/agentic-system/milestone-06-multi-agent-coordination-and-topology/README.md)
@@ -83,7 +83,8 @@ behavior, and the retention requirements for test evidence.
 | Test ID | Description |
 |---------|-------------|
 | `P3-SF-001` | Create a fan-out plan with a valid fan-out plan directive and verify that all five atomic commit steps are executed (plan registry entry, plan journal entry, child work items, aggregation state initialization, evidence emission). |
-| `P3-SF-002` | Create a fan-out plan with a deterministic `plan_id` and verify that two identical directives produce the same `plan_id`. |
+| `P3-SF-002` | Evaluate the fixed plan identity construction twice with the same canonical payload and reserved `plan_sequence` and verify the same `plan_id`; increment only the sequence and verify a different ID; restart the host and verify the per-agent allocator resumes without reuse. |
+| `P3-SF-002A` | Verify `plan_id`, `work_item_id`, and `result_id` against fixed domain-separated, length-prefixed SHA-256 test vectors and reject any alternate prefix, hash, framing, or integer encoding. |
 | `P3-SF-003` | Create a fan-out plan with all five aggregation policy types and verify that each policy is correctly recorded in the plan registry entry. |
 | `P3-SF-004` | Create a fan-out plan with attenuated delegation grants and verify that the child agents' grants are strictly a subset of the delegating agent's grants as defined in
 [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md). |
@@ -144,7 +145,7 @@ in section 37.1.
 | `P3-SF-016` | Create a fan-out plan with `aggregation_policy: all` and verify that all child results are aggregated into the final result. |
 | `P3-SF-017` | Create a fan-out plan with `aggregation_policy: quorum` and `quorum_threshold: 2` and verify that aggregation completes when 2 successful results are received. |
 | `P3-SF-018` | Create a fan-out plan with `aggregation_policy: first-success` and verify that aggregation completes when the first successful result is received. |
-| `P3-SF-019` | Create a fan-out plan with `aggregation_policy: best-effort` and verify that the best result is selected according to the implementation-defined quality metric. |
+| `P3-SF-019` | Create a fan-out plan with `aggregation_policy: best-effort` and verify that successful results precede partial results, followed by ascending `work_item_index`, `sequence_number`, and `result_id` ordering under [Aggregation policies](37-fan-out-fan-in-delegation-and-result-aggregation-behavior-and-integration.md#aggregation-policies). |
 | `P3-SF-020` | Create a fan-out plan with `aggregation_policy: ordered` and verify that results are aggregated in the order of their `work_item_index`. |
 
 > **Non-normative note.**
@@ -175,12 +176,17 @@ Failure handling tests verify that the host correctly rejects invalid inputs
 with stable diagnostics and without leaving unauthorized or partial state.
 Each test scenario below describes the invalid input, the expected diagnostic,
 and the state invariants that MUST hold after the failure.
+Every failure test MUST verify the exact Chapter 04 top-level fields, the
+category-specific `identity.*.fanout` family from Section 37.3, the listed
+domain `code`, `severity: "error"`, and all required bounded `details` members.
 
 #### Malformed input tests
 
 | Test ID | Description | Expected diagnostic |
 |---------|-------------|---------------------|
 | `P3-FH-001` | Fan-out plan directive with missing `plan_id` field. | `fanout.plan.malformed` |
+| `P3-FH-001A` | `plan_id` with an alternate prefix, digest length, case, hash, framing, component order, or a digest that does not match the canonical directive payload and `plan_sequence`. | `fanout.plan.malformed` |
+| `P3-FH-001B` | `plan_sequence: 0` or reuse of a reserved sequence for a distinct fan-out plan. | `fanout.plan.malformed` |
 | `P3-FH-002` | Fan-out plan directive with empty `work_items` list. | `fanout.plan.malformed-work-items` |
 | `P3-FH-003` | Fan-out plan directive with `concurrency_bound: 0`. | `fanout.plan.malformed-concurrency-bound` |
 | `P3-FH-004` | Fan-out plan directive with past `deadline`. | `fanout.plan.malformed-deadline` |
@@ -188,8 +194,10 @@ and the state invariants that MUST hold after the failure.
 | `P3-FH-006` | Fan-out plan directive with `aggregation_policy: quorum` and `quorum_threshold: 0`. | `fanout.plan.malformed-quorum` |
 | `P3-FH-007` | Fan-out plan directive with `aggregation_policy: quorum` and `quorum_threshold` greater than the number of work items. | `fanout.plan.malformed-quorum` |
 | `P3-FH-008` | Child work item with missing `work_item_id` field. | `fanout.work-item.malformed` |
+| `P3-FH-008A` | `work_item_id` that does not match the fixed construction from its admitted plan, index, and input. | `fanout.work-item.malformed` |
 | `P3-FH-009` | Child work item with invalid artifact digest. | `fanout.work-item.malformed-artifact` |
 | `P3-FH-010` | Child result with missing `result_id` field. | `fanout.result.malformed` |
+| `P3-FH-010A` | `result_id` that does not match the fixed construction, or a new result that reuses a durable `sequence_number`. | `fanout.result.malformed` |
 | `P3-FH-011` | Child result with invalid `result_data`. | `fanout.result.malformed-data` |
 
 > **Normative definition.**
@@ -210,7 +218,7 @@ guarantees defined in
 
 | Test ID | Description | Expected diagnostic |
 |---------|-------------|---------------------|
-| `P3-FH-012` | Fan-out plan directive with `lifecycle_policy` that does not name a defined policy. | `fanout.plan.incompatible` |
+| `P3-FH-012` | Fan-out plan whose `result_contract` names a schema version unsupported by its admitted work-item manifests. | `fanout.plan.incompatible` |
 | `P3-FH-013` | Child work item with `manifest` digest that does not correspond to `artifact` digest. | `fanout.plan.incompatible-manifest-artifact` |
 | `P3-FH-014` | Child work item with `plan_id` that does not resolve to an active plan. | `fanout.plan.incompatible-plan` |
 | `P3-FH-015` | Child result that does not satisfy the parent plan's `result_contract`. | `fanout.result.incompatible-contract` |
@@ -228,7 +236,7 @@ state or leave partial state in the durable journal.
 | `P3-FH-016` | Two fan-out plan directives with the same `plan_id` submitted concurrently. | `fanout.plan.duplicate-plan-id` for the second directive. |
 | `P3-FH-017` | Two child work item directives for the same plan submitted concurrently. | `fanout.work-item.duplicate-work-item-id` for the second directive. |
 | `P3-FH-018` | Two child results with the same `result_id` submitted for the same work item. | `fanout.result.duplicate` for the second result. |
-| `P3-FH-019` | Two child results with different `result_id` values, same `work_item_id`, but different `result_data` hashes. | `fanout.result.conflict` event emitted. |
+| `P3-FH-019` | Two child results with different `result_id` values, the same `work_item_id`, but different result payload hashes. | `fanout.result.conflict` event emitted. |
 | `P3-FH-020` | Child result submitted after aggregation has completed. | `fanout.result.late` for the late result. |
 
 > **Non-normative note.**
@@ -255,9 +263,11 @@ policy and compromise system security.
 
 | Test ID | Description | Expected diagnostic |
 |---------|-------------|---------------------|
-| `P3-FH-024` | Fan-out plan directive that would exceed the implementation-defined maximum concurrency per plan. | `fanout.plan.exhausted-concurrency` |
+| `P3-FH-024` | Fan-out plan directive that would exceed the disclosed maximum concurrency under [Implementation limits](37-fan-out-fan-in-delegation-and-result-aggregation-failure-evidence-and-operational-notes.md#implementation-limits). | `fanout.plan.exhausted-concurrency` |
 | `P3-FH-025` | Child work item that would exceed the parent plan's `concurrency_bound`. | `fanout.work-item.exhausted-concurrency` |
-| `P3-FH-026` | Child result that would exceed the implementation-defined maximum number of results per plan. | `fanout.plan.exhausted-results` |
+| `P3-FH-026` | Child result that would exceed the disclosed maximum results under [Implementation limits](37-fan-out-fan-in-delegation-and-result-aggregation-failure-evidence-and-operational-notes.md#implementation-limits). | `fanout.plan.exhausted-results` |
+| `P3-FH-LIM-001` | Fan-out plan directive that would exceed the disclosed maximum work items under [Implementation limits](37-fan-out-fan-in-delegation-and-result-aggregation-failure-evidence-and-operational-notes.md#implementation-limits). | `fanout.plan.exhausted-work-items` |
+| `P3-FH-LIM-002` | A `wait-completion` child exceeds the disclosed maximum wait; verify that results committed before the exhaustion event remain included, the unfinished child is excluded, and aggregation then finalizes. | `fanout.work-item.exhausted-wait` |
 
 > **Non-normative note.**
 The exhausted input tests validate the resource limit enforcement layer
@@ -291,12 +301,14 @@ child timeout, plan cancellation, and parent cancellation under various
 | Test ID | Description |
 |---------|-------------|
 | `P3-TO-001` | Create a fan-out plan with `cancellation_policy: cancel-all` and verify that child agents are cancelled when the plan's `deadline` expires. |
-| `P3-TO-002` | Create a fan-out plan with `cancellation_policy: wait-completion` and verify that child agents are allowed to complete their work items even after the plan's `deadline` expires. |
+| `P3-TO-002` | Create an `all` fan-out plan with `cancellation_policy: wait-completion` and verify that aggregation remains incomplete after the plan deadline, a result committed before maximum-wait exhaustion is included, and aggregation then completes. |
 | `P3-TO-003` | Create a fan-out plan with `cancellation_policy: allow-partial` and verify that child agents are allowed to complete their work items but their results are excluded from aggregation if they complete after the deadline. |
 | `P3-TO-004` | Verify that a `fanout.work-item.timeout` event is emitted when a child agent times out. |
+| `P3-TO-005` | Reach the aggregation cutoff without the required quorum and verify that the plan fails without aggregating a sub-quorum result. |
+| `P3-TO-006` | Reach the aggregation cutoff without a successful result under `first-success` and verify that the plan fails. |
 
 > **Non-normative note.**
-Tests `P3-TO-001` through `P3-TO-004` validate the child timeout behavior
+Tests `P3-TO-001` through `P3-TO-006` validate the child timeout behavior
 defined in section 37.2.
 Each test validates one of the three `cancellation_policy` settings and
 verifies that the host behaves correctly according to the policy.
@@ -402,7 +414,7 @@ subsystems (such as the agent registry, mailboxes, and durable journal).
 > **Normative definition.**
 Integration test evidence is the durable, auditable record that the Phase 3
 integration tests were executed and the results.
-Evidence is the primary input for promotion from `status: draft` to
+Evidence is the primary input for promotion from `status: candidate` to
 `status: normative`.
 
 > **Normative definition.**
@@ -431,7 +443,7 @@ evidence record has not been tampered with after creation.
 The `approved_variability` field enables operators to document and
 retroactively approve intentional deviations from the baseline, which
 is important for cross-milestone compatibility testing where some
-variations are acceptable (such as implementation-defined bounded times).
+variations are acceptable (such as disclosed implementation resource limits).
 
 > **Normative definition.**
 A run of all Phase 3 integration tests passes if and only if:
@@ -447,7 +459,7 @@ A run of all Phase 3 integration tests passes if and only if:
    [Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md).
 
 > **Normative definition.**
-Promotion from `status: draft` to `status: normative` requires:
+Promotion from `status: candidate` to `status: normative` requires:
 
 1. A passing run of all Phase 3 integration tests as defined above.
 2. A passing run of all cross-milestone compatibility tests as defined

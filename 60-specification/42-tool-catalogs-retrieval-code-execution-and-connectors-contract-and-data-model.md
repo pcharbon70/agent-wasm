@@ -2,7 +2,7 @@
 title: "Tool Catalogs Retrieval Code Execution And Connectors Contract And Data Model"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.2.0"
 tags:
   - milestone-07
@@ -21,7 +21,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 2](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/phase-02-tool-catalogs-retrieval-code-execution-and-connectors.md)
 of
 [Milestone 7](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/README.md)
@@ -115,6 +115,7 @@ Every tool descriptor MUST include the following fields:
 | `output_schema` | The JSON Schema for the tool's output result. | Framework plugin. |
 | `capability` | The capability identifier granted to agents for using this tool (e.g., `tool.search.read`, `tool.code.execute`). | Capability policy. |
 | `side_effect_class` | The side-effect class: `read_only`, `write`, `network`, `stateful`. | Framework plugin. |
+| `network_destinations` | Sorted, duplicate-free exact destinations the tool may contact; non-empty only for `network`. | Framework plugin and host policy. |
 | `idempotent` | Whether the tool is idempotent (safe to retry without side effects). | Framework plugin. |
 | `timeout_ms` | The maximum execution time in milliseconds. | Framework plugin. |
 | `result_limits` | Limits on the result size (e.g., `max_bytes`, `max_tokens`, `max_items`). | Framework plugin. |
@@ -122,6 +123,29 @@ Every tool descriptor MUST include the following fields:
 | `framework_plugin` | The framework plugin identifier that provides this tool. | Framework plugin. |
 | `created_at` | The ISO 8601 timestamp of descriptor creation. | Host clock. |
 | `status` | The current status: `active`, `deprecated`, `suspended`. | Host runtime. |
+
+`timeout_ms` MUST be a positive integer no greater than the host's published
+timeout implementation limit. A descriptor exceeding that limit is rejected
+with `tool.execution.exhausted-timeout`.
+
+> **Normative definition.**
+
+```
+NetworkDestination {
+  scheme: "https" | "http" | "tcp",
+  host: string,
+  port: u16
+}
+```
+
+`host` MUST be one of: a lowercase ASCII DNS A-label sequence without a
+trailing dot; an IPv4 dotted-decimal address with four decimal octets and no
+leading zeroes; or a lowercase RFC 5952 IPv6 address without brackets or a zone
+identifier. `port` MUST be between 1 and 65535 inclusive. Wildcards, user
+information, paths, queries, fragments, port zero, and port ranges are invalid.
+The tuple `(scheme, host, port)` is the complete destination identity.
+A network-class descriptor MUST contain at least one destination. Every other
+side-effect class MUST contain an empty list.
 
 > **Non-normative note.**
 The `tool_id` is deterministic to enable idempotent tool resolution and
@@ -174,6 +198,10 @@ Every retrieval request MUST include the following fields:
 | `created_at` | The ISO 8601 timestamp of request creation. | Host clock. |
 | `status` | The current status: `pending`, `completed`, `failed`, `cancelled`. | Host runtime. |
 
+Retrieval requests use a fixed 60-second timeout. The host MUST cancel a
+request that has not completed after 60 seconds and emit
+`tool.execution.timeout`.
+
 > **Normative definition.**
 Every retrieval result MUST include the following fields:
 
@@ -223,10 +251,42 @@ Every code-execution request MUST include the following fields:
 | `environment` | The immutable execution environment (e.g., `python:3.11-slim`, `node:20-alpine`). | Agent. |
 | `capability` | The capability identifier granted to agents for code execution (e.g., `code.execute`). | Capability policy. |
 | `resource_budget` | The resource budget for execution (e.g., `max_memory_mb`, `max_cpu_seconds`, `max_network_requests`). | Agent. |
+| `network_tool` | The `tool_id` of the active network-class tool authorizing sandbox network access, or `null` when network access is not requested. | Agent. |
+| `authorized_network_destinations` | Sorted, duplicate-free exact `NetworkDestination` values admitted for this request. | Host runtime. |
 | `isolation_class` | The isolation class: `shared`, `tenant`, `isolated`. | Agent. |
 | `timeout_ms` | The maximum execution time in milliseconds. | Agent. |
 | `created_at` | The ISO 8601 timestamp of request creation. | Host clock. |
 | `status` | The current status: `pending`, `executing`, `completed`, `failed`, `cancelled`. | Host runtime. |
+
+The code-execution `timeout_ms` MUST be positive and no greater than the
+published timeout implementation limit. `max_memory_mb` MUST be positive and
+no greater than the published sandbox-memory implementation limit. Values
+over those limits are rejected with `tool.execution.exhausted-timeout` and
+`tool.execution.exhausted-memory` respectively.
+
+Sandbox network access is denied unless the request names a tool with
+`side_effect_class: network` and the agent has the corresponding
+`tool.<name>.network` capability. Configuration MUST NOT grant network access
+that either admission check denies. Failure of either admission check MUST be
+reported as `tool.execution.denied_capability`. After both checks pass, a
+runtime violation of an authorized sandbox destination or network budget MUST
+be reported as `tool.execution.sandbox_failure`.
+
+A request asks for network access when `network_tool` is non-null or
+`resource_budget.max_network_requests` is greater than zero. Network admission
+requires both a non-null `network_tool` and a positive
+`max_network_requests`; a mismatched pair is rejected with
+`tool.execution.denied_capability`.
+
+For an admitted network request, the host MUST set
+`authorized_network_destinations` to the exact intersection of the selected
+descriptor's `network_destinations` and the resources allowed by the current
+capability-policy decision. An empty intersection is denied with
+`tool.execution.denied_capability`. Before every DNS resolution or connection,
+the sandbox MUST compare the canonical destination to this durable list and
+MUST reject a non-member with `tool.execution.sandbox_failure` before network
+I/O. A request that does not ask for network access MUST contain an empty list
+and run with sandbox network access disabled.
 
 > **Normative definition.**
 Every code-execution result MUST include the following fields:
@@ -333,13 +393,16 @@ earlier chapters:
    [Threads Checkpoints Memory Approvals Quotas And Secret Leases Contract And Data Model](44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md)
    takes precedence for handle, lease, typed-use, and receipt semantics.
 6. Where both sections are applicable and agree, they are mutually
-    reinforcing.
+     reinforcing.
+
+The precedence statements above are normative. In particular, Chapter 31
+supplies the agent's resource authorization, while this chapter governs the
+tool-specific mapping from that authorization to exact
+`NetworkDestination` values and the resulting tool diagnostics.
 
 ## Variability register
 
-The following table lists every implementation-defined choice,
-non-normative disposition, and permitted presentation documented in this
-chapter.
+The following table summarizes the variability documented in this chapter.
 
 | Item | Location | Nature | Constraint |
 |------|----------|--------|------------|
@@ -353,11 +416,12 @@ chapter.
 | Connector authentication binding | Section 42.1 | Required for authenticated connectors | User-controlled, versioned, and outside the plugin artifact; must contain no credential or opaque handle. |
 | Connector credential custody | Section 42.1 | Required for end-user distributions | Authenticated operations must use Section 44 custody; host-local compatibility cannot claim separated custody. |
 | Framework plugin query order | Section 42.2 | MAY | Must query all approved framework plugins. Order is informational. |
-| Tool execution timeout | Section 42.3 | MAY | Must be at least the minimum execution duration. Documented in conformance profile. |
-| Code execution timeout | Section 42.3 | MAY | Must be at least the minimum execution duration. Documented in conformance profile. |
-| Retrieval timeout | Section 42.3 | MAY | Must be at least the minimum execution duration. Documented in conformance profile. |
-| Sandbox memory limit | Section 42.3 | MAY | Must be at least 64 MB. Documented in conformance profile. |
-| Sandbox network access | Section 42.3 | MAY | Must be configurable per tool or globally. Documented in conformance profile. |
+| Tool descriptor timeout | [Tool descriptor identity and properties](#tool-descriptor-identity-and-properties) | Implementation limit | Positive `timeout_ms` no greater than the published maximum; reject larger values with `tool.execution.exhausted-timeout`. |
+| Code execution timeout | [Code-execution request and result schema](#code-execution-request-and-result-schema) | Implementation limit | Positive `timeout_ms` no greater than the published maximum; reject larger values with `tool.execution.exhausted-timeout`. |
+| Retrieval timeout | [Retrieval request and result schema](#retrieval-request-and-result-schema) | Fixed | Cancel at exactly 60 seconds with `tool.execution.timeout`; configuration cannot alter the boundary. |
+| Sandbox memory limit | [Code-execution request and result schema](#code-execution-request-and-result-schema) | Implementation limit | At least 64 MB and published; reject larger requests with `tool.execution.exhausted-memory`. |
+| Sandbox network access | [Code-execution request and result schema](#code-execution-request-and-result-schema) | Fixed authorization rule | `network_tool` must name an active network-class tool and the agent must hold its matching capability; configuration may further restrict access but cannot grant denied access. |
+| Authorized sandbox destinations | [Code-execution request and result schema](#code-execution-request-and-result-schema) | Fixed schema and intersection | Exact canonical destinations only; deny an empty intersection and reject a non-member before network I/O. |
 | Diagnostic message format | Section 42.3 | MAY | Must include all required fields. Free-text portion is informational. |
 | Evidence record field order | Section 42.3 | SHOULD | Must include all required fields. Order is informational. |
 | Integration test ordering | Section 42.4 | MAY | Must cover all required scenarios. Order is informational. |

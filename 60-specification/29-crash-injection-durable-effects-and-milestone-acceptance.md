@@ -2,7 +2,7 @@
 title: "Crash Injection Durable Effects And Milestone Acceptance"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.1.0"
 tags:
   - milestone-04
@@ -19,7 +19,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 5](../.spec/planning/agentic-system/milestone-04-durable-state-effects-and-recovery/phase-05-crash-injection-durable-effects-and-milestone-acceptance.md)
 of
 [Milestone 4](../.spec/planning/agentic-system/milestone-04-durable-state-effects-and-recovery/README.md)
@@ -300,15 +300,20 @@ boundary without exposing secrets.
 ### Bounded diagnostics
 
 > **Normative definition.**
-The host MUST emit bounded diagnostics for each failure outcome.
-The diagnostics MUST include:
+The host MUST emit bounded diagnostics for each failure outcome using exactly
+the Chapter 04 `Diagnostic` top-level structure. The domain error is `code`,
+`severity` is `error`, and `details` contains `phase`, `contract`, `profile`,
+`failed_boundary`, `context`, `entity_identifiers`, `timestamp`, and
+`retryable`.
 
-1. **Error code**: The specific error code from the table above.
-2. **Context**: The operation that failed (e.g., commit, dispatch, recovery).
-3. **Entity identifiers**: The tenant ID, agent ID, or record ID involved
-   (without exposing sensitive data).
-4. **Timestamp**: The time the error occurred.
-5. **Retryable**: Whether the operation can be retried.
+| Family | Domain codes |
+|--------|--------------|
+| `identity.conflict.crash_recovery` | `attempt.conflicting_replay`, `commit.conflict`, `storage.snapshot.duplicate` |
+| `identity.limit.crash_recovery` | `attempt.timeout`, `attempt.max_retries_exceeded`, `recovery.timer_expired`, `recovery.retry_expired` |
+| `identity.resource.crash_recovery` | `commit.before_failure`, `commit.during_failure`, `commit.after_failure`, `dispatch.before_failure`, `dispatch.after_lease_failure`, `dispatch.after_external_success_failure`, `dispatch.before_ack_failure`, `dispatch.after_ack_failure` |
+| `identity.storage.crash_recovery` | `recovery.snapshot_invalid`, `recovery.journal_gap`, `recovery.outbox_inconsistent`, `recovery.hibernate_invalid`, `recovery.migration_incomplete`, `storage.unavailable` |
+
+No additional top-level diagnostic member is permitted.
 
 > **Normative definition.**
 The host MUST NOT expose internal implementation details, secrets, or
@@ -319,12 +324,24 @@ sensitive data in diagnostics.
 > **Normative implementation-defined choice.**
 The following choices are implementation-defined and MUST be documented in the
 conformance profile:
+Each selection is one of the alternatives or finite positive duration/count
+domains stated below. Observable recovery deadlines, snapshot availability,
+and test-harness evidence may differ according to the recorded selections;
+recovered durable state and effect outcomes MUST NOT differ.
 
-1. **Crash injection framework**: The framework used for crash injection testing.
+1. **Crash injection framework**: A deterministic in-process fault injector or
+   a process-level termination harness.
 2. **Recovery timeout**: The maximum time allowed for crash recovery.
-3. **Outbox ack retry policy**: The retry policy for outbox acknowledgement.
-4. **Snapshot frequency**: The frequency of snapshot creation.
-5. **Journal compaction**: The strategy for journal compaction.
+3. **Snapshot frequency**: The frequency of snapshot creation.
+4. **Journal physical compaction**: The physical storage compaction technique;
+   it MUST preserve the logical journal contract in Chapter 25.
+
+> **Normative definition.**
+Outbox acknowledgement retries are not a separate profile choice. They MUST use
+the same persisted, validated effect-handler `RetryPolicy` as the originating
+dispatch: a bounded attempt count, the exact constant `backoff_ms` before each
+subsequent attempt, and absent or zero jitter. Recovery MUST preserve those
+values and the directive idempotency key.
 
 ### Deferred work
 
@@ -354,14 +371,18 @@ affected milestone MUST be revised and re-validated.
 
 ## Variability register
 
+The register below indexes profile selections and other variability governed by
+the linked clauses. It does not independently license variation.
+
+> **Non-normative note.**
+
 | Item | Permission | Recommendation | Constraint |
 |------|------------|----------------|------------|
-| Crash injection framework | Implementation-defined | Document in conformance profile | Must support deterministic failure injection |
-| Recovery timeout | Implementation-defined | Document in conformance profile | Must not exceed turn timeout |
-| Outbox ack retry policy | Implementation-defined | Document in conformance profile | Must be bounded |
-| Snapshot frequency | Implementation-defined | Document in conformance profile | Must balance durability and performance |
-| Journal compaction | Implementation-defined | Document in conformance profile | Must preserve audit trail |
-| Backoff strategy | Implementation-defined | Exponential backoff | Must be bounded |
+| [Crash injection framework](#implementation-defined-choices) | Implementation-defined | Document in conformance profile | Must support deterministic failure injection |
+| [Recovery timeout](#implementation-defined-choices) | Implementation-defined | Document in conformance profile | Must not exceed turn timeout |
+| [Snapshot frequency](#implementation-defined-choices) | Implementation-defined | Document in conformance profile | Must balance durability and performance |
+| [Journal physical compaction](#implementation-defined-choices) | Internal mechanism | Document operational technique | Must preserve every logical audit entry byte-for-byte and in order |
+| [Outbox acknowledgement retry](#implementation-defined-choices) | Required | Reuse the persisted dispatch policy | Exact constant delay, zero jitter, bounded attempts, and stable idempotency key |
 
 ## 5.4 Phase 5 Integration Tests
 
@@ -427,13 +448,17 @@ The following tests MUST verify failure handling:
 6. **External success ambiguity**: Simulate an ambiguous external success and
    verify the result is cached and not re-dispatched.
 7. **Acknowledgement before crash**: Simulate a crash before acknowledgement and
-   verify the outbox entry is retried.
+   verify the outbox entry is retried after exactly the persisted constant
+   `backoff_ms`, with zero jitter and the same directive idempotency key.
 8. **Acknowledgement after crash**: Simulate a crash after acknowledgement and
    verify the outbox entry is marked as acknowledged.
+9. **Retry-policy recovery**: Crash after scheduling at least two acknowledgement
+   retries and verify recovery preserves the attempt bound and exact constant
+   delay rather than selecting a new policy or applying delay growth.
 
 > **Normative definition.**
-Each test MUST verify that the error code and diagnostic message match the
-expected values.
+Each test MUST verify the exact Chapter 04 diagnostic shape, assigned family,
+domain `code`, `severity: "error"`, message, and required bounded details.
 
 ### Recovery after transient failure tests
 

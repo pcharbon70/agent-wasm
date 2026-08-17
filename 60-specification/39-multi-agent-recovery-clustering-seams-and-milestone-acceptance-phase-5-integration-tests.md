@@ -2,7 +2,7 @@
 title: "Multi-Agent Recovery Clustering Seams And Milestone Acceptance Phase 5 Integration Tests"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.1.0"
 tags:
   - milestone-06
@@ -20,7 +20,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 5](../.spec/planning/agentic-system/milestone-06-multi-agent-coordination-and-topology/phase-05-multi-agent-recovery-clustering-seams-and-milestone-acceptance.md)
 of
 [Milestone 6](../.spec/planning/agentic-system/milestone-06-multi-agent-coordination-and-topology/README.md)
@@ -109,6 +109,7 @@ and terminal aggregation flow defined in section 39.2.
 |---------|-------------|
 | `P5-SF-010` | Simulate a host restart and verify that live placement is correctly reconstructed from durable topology. |
 | `P5-SF-011` | Simulate a host restart with an in-flight coordination and verify that the coordination is retained. |
+| `P5-SF-011A` | Restart after reserving topology and lease sequences and verify each durable allocator resumes above its previous reservation without reuse. |
 | `P5-SF-012` | Simulate a host restart with an expired activation lease and verify that the node is marked as stale. |
 | `P5-SF-013` | Simulate a host restart with a failed live agent and verify that the node is restarted according to its lifecycle policy. |
 | `P5-SF-014` | Simulate a host restart with a duplicate topology version and verify that the duplicate is rejected. |
@@ -124,10 +125,11 @@ host correctly recovers from durable topology.
 
 | Test ID | Description |
 |---------|-------------|
-| `P5-SF-016` | Verify that an activation lease is correctly issued for a reconciliation pass and that the lease includes all required fields. |
+| `P5-SF-016` | Verify that the first activation lease for a node includes all required fields and has `fence_token: 1`. |
 | `P5-SF-017` | Verify that an activation lease with a lower `fence_token` than the current fence token is rejected with `topology.lease.expired-fence`. |
-| `P5-SF-018` | Verify that an activation lease with a past `expires_at` timestamp is rejected with `topology.lease.expired-timeout`. |
-| `P5-SF-019` | Verify that an activation lease is correctly renewed before expiration and that the renewed lease extends the `expires_at` timestamp. |
+| `P5-SF-018` | Admit a valid activation lease, advance the clock to `expires_at`, and verify that later use is rejected with `topology.lease.expired-timeout`. |
+| `P5-SF-019` | Renew an activation lease before expiration and verify that only `expires_at` changes to exactly 30 seconds after renewal acceptance while `lease_id`, `lease_sequence`, `host_id`, and `fence_token` remain unchanged. |
+| `P5-SF-019A` | After a lease expires or is revoked, issue a distinct lease for the same `node_id` and verify a new `lease_sequence` and `lease_id` and a `fence_token` exactly one greater than the previous token. |
 | `P5-SF-020` | Verify that an activation lease is correctly expired and that the node is marked as stale. |
 
 > **Non-normative note.**
@@ -143,12 +145,18 @@ Failure handling tests verify that the host correctly rejects invalid inputs
 with stable diagnostics and without leaving unauthorized or partial state.
 Each test scenario below describes the invalid input, the expected diagnostic,
 and the state invariants that MUST hold after the failure.
+Every failure test MUST verify the exact Chapter 04 top-level fields, the
+category-specific `identity.*.topology` family from Section 39.3, the listed
+domain `code`, `severity: "error"`, and all required bounded `details` members.
 
 #### Malformed input tests
 
 | Test ID | Description | Expected diagnostic |
 |---------|-------------|---------------------|
 | `P5-FH-001` | Topology directive with missing `topology_owner` field. | `topology.directive.malformed` |
+| `P5-FH-001A` | `topology_identity`, `node_id`, or `lease_id` does not match the fixed Chapter 38 identity construction. | The applicable `topology.directive.malformed`, `topology.directive.malformed-node-id`, or `topology.lease.malformed` code |
+| `P5-FH-001B` | `topology_sequence: 0` or reuse of a reserved sequence for a distinct topology directive. | `topology.directive.malformed` |
+| `P5-FH-001C` | A distinct lease issuance reuses a reserved `lease_sequence`. | `topology.lease.malformed` |
 | `P5-FH-002` | Topology directive with empty `nodes` list. | `topology.directive.malformed-nodes` |
 | `P5-FH-003` | Topology directive with invalid `node_id` format. | `topology.directive.malformed-node-id` |
 | `P5-FH-004` | Topology directive with invalid `agent_address` format. | `topology.directive.malformed-agent-address` |
@@ -158,7 +166,7 @@ and the state invariants that MUST hold after the failure.
 | `P5-FH-008` | Topology node with missing required fields. | `topology.node.malformed` |
 | `P5-FH-009` | Topology node with invalid `dependencies` list. | `topology.node.malformed-dependencies` |
 | `P5-FH-010` | Activation lease with missing required fields. | `topology.lease.malformed` |
-| `P5-FH-011` | Activation lease with past `expires_at` timestamp. | `topology.lease.malformed-expiry` |
+| `P5-FH-011` | New lease admission request whose supplied `expires_at` is already in the past. | `topology.lease.malformed-expiry` |
 
 > **Normative definition.**
 Each malformed input test MUST verify that the host: (1) rejects the
@@ -182,6 +190,7 @@ guarantees defined in
 | `P5-FH-013` | Topology node whose `agent_address` does not resolve to an active agent. | `topology.node.incompatible-agent` |
 | `P5-FH-014` | Topology node whose `dependencies` reference non-existent `node_id` values. | `topology.node.incompatible-dependency` |
 | `P5-FH-015` | Topology directive whose `nodes` list contains a circular dependency. | `topology.node.incompatible-circular-dependency` |
+| `P5-FH-015A` | Request to transfer an activation lease to another host. | `topology.lease.transfer-unsupported`; current lease remains unchanged |
 
 > **Non-normative note.**
 The incompatible input tests validate the semantic validation layer that
@@ -196,7 +205,6 @@ state or leave partial state in the durable journal.
 | `P5-FH-016` | Two topology directives with the same `topology_version` submitted concurrently. | `topology.directive.duplicate-version` for the second directive. |
 | `P5-FH-017` | Two topology directives with the same `node_id` submitted concurrently. | `topology.node.duplicate-node-id` for the second directive. |
 | `P5-FH-018` | Two activation leases with lower `fence_token` than the current fence token for the same `node_id`. | `topology.lease.expired-fence` for the second lease. |
-| `P5-FH-019` | Two activation leases with past `expires_at` timestamp. | `topology.lease.expired-timeout` for the second lease. |
 | `P5-FH-020` | Two reconciliation passes attempt to modify the same `node_id` concurrently. | `topology.reconciliation.conflict` for the second pass. |
 
 > **Non-normative note.**
@@ -227,11 +235,13 @@ policy and compromise system security.
 
 | Test ID | Description | Expected diagnostic |
 |---------|-------------|---------------------|
-| `P5-FH-028` | Topology directive that would exceed the implementation-defined maximum number of nodes per topology. | `topology.directive.exhausted-nodes` |
-| `P5-FH-029` | Topology node that would exceed the implementation-defined maximum concurrency per topology. | `topology.node.exhausted-concurrency` |
-| `P5-FH-030` | Host that would exceed the implementation-defined maximum number of concurrent leases. | `topology.lease.exhausted-concurrency` |
-| `P5-FH-031` | Live agent mailbox queue that exceeds the implementation-defined maximum. | `topology.mailbox.exhausted-queue` |
-| `P5-FH-032` | Topology node that exceeds the implementation-defined maximum retries. | `topology.retry.exhausted` |
+| `P5-FH-028` | Topology directive that would exceed the disclosed maximum nodes under [Resource bounding under coordination load](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-behavior-and-integration.md#resource-bounding-under-coordination-load). | `topology.directive.exhausted-nodes` |
+| `P5-FH-029` | Topology node that would exceed the disclosed concurrent agents under [Resource bounding under coordination load](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-behavior-and-integration.md#resource-bounding-under-coordination-load). | `topology.node.exhausted-concurrency` |
+| `P5-FH-030` | Host that would exceed the disclosed concurrent leases under [Resource bounding under coordination load](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-behavior-and-integration.md#resource-bounding-under-coordination-load). | `topology.lease.exhausted-concurrency` |
+| `P5-FH-031` | Live agent mailbox queue that exceeds the disclosed queue limit under [Resource bounding under coordination load](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-behavior-and-integration.md#resource-bounding-under-coordination-load). | `topology.mailbox.exhausted-queue` |
+| `P5-FH-032` | Topology node that exceeds the disclosed retries-per-node limit under [Resource bounding under coordination load](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-behavior-and-integration.md#resource-bounding-under-coordination-load). | `topology.retry.exhausted` |
+| `P5-FH-LIM-001` | Topology node that exceeds the disclosed outstanding-cancellations limit. | `topology.cancellation.exhausted-outstanding` |
+| `P5-FH-LIM-002` | Topology node that exceeds the disclosed retained-results limit. | `topology.result.exhausted-retention` |
 
 > **Non-normative note.**
 The exhausted input tests validate the resource limit enforcement layer
@@ -243,7 +253,7 @@ and compromise system stability.
 
 | Test ID | Description | Expected diagnostic |
 |---------|-------------|---------------------|
-| `P5-FH-033` | Topology directive whose `topology_owner` is not active in the durable registry. | `topology.directive.unavailable` |
+| `P5-FH-033` | Topology directive whose agent or non-agent `topology_owner` is not active in the registry selected by its address discriminant. | `topology.directive.unavailable` |
 | `P5-FH-034` | Topology node whose `agent_address` is not active in the durable registry. | `topology.node.unavailable-agent` |
 | `P5-FH-035` | Activation lease whose `host_id` is not active in the host registry. | `topology.lease.unavailable-host` |
 
@@ -264,8 +274,9 @@ cancellation under various `lifecycle_policy` settings.
 
 | Test ID | Description |
 |---------|-------------|
-| `P5-TO-001` | Create a topology directive and verify that the directive is accepted before the implementation-defined timeout expires. |
-| `P5-TO-002` | Create a topology directive and verify that the directive is rejected with `topology.directive.timeout` if it exceeds the implementation-defined timeout. |
+| `P5-TO-001` | Create a topology directive and verify acceptance before the fixed 30-second processing timeout under [Durable topology validation behavior](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-behavior-and-integration.md#durable-topology-validation-behavior). |
+| `P5-TO-002` | Create a topology directive and verify rejection with `topology.directive.timeout` after the fixed 30-second processing timeout under [Durable topology validation behavior](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-behavior-and-integration.md#durable-topology-validation-behavior). |
+| `P5-TO-006` | Verify lease expiry after 30 seconds, stale-node detection after 60 seconds, 30-second retry spacing, and `topology.recovery.timeout` after 60 seconds. |
 | `P5-LP-001` | Create a topology directive with `lifecycle_policy: terminate-on-topology-revoke` and verify that the directive is terminated when the topology is revoked. |
 | `P5-LP-002` | Create a topology directive with `lifecycle_policy: wait-completion-on-topology-revoke` and verify that the directive is allowed to complete before being terminated. |
 | `P5-LP-003` | Create a topology directive with `lifecycle_policy: allow-partial-on-topology-revoke` and verify that the directive is allowed to continue but its results are excluded from aggregation. |
@@ -364,7 +375,7 @@ subsystems (such as the agent registry, mailboxes, and durable journal).
 > **Normative definition.**
 Integration test evidence is the durable, auditable record that the Phase 5
 integration tests were executed and the results.
-Evidence is the primary input for promotion from `status: draft` to
+Evidence is the primary input for promotion from `status: candidate` to
 `status: normative`.
 
 > **Normative definition.**
@@ -393,7 +404,7 @@ evidence record has not been tampered with after creation.
 The `approved_variability` field enables operators to document and
 retroactively approve intentional deviations from the baseline, which
 is important for cross-milestone compatibility testing where some
-variations are acceptable (such as implementation-defined bounded times).
+variations are acceptable (such as disclosed implementation resource limits).
 
 > **Normative definition.**
 A run of all Phase 5 integration tests passes if and only if:
@@ -409,7 +420,7 @@ A run of all Phase 5 integration tests passes if and only if:
    [Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md).
 
 > **Normative definition.**
-Promotion from `status: draft` to `status: normative` requires:
+Promotion from `status: candidate` to `status: normative` requires:
 
 1. A passing run of all Phase 5 integration tests as defined above.
 2. A passing run of all cross-milestone compatibility tests as defined

@@ -2,7 +2,7 @@
 title: "Provider-Neutral Model Requests Responses Streaming And Usage Contract And Data Model"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.2.0"
 tags:
   - milestone-07
@@ -22,7 +22,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 1](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/phase-01-provider-neutral-model-requests-responses-streaming-and-usage.md)
 of
 [Milestone 7](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/README.md).
@@ -114,10 +114,12 @@ operator independently of plugin installation.
 | Field | Meaning |
 | --- | --- |
 | `connection_id` | Stable tenant-scoped connection identity. |
+| `revision` | Monotonically increasing connection revision. |
 | `tenant_id` | Owning tenant. |
 | `adapter_id` | Reviewed host adapter or external effect-worker adapter. |
-| `custody_mode` | `external-broker`, `provider-workload-identity`, or explicitly opted-in `host-local`. |
+| `custody_mode` | `external-broker`, `provider-workload-identity`, explicitly opted-in `host-local`, or `none` for an unauthenticated local model. |
 | `custodian_id` | Registered credential custodian, if authentication is required. |
+| `credential_lease_id` | Active use-only credential lease, if authentication is required. |
 | `credential_handle_ref` | Opaque sender-constrained reference, if authentication is required. |
 | `endpoint_ref` | Reference to an operator-approved endpoint registry entry. |
 | `catalog_revision` | Revision of advertised provider models and capabilities. |
@@ -126,6 +128,13 @@ operator independently of plugin installation.
 `endpoint_ref` MUST NOT be an arbitrary URL supplied by an agent or plugin.
 `credential_handle_ref` MUST NOT contain credential bytes and MUST NOT be
 sufficient as an unauthenticated bearer token.
+
+Changing the adapter, custody mode, custodian, credential lease, protected
+handle reference, endpoint, catalog revision, or status MUST create a new
+connection revision. A `custody_mode: none` connection MUST identify a local
+unauthenticated endpoint and MUST have null `custodian_id`,
+`credential_lease_id`, and `credential_handle_ref` fields. Every other custody
+mode used for an authenticated request MUST identify all three fields.
 
 A `ModelBinding` records the user's concrete choice for one logical slot.
 
@@ -137,6 +146,7 @@ A `ModelBinding` records the user's concrete choice for one logical slot.
 | `agent_definition_digest` | Host runtime | Immutable composed definition being configured. |
 | `model_slot` | Manifest | Logical requirement being satisfied. |
 | `connection_id` | User configuration | Selected registered connection. |
+| `connection_revision` | Host runtime | Pinned revision of the selected connection. |
 | `provider` | User configuration through catalog | Concrete provider identifier. |
 | `model` | User configuration through catalog | Concrete provider model identifier. |
 | `catalog_revision` | Host runtime | Catalog metadata used for compatibility validation. |
@@ -155,6 +165,10 @@ or agent artifact digest. Approval of one revision MUST NOT authorize a later
 revision. Compatibility is evaluated from signed or operator-approved model
 catalog metadata against every requirement field.
 
+If the selected connection revision changes, the host MUST create and approve
+a new binding revision before materializing another intent. A binding MUST NOT
+float to the latest revision of its `connection_id`.
+
 ### Materialized model request
 
 After authorization and binding resolution, the host materializes a durable
@@ -167,7 +181,8 @@ After authorization and binding resolution, the host materializes a durable
 | `agent_address` | Authenticated intent context. |
 | `model_slot` | Admitted intent. |
 | `binding_id` and `binding_revision` | Active approved binding. |
-| `connection_id` and `adapter_id` | Bound connection. |
+| `connection_id`, `connection_revision`, and `adapter_id` | Bound connection revision. |
+| `credential_lease_id` | Bound use-only lease for authenticated dispatch, or null for `custody_mode: none`. |
 | `provider` and `model` | User-approved binding. |
 | `messages`, `structured_output_schema`, `tool_definitions`, `sampling` | Validated intent. |
 | `deadline` and `budget` | Attenuated policy result. |
@@ -219,9 +234,34 @@ Every normalized response MUST include:
 | `usage` | Prompt, completion, total token, and cost observations. |
 | `provider_response_ref` | Bounded provider correlation reference. |
 | `safety_metadata` | Bounded provider safety result. |
-| `credential_use_receipt_ref` | Verified custodian receipt correlation. |
+| `credential_receipt` | Verified credential-use receipt or a host-created no-credential receipt. |
 | `diagnostics` | Bounded latency and retry information. |
 | `created_at` | Host timestamp. |
+
+> **Normative definition.**
+
+```
+ModelCredentialReceipt = CredentialUseReceiptRef | NoCredentialReceipt
+
+CredentialUseReceiptRef {
+  kind: "credential-use",
+  receipt_ref: string
+}
+
+NoCredentialReceipt {
+  kind: "not-required",
+  reason: "local-unauthenticated",
+  connection_id: string,
+  connection_revision: u64
+}
+```
+
+An authenticated request MUST use `CredentialUseReceiptRef` and the referenced
+receipt MUST pass Section 44 verification. A request through a pinned
+`custody_mode: none` connection MUST use `NoCredentialReceipt`; the host MUST
+create it only after verifying that the connection has no custodian, lease,
+handle, or authenticated provider operation. Neither receipt variant grants
+authority.
 
 A streaming event includes `event_id`, `request_id`, monotonically
 increasing `sequence`, `event_type`, the applicable bounded delta,
@@ -238,7 +278,7 @@ conformance profile documents retention and redaction.
 Every usage record MUST include `usage_id`, `request_id`,
 `agent_address`, `model_slot`, `binding_id`, `binding_revision`,
 `provider`, `model`, token counts, cost, currency or cost unit,
-`credential_use_receipt_ref`, and `created_at`.
+`credential_receipt`, and `created_at`.
 
 Prompt and response bodies MUST be represented in durable request and result
 records by access-controlled content references when policy classifies them as
@@ -251,18 +291,36 @@ reject the response with `model.request.tool_call_mismatch`. If a structured
 value does not satisfy `structured_output_schema`, the host MUST reject it
 with `model.request.invalid_structured_output`.
 
+### Cross-chapter type and precedence rules
+
+For authenticated model requests, the `SecretLease`, `CredentialUseRequest`,
+and `CredentialUseReceipt` types in
+[Threads Checkpoints Memory Approvals Quotas And Secret Leases Contract And Data Model](44-threads-checkpoints-memory-approvals-quotas-and-secret-leases-contract-and-data-model.md#credential-custodians-leases-handles-and-receipts)
+govern credential-use scope and receipt verification. This chapter requires a
+model connection's `credential_lease_id` to equal the governing `lease_id` and
+adds only the
+`NoCredentialReceipt` alternative for a connection that performs no
+authenticated operation. `NoCredentialReceipt` MUST NOT be used to bypass or
+replace a Section 44 receipt.
+
 ## Variability register
+
+The following table summarizes fixed requirements and internal mechanisms.
+
+> **Non-normative note.**
 
 | Item | Permission | Recommendation | Constraint |
 | --- | --- | --- | --- |
 | Concrete provider and model selection | Required | User-approved binding for every required slot | Agent, publisher, adapter, and custodian selection is prohibited |
-| Binding storage backend | Implementation-defined | Versioned tenant-scoped registry | Must remain outside artifact digest and preserve revision history |
-| Model catalog source | Implementation-defined | Signed provider catalog or operator-approved registry | Compatibility decision and catalog revision must be auditable |
-| Adapter implementation | Implementation-defined | Reviewed host integration or authenticated external worker | Must implement the common contract and never expose credentials |
-| Sensitive content storage | Implementation-defined | Access-controlled content references | Durable records and evidence must remain bounded |
+| Model connection revision | Required | Pin the complete connection authority used by a binding | Every authority-bearing connection change creates a new revision |
+| Binding storage backend | Internal mechanism | Versioned tenant-scoped registry | Backend changes must preserve revision history and must not alter artifact identity or observable binding semantics |
+| Model catalog source | Required trust rule | Signed provider catalog or operator-approved registry | Compatibility decision and catalog revision must be auditable |
+| Adapter implementation | Internal mechanism | Reviewed host integration or authenticated external worker | Both forms must implement the same common contract and never expose credentials |
+| Sensitive content storage | Internal mechanism | Access-controlled content references | Backend choice must not change authorization, boundedness, or durable reference semantics |
 | Streaming-event retention | Optional | Do not retain deltas by default | Retention and redaction must be documented |
-| Cost units and currency | Implementation-defined | Preserve provider observation and host calculation | Budget enforcement method must be documented |
-| Credential custody | Required for end-user distributions | Use separated credential custody | Host-local mode must be explicit and cannot claim separated-custody conformance |
+| Cost units and currency | Required preservation | Preserve provider observation and host calculation | Budget enforcement must retain both values and apply the conservative authorized amount |
+| Credential custody | Required for authenticated end-user operations | Use separated credential custody | `host-local` must be explicit and cannot claim separated-custody conformance; `none` is restricted to local unauthenticated models |
+| Model credential receipt | Closed required union | Verified Section 44 receipt or `NoCredentialReceipt` | The no-credential variant is valid only for a pinned `custody_mode: none` connection |
 | Automatic model routing or fallback | Deferred | Require an explicit user binding | Runtime must not silently change provider or model |
 
 ## Rationale and evidence (non-normative)
