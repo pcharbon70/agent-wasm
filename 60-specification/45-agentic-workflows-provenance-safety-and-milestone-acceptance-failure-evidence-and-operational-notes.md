@@ -2,7 +2,7 @@
 title: "Agentic Workflows Provenance Safety And Milestone Acceptance Failure Evidence And Operational Notes"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.2.0"
 tags:
   - milestone-07
@@ -24,7 +24,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 5](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/phase-05-agentic-workflows-provenance-safety-and-milestone-acceptance.md)
 of
 [Milestone 7](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/README.md)
@@ -32,8 +32,8 @@ of
 AI, Tools, Memory, And Human Control.
 It establishes the failure evidence and operational notes for agentic
 workflows, provenance, safety, and milestone acceptance, including failure
-outcomes, bounded diagnostics, evidence emission, implementation-defined
-choices, deferred work, and results that would invalidate earlier milestone
+outcomes, bounded diagnostics, evidence emission, profiled configuration,
+deferred work, and results that would invalidate earlier milestone
 assumptions.
 
 Version `0.2.0` aligns workflow failures and evidence with logical model
@@ -156,7 +156,7 @@ safety, and milestone acceptance into the following categories:
 
 | Diagnostic | Cause | Host behavior |
 |------------|-------|---------------|
-| `workflow_budget_exhausted` | The workflow budget is exhausted. | Terminate the workflow and emit a `workflow_budget_exhausted` diagnostic. |
+| `workflow_budget_exhausted` | An aggregate workflow budget is exhausted without a more specific Chapter 43 budget diagnostic. | Terminate the workflow, mark it `failed`, emit `workflow_budget_exhausted`, and retain intermediate state only for inspection. |
 | `quota_exhausted` | The quota is exhausted. | Reject the request and emit a `quota_exhausted` diagnostic. |
 | `approval_expired` | The approval request has expired. | Reject the request and emit an `approval_expired` diagnostic. |
 | `credential.handle.expired` | Credential lease or handle has expired. | Reject new use and reconcile in-flight work. |
@@ -178,6 +178,13 @@ Model and credential failures MUST preserve the canonical diagnostic from
 Sections 41 and 44. The workflow layer MUST NOT translate a binding, scope,
 export, replay, receipt, or custodian failure into a generic workflow,
 network, or tool error.
+
+Chapter 43 strategy-budget diagnostics also remain canonical. Chapter 45 MUST
+NOT translate them into `workflow_budget_exhausted`; it emits
+`workflow.budget_exhausted` evidence and applies the fixed `failed` workflow
+status. Within Chapter 45, `workflow_budget_exhausted` is a diagnostic and
+`workflow.budget_exhausted` is an evidence type. Dotted evidence names MUST
+NOT be emitted as diagnostics.
 
 ### Bounded diagnostics
 
@@ -287,7 +294,7 @@ Evidence MUST be bounded. It MUST NOT expose:
 ### Implementation-defined choices
 
 > **Normative definition.**
-The following implementation-defined choices MUST be documented by the host:
+The following host configuration values MUST be documented in the conformance profile:
 
 | Choice | Default | Documentation requirement |
 |--------|---------|---------------------------|
@@ -346,3 +353,12 @@ milestone maintainer.
 - **Recommendation**: The host SHOULD support tenant-level configuration by default.
 - **Permitted presentation**: The host MAY present the configured budgets to the operator.
 - **Limit**: Budgets MUST be enforced at all times. Budget exhaustion is a hard stop, not a soft target.
+
+### 45.3.4 Budget failure classification
+
+- **Requirement**: Preserve a more specific Chapter 43 budget diagnostic;
+  otherwise use `workflow_budget_exhausted`.
+- **Permitted presentation**: The host MAY correlate the diagnostic with
+  `workflow.budget_exhausted` evidence.
+- **Limit**: Correlation MUST NOT translate either stable identifier or permit
+  a `completed` terminal status.

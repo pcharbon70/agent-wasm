@@ -2,7 +2,7 @@
 title: "Threads Checkpoints Memory Approvals Quotas And Secret Leases Phase 4 Integration Tests"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.2.0"
 tags:
   - milestone-07
@@ -23,7 +23,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 4](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/phase-04-threads-checkpoints-memory-approvals-quotas-and-secret-leases.md)
 of
 [Milestone 7](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/README.md)
@@ -204,6 +204,10 @@ The following tests verify exhaustion handling:
 | `lease-expired` | Wait for a lease to expire. | `credential.handle.expired` diagnostic is emitted. |
 | `lease-revoked` | Revoke a lease before a new use. | `credential.handle.revoked` diagnostic is emitted. |
 
+The quota and approval exhaustion tests MUST additionally verify that the
+diagnostic uses the underscore code while the correlated lifecycle evidence
+uses `quota.exhausted` or `approval.expired` respectively.
+
 > **Normative definition.**
 The following tests verify unavailable dependency handling:
 
@@ -313,7 +317,14 @@ milestone maintainer.
 
 | Item | Permission | Recommendation | Constraint |
 | --- | --- | --- | --- |
-| Custodian fixture transport | Implementation-defined | Exercise the product's real authenticated boundary | Credential must never be supplied to host process |
-| Host and Port memory inspection | Implementation-defined | Capture success and injected-crash artifacts | Must include every shipped process that could receive configuration or request data |
 | Sentinel encoding scan | Required | Raw, base64, hex, URL-encoded, and structured variants | Must accompany a non-transmission assertion |
 | Test parallelism | Optional | Parallelize isolated tenants only | Shared custodian, lease, nonce, and quota tests must serialize |
+| Diagnostic/evidence namespace assertion | Required | Compare exact strings | Underscore diagnostics and dotted evidence types must remain distinct |
+
+### Internal harness mechanisms (non-normative)
+
+Custodian fixture transport and host/Port memory-inspection techniques are
+internal harness mechanisms. They may vary only when they exercise the shipped
+authenticated boundary, inspect every process and artifact that could receive
+configuration or request data, and reproducibly detect the same raw and
+encoded sentinel occurrences after success and injected crashes.

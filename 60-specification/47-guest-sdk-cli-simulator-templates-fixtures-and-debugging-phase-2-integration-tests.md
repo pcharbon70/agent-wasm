@@ -2,7 +2,7 @@
 title: "Guest SDK CLI Simulator Templates Fixtures And Debugging Phase 2 Integration Tests"
 kind: specification
 created: "2026-08-10"
-status: draft
+status: normative
 spec_version: "0.2.0"
 tags:
   - milestone-09
@@ -23,7 +23,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 2](../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/phase-02-guest-sdk-cli-simulator-templates-fixtures-and-debugging.md)
 of
 [Milestone 9](../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/README.md)
@@ -219,10 +219,13 @@ The SDK, CLI, and fixtures MUST negotiate compatibility with the host.
 The test MUST verify that:
 
 1. Compatible SDK/CLI versions proceed normally.
-2. Deprecated SDK/CLI versions produce warnings and proceed.
-3. Incompatible SDK/CLI versions produce errors and refuse execution.
-4. Missing features produce errors and refuse execution.
-5. Compatibility negotiation results are logged and included in diagnostics.
+2. Deprecated SDK/CLI versions produce warnings and proceed for 6 months.
+3. Sunset SDK/CLI versions produce errors and refuse execution for 3 months
+   before removal.
+4. An incompatible protocol version that is not merely in a deprecation stage
+   produces a stable error and refuses execution.
+5. Missing features produce errors and refuse execution.
+6. Compatibility negotiation results are logged and included in diagnostics.
 
 ### 47.4.10 Reproducible builds
 
@@ -264,10 +267,10 @@ See [Variability register](#variability-register).
 | Cross-milestone fixtures | Section 47.4.6 | MUST | Must include all fixtures listed in section 47.4.6. |
 | Regression approval | Section 47.4.6 | Required | Must record and approve or reject any regression. |
 | Deterministic reproducibility verification | Section 47.4.7 | MUST | Must verify determinism via output hash, file content, and evidence record comparison. |
-| Offline capabilities tested | Section 47.4.9 | MUST | Must test all offline capabilities listed in section 47.1.9. |
-| Compatibility negotiation tested | Section 47.4.10 | MUST | Must test compatible, deprecated, incompatible, and missing feature scenarios. |
-| Reproducible build verification | Section 47.4.11 | MUST | Must verify determinism, source inclusion, and dependency pinning. |
-| Actionable failure fields | Section 47.4.12 | MUST | Must verify `hint` and `reference` fields are present and actionable. |
+| Offline capabilities tested | Section 47.4.8 | MUST | Must test all offline capabilities listed in section 47.1.9. |
+| Compatibility negotiation tested | Section 47.4.9 | MUST | Must test compatible, deprecated, sunset, incompatible, and missing-feature scenarios. |
+| Reproducible build verification | Section 47.4.10 | MUST | Must verify determinism, source inclusion, and dependency pinning. |
+| Actionable failure fields | Section 47.4.11 | MUST | Must verify `hint` and `reference` fields are present and actionable. |
 
 ## Rationale and evidence (non-normative)
 

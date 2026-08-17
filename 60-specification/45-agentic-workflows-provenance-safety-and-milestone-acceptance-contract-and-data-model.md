@@ -2,7 +2,7 @@
 title: "Agentic Workflows Provenance Safety And Milestone Acceptance Contract And Data Model"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.2.0"
 tags:
   - milestone-07
@@ -23,7 +23,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 5](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/phase-05-agentic-workflows-provenance-safety-and-milestone-acceptance.md)
 of
 [Milestone 7](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/README.md)
@@ -333,23 +333,20 @@ Provenance references MUST be bounded. They MUST NOT expose:
 
 ## Variability register
 
-### 45.1.1 Workflow type extensibility
-
-- **Permission**: The host MAY support custom workflow types beyond the six defined.
-- **Recommendation**: The host SHOULD document any custom workflow types.
-- **Permitted presentation**: The host MAY present custom workflow types to the operator.
-- **Limit**: Custom workflow types MUST follow the same contract as built-in types.
-
-### 45.1.2 Provenance reference deduplication
+### 45.1.1 Provenance reference deduplication
 
 - **Permission**: The host MAY deduplicate provenance references (e.g., if the same model response is referenced multiple times).
 - **Recommendation**: The host SHOULD deduplicate provenance references when possible.
 - **Permitted presentation**: The host MAY present deduplication statistics to the operator.
 - **Limit**: Deduplication MUST not lose any reference information.
 
-### 45.1.3 Safety boundary configurability
+### 45.1.2 Safety boundary configurability
 
 - **Permission**: The host MAY configure safety boundaries per tenant, with per-agent override support for sandbox/power agent patterns.
 - **Recommendation**: The host SHOULD support tenant-level configuration by default. Per-agent override lets tenants run agents with tighter limits (e.g., a sandbox agent at 50% of tenant budget). Per-workflow configuration is not supported — workflow types are internal implementation categories, not security boundaries.
 - **Permitted presentation**: The host MAY present the configured safety boundaries to the operator.
 - **Limit**: Safety boundaries MUST be enforced at all times.
+
+Custom workflow types are deferred under
+[Deferred work](45-agentic-workflows-provenance-safety-and-milestone-acceptance-failure-evidence-and-operational-notes.md#deferred-work)
+and are not permitted variability in version `0.2.0`.

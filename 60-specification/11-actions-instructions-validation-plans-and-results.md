@@ -2,8 +2,8 @@
 title: "Actions Instructions Validation Plans And Results"
 kind: specification
 created: "2026-08-08"
-status: draft
-spec_version: "0.1.0"
+status: normative
+spec_version: "1.0.0"
 tags:
   - milestone-02
   - phase-02
@@ -20,7 +20,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 2](../.spec/planning/agentic-system/milestone-02-signals-actions-state-and-strategies/phase-02-actions-instructions-validation-plans-and-results.md)
 of
 [Milestone 2](../.spec/planning/agentic-system/milestone-02-signals-actions-state-and-strategies/README.md)
@@ -49,61 +49,26 @@ Related chapters:
 ### ActionDescriptor
 
 > **Normative definition.**
-An action descriptor is a reusable operation definition that the artifact
-declares in its manifest.
-It describes the operation's input/output schemas, state access requirements,
-directive kinds, required grants, and deterministic constraints.
+`ActionDescriptor` is the single manifest type defined by
+[Action descriptor](03-agent-manifests-artifacts-schemas-and-registries.md#action-descriptor).
+Its schema references are resolved to JSON Schemas before instruction
+validation. This chapter does not define or accept a second action shape.
 
-> **Normative definition.**
-
-```
-ActionDescriptor {
-  name: string,
-  input_schema: JsonSchema?,
-  output_schema: JsonSchema?,
-  state_access: StateAccess,
-  directive_kinds: DirectiveKind[],
-  required_grants: GrantRef[],
-  deterministic: boolean,
-  timeout_ms: int?
-}
-
-StateAccess {
-  read: string[],
-  write: string[],
-  delete: string[]
-}
-
-DirectiveKind {
-  type: string,
-  required_capabilities: CapabilityRef[]
-}
-
-GrantRef {
-  principal: string?,
-  capability: CapabilityRef,
-  resource: string?,
-  conditions: JsonObject?
-}
-```
-
-| Field | Type | Required | Purpose |
-|-------|------|----------|---------|
-| `name` | string | Yes | Action identifier |
-| `input_schema` | JsonSchema? | No | Input validation schema |
-| `output_schema` | JsonSchema? | No | Output validation schema |
-| `state_access` | StateAccess | Yes | State access permissions |
-| `directive_kinds` | DirectiveKind[] | Yes | Allowed directive types |
-| `required_grants` | GrantRef[] | Yes | Required capability grants |
-| `deterministic` | boolean | Yes | Whether the action is deterministic |
-| `timeout_ms` | int? | No | Execution timeout |
+The base profile requires `deterministic: true`. A descriptor with
+`deterministic: false` is incompatible with deterministic reducer execution
+and MUST be rejected at artifact admission.
 
 ### Instruction
 
 > **Normative definition.**
 An instruction is a concrete invocation of an action within a turn.
-It carries the action reference, arguments, causal context, expected revision,
-and optional scheduling metadata.
+It carries the action reference, arguments, causal context, and optional
+scheduling metadata. The enclosing `TurnRequest` carries the expected state
+revision.
+This is the `Instruction` wire type defined by
+[Instruction](04-turn-lifecycle-protocols-and-canonical-encoding.md#instruction);
+the definition below is an exact restatement and does not introduce a second
+representation or conversion.
 
 > **Normative definition.**
 
@@ -205,18 +170,35 @@ ExecutionOrder {
 ### Deterministic scheduling
 
 > **Normative definition.**
-The host MUST schedule plan nodes in a deterministic order.
+The host MUST schedule and execute plan nodes one at a time in a deterministic
+order.
 For sequential plans, nodes are executed in the order specified.
 For DAG plans, nodes are executed in topological order with ties broken
 by node ID lexicographically.
 
 The host MUST ensure that node dependencies are satisfied before execution.
 A node MUST NOT execute until all its dependencies have completed successfully.
+Parallel execution and plan reordering are not permitted.
+
+### Action timeout enforcement
+
+> **Normative definition.**
+When an `ActionDescriptor` supplies `timeout_ms`, the action deadline is the
+earlier of the turn deadline and `timeout_ms` milliseconds after that action
+starts. Without `timeout_ms`, the turn deadline is the action deadline.
+
+The host MUST stop an action that reaches its effective deadline, discard all
+of that node's result contributions, and terminate the plan without executing
+later nodes. If the descriptor timeout is strictly earlier than the turn
+deadline, the diagnostic is `action.timeout.deadline_exceeded`; otherwise it
+is `identity.limit.time.turn_ms`. The interruption mechanism is internal and
+MAY vary only when deadline classification, node execution, outputs,
+diagnostics, and absence of partial effects are identical.
 
 ### Result classes
 
 > **Normative definition.**
-Action results fall into four distinct classes:
+Action results fall into five distinct classes:
 
 | Class | Description | Conditions |
 |-------|-------------|------------|
@@ -224,6 +206,7 @@ Action results fall into four distinct classes:
 | Domain rejection | Action completed but domain logic rejected the operation | All validations passed, action returned rejection |
 | Validation failure | Action failed validation before execution | Validation step failed |
 | Infrastructure failure | Action failed due to infrastructure issues | Timeout, resource exhaustion, etc. |
+| Cancellation | Action was interrupted by an authenticated cancellation request | No result contribution is committed |
 
 ### Result contributions
 
@@ -241,7 +224,7 @@ Action results contribute to the following turn outputs:
 ```
 ActionResult {
   node_id: string,
-  status: "success" | "rejection" | "validation_failure" | "infrastructure_failure",
+  status: "success" | "rejection" | "validation_failure" | "infrastructure_failure" | "cancelled",
   state_patch: StatePatch?,
   directives: Directive[],
   facts: JsonObject?,
@@ -284,25 +267,23 @@ without exposing secrets or implementation internal state.
 | Exhausted | Resource limits exceeded | Size limits, timeout, etc. |
 | Unavailable | Action or dependency unavailable | Action not found or resource unavailable |
 
-### Implementation-defined choices
+### Fixed execution policy and governing references
 
-> **Normative implementation-defined choice.**
-The following choices are implementation-defined and do not create
-conformance obligations.
-The Variability register below catalogs all such choices.
+1. **Plan optimization**: Execution order and the prohibition on parallel plan
+   execution are fixed by [Deterministic scheduling](#deterministic-scheduling).
 
-1. **Plan optimization**: The host MAY optimize execution plans (e.g.,
-   parallelize independent nodes). The optimization algorithm is
-   implementation-defined.
+2. **Timeout enforcement**: Effective deadlines and timeout failure behavior
+   are fixed by [Action timeout enforcement](#action-timeout-enforcement).
 
-2. **Timeout enforcement**: The host MAY enforce action execution timeouts.
-   The enforcement mechanism is implementation-defined.
+3. **State conflict resolution**: Conflict detection and patch rejection are
+   governed by [Conflict detection](12-state-operations-patches-revisions-and-conflicts.md#conflict-detection).
 
-3. **State conflict resolution**: The host MAY implement state conflict
-   resolution strategies. The strategy is implementation-defined.
-
-4. **Result caching**: The host MAY cache action results for idempotency.
-   The caching strategy is implementation-defined.
+4. **Result caching**: The host MUST NOT reuse a cached `ActionResult` in place
+   of invoking an eligible plan node. During one plan attempt, each eligible
+   node is invoked at most once in fixed order. Nodes after a failed, timed-out,
+   or cancelled node are skipped and are not executions. Any staged
+   contribution from the interrupted plan is discarded; idempotency does not
+   permit re-execution within that attempt.
 
 ### Deferred work
 
@@ -310,18 +291,15 @@ The Variability register below catalogs all such choices.
 The following work is deferred to future milestones and creates no
 conformance obligation for current implementations:
 
-1. **Plan optimization API**: A formal plan optimization API will be
-   implemented in future milestones. The protocol is language-neutral and
-   does not require plan optimization for base conformance.
+1. **Plan optimization API**: A future versioned extension may define a plan
+   optimization API. The base protocol remains sequential and prohibits
+   reordering.
 
-2. **State conflict resolution API**: A formal state conflict resolution
-   API will be implemented in future milestones. The protocol is
-   language-neutral and does not require conflict resolution for base
-   conformance.
+2. **State conflict inspection API**: A future API may expose conflict evidence
+   and the fixed patch-id ordering. It may not select a different winner.
 
-3. **Result caching API**: A formal result caching API will be implemented
-   in future milestones. The protocol is language-neutral and does not
-   require result caching for base conformance.
+3. **Result evidence cache API**: A future API may cache result evidence for
+   inspection. It may not substitute a cached result for node invocation.
 
 ## 2.4 Phase 2 Integration Tests
 
@@ -388,14 +366,17 @@ Expected behavior:
 ### Timeout
 
 > **Normative definition.**
-The timeout integration test validates that an instruction exceeding the
-execution timeout is rejected with a `action.timeout.deadline_exceeded` diagnostic.
+The timeout integration test validates both descriptor-local and turn-limit
+classification.
 
 Expected behavior:
 
-- Input: valid instruction that exceeds timeout.
-- Expected output: null.
-- Expected error: `action.timeout.deadline_exceeded`.
+- Input A: valid instruction whose positive descriptor `timeout_ms` is
+  strictly shorter than the remaining turn ceiling and is exhausted.
+- Expected A: null with `action.timeout.deadline_exceeded`.
+- Input B: valid instruction for which the turn ceiling is earlier than or
+  equal to the descriptor timeout and is exhausted.
+- Expected B: null with `identity.limit.time.turn_ms`.
 
 ### Infrastructure failure
 
@@ -409,17 +390,19 @@ Expected behavior:
 - Expected output: null.
 - Expected error: `action.infrastructure.internal_error`.
 
-### State conflict
+### Serialized state updates
 
 > **Normative definition.**
-The state conflict integration test validates that conflicting instructions
-are detected and handled appropriately.
+The serialized-state integration test validates that concurrent signal
+submissions cannot produce concurrent reducer patches for one agent.
 
 Expected behavior:
 
-- Input: two instructions modifying same state concurrently.
-- Expected output: one instruction succeeds, other is rejected.
-- Expected error: `action.state.conflict` for rejected instruction.
+- Input: two FIFO-ordered mailbox entries whose actions update the same state
+  path.
+- Expected output: the first turn loads revision `n` and commits `n + 1`; only
+  then does the second turn load `n + 1` and commit `n + 2`.
+- Expected error: null; no patch conflict arbitration occurs.
 
 ### Cancellation
 
@@ -430,7 +413,8 @@ can be cancelled and leaves no unauthorized or partial state.
 Expected behavior:
 
 - Input: valid instruction that is cancelled mid-execution.
-- Expected output: action result with cancellation status.
+- Expected output: action result with `status: "cancelled"`; later nodes are
+  skipped and no staged contribution commits.
 - Expected error: null.
 
 ### Cross-milestone fixture regression
@@ -448,17 +432,23 @@ Any approved variability MUST be documented in the Milestone 2 exit report.
 
 ## Variability register
 
+This register summarizes the governing clauses linked below; it does not
+define or redeclare permitted variation.
+
+> **Non-normative note.**
+
 | Clause | Type | Selection |
 |--------|------|-----------|
-| Action descriptors | Required | Declared in artifact manifest |
+| [Action descriptors](03-agent-manifests-artifacts-schemas-and-registries.md#action-descriptor) | Required | One manifest type; this chapter defines no alternate shape |
 | Instruction structure | Required | Fields fixed by this chapter |
 | Validation order | Required | 5-step order fixed by this chapter |
-| Execution order | Required | Sequential or DAG fixed by this chapter |
-| Result classes | Required | Four classes fixed by this chapter |
-| Plan optimization | Implementation-defined | Documented in conformance profile |
-| Timeout enforcement | Implementation-defined | Documented in conformance profile |
-| State conflict resolution | Implementation-defined | Documented in conformance profile |
-| Result caching | Implementation-defined | Documented in conformance profile |
+| [Plan shape](#execution-plans) | MAY | Sequential or DAG-shaped; both execute one node at a time in fixed order |
+| Result classes | Required | Five classes fixed by this chapter |
+| [Result contributions](#result-contributions) | MAY | Actions may contribute patches, directives, facts, diagnostics, or terminal status within the fixed result schema |
+| [Plan optimization](#deterministic-scheduling) | Required | Sequential deterministic execution; no parallel execution or reordering |
+| [Timeout enforcement](#action-timeout-enforcement) | MAY (internal interruption mechanism) | Descriptor-local expiry uses `action.timeout`; turn-limit expiry uses `identity.limit.time.turn_ms` |
+| [Concurrent state requests](12-state-operations-patches-revisions-and-conflicts.md#conflict-detection) | Required | Ordinary turns load state only after acquiring the lease; prebuilt same-base maintenance patches serialize and later ones are stale |
+| [Result caching](#fixed-execution-policy-and-governing-references) | Required | Cached substitution prohibited; each eligible node is invoked at most once per plan attempt |
 
 ## Rationale and evidence (non-normative)
 
@@ -488,7 +478,7 @@ The execution plan model provides:
 
 - Deterministic scheduling of action executions.
 - Support for both sequential and DAG-shaped dependencies.
-- Clear dependency tracking for parallel execution.
+- Clear dependency tracking for deterministic sequential execution.
 
 The result classes provide:
 

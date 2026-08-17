@@ -2,7 +2,7 @@
 title: "Multi-Agent Recovery Clustering Seams And Milestone Acceptance Contract And Data Model"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.1.0"
 tags:
   - milestone-06
@@ -19,7 +19,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 5](../.spec/planning/agentic-system/milestone-06-multi-agent-coordination-and-topology/phase-05-multi-agent-recovery-clustering-seams-and-milestone-acceptance.md)
 of
 [Milestone 6](../.spec/planning/agentic-system/milestone-06-multi-agent-coordination-and-topology/README.md)
@@ -90,8 +90,9 @@ Every topology MUST include the following fields:
 | Field | Content | Source |
 |-------|---------|--------|
 | `topology_version` | A monotonic integer version of the topology. | Topology directive. |
-| `topology_identity` | A deterministic identity derived from `topology_version` and `topology_owner`. | Host runtime. |
-| `topology_owner` | The `TenantQualifiedAgentAddress` of the principal that owns the topology. | Topology directive. |
+| `topology_sequence` | The monotonic per-owner-scope `u64` sequence reserved for this distinct topology directive; system principals use the single system scope. | Topology directive. |
+| `topology_identity` | The fixed `topology:sha256:<hex>` identity derived from `topology_version`, `topology_owner`, and `topology_sequence`. | Topology directive construction. |
+| `topology_owner` | The `AddressablePrincipal` that owns the topology. Agents use `TenantQualifiedAgentAddress`; non-agent owners use `PrincipalAddress`. | Topology directive. |
 | `nodes` | A list of topology nodes that define the desired placement. | Topology directive. |
 | `created_at` | The ISO 8601 timestamp of topology creation. | Topology directive. |
 | `updated_at` | The ISO 8601 timestamp of the last topology revision. | Topology directive. |
@@ -106,6 +107,11 @@ section 38.1.
 Phase 5 reuses the Phase 4 node schema without deviation.
 The `node_id` is derived deterministically from `topology_version`,
 `role`, `agent_address`, and position index as defined in Phase 4.
+The `topology_identity`, `node_id`, and retransmission sequence semantics MUST
+use the exact domain-separated, length-prefixed SHA-256 constructions in
+[Pod-like topology nodes](38-pod-topology-placement-activation-leases-and-reconciliation-contract-and-data-model.md#pod-like-topology-nodes)
+and
+[Desired topology, observed status, and live placement](38-pod-topology-placement-activation-leases-and-reconciliation-contract-and-data-model.md#desired-topology-observed-status-and-live-placement).
 
 > **Non-normative note.**
 The `updated_at` field is set by the host at topology admission (not from
@@ -138,8 +144,8 @@ Every recovery clustering seam MUST satisfy the following invariants:
 | `topology-only-identities` | The durable topology contains only logical identities, relationships, and lifecycle policies. | Schema validation at topology admission. |
 | `no-cross-tenant-routes` | No durable topology record grants cross-tenant routing, relationship, grant, or result access. | Capability policy enforcement at topology admission. |
 | `bounded-mailboxes` | Live agent mailboxes are bounded by the mailbox contract and do not leak across topology boundaries. | Mailbox lease enforcement at reconciliation. |
-| `bounded-concurrency` | Live agent concurrency is bounded by the topology's resource class and the implementation-defined limits. | Resource limit enforcement at reconciliation. |
-| `bounded-retries` | Live agent retry counts are bounded by the node's `lifecycle_policy` and the implementation-defined maximum. | Lifecycle policy enforcement at reconciliation. |
+| `bounded-concurrency` | Live agent concurrency is bounded by the topology's resource class and disclosed implementation limits under [Resource bounding under coordination load](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-behavior-and-integration.md#resource-bounding-under-coordination-load). | Resource limit enforcement at reconciliation. |
+| `bounded-retries` | Live agent retry counts are bounded by the node's `lifecycle_policy` and disclosed implementation limits under [Resource bounding under coordination load](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-behavior-and-integration.md#resource-bounding-under-coordination-load). | Lifecycle policy enforcement at reconciliation. |
 
 > **Non-normative note.**
 Recovery clustering seams ensure that durable topology is always
@@ -162,18 +168,23 @@ Every activation lease MUST include the following fields:
 
 | Field | Content | Source |
 |-------|---------|--------|
-| `lease_id` | A deterministic lease identity derived from `node_id`, `topology_version`, and lease sequence number. | Host runtime. |
+| `lease_id` | The fixed Chapter 38 lease identity derived from `topology_identity`, `node_id`, `host_id`, and `lease_sequence`. | Host runtime. |
+| `lease_sequence` | The monotonic `u64` sequence reserved by the issuing host service. | Host runtime. |
+| `topology_identity` | The deterministic identity of the topology that authorizes the lease. | Topology directive. |
 | `node_id` | The `node_id` of the topology node this lease authorizes. | Topology directive. |
-| `topology_version` | The `topology_version` of the topology that this lease belongs to. | Topology directive. |
-| `host_id` | The `TenantQualifiedAgentAddress` of the host that holds the lease. | Host runtime. |
+| `host_id` | The `PrincipalAddress` with `kind: "service"` of the host that holds the lease. | Host runtime. |
 | `fence_token` | A deterministic fence token that increases monotonically for each lease issued for the same `node_id`. | Host runtime. |
 | `issued_at` | The ISO 8601 timestamp of lease issuance. | Host clock. |
 | `expires_at` | The ISO 8601 timestamp of lease expiration. | Host clock. |
 | `lease_type` | The lease type: `create`, `update`, `terminate`, or `reconcile`. | Host runtime. |
 
+The `lease_id`, `lease_sequence`, issuance, and renewal identity semantics MUST
+be exactly those in
+[Activation leases](38-pod-topology-placement-activation-leases-and-reconciliation-behavior-and-integration.md#activation-leases).
+
 > **Normative definition.**
-Activation leases are time-bounded: a lease MUST expire after a maximum
-duration defined by the implementation's `lease_timeout` configuration.
+Activation leases are time-bounded: a lease MUST expire 30 seconds after
+`issued_at` unless renewed.
 Expiration is enforced by the host at the next reconciliation pass.
 
 > **Non-normative note.**
@@ -186,34 +197,30 @@ The host MUST detect expired leases and mark the corresponding nodes as
 A lease MAY be renewed by the same host that issued it.
 Renewal extends the `expires_at` timestamp but does NOT increment the
 `fence_token`.
+The renewed `expires_at` MUST be exactly 30 seconds after the host accepts the
+renewal; `lease_id`, `lease_sequence`, `host_id`, and `fence_token` remain
+unchanged.
 Renewal is not transactional: if renewal fails after journal commit, the
 host MUST record the failure in observed status and retry on the next
 reconciliation pass.
 
-> **Non-normative note.**
-Phase 5's renewal behavior supersedes Phase 4's behavior: Phase 4 defined
-renewal as incrementing the `fence_token`, but Phase 5 defines renewal as
-NOT incrementing the `fence_token`.
-This change is intentional: renewal is a safety mechanism to extend lease
-lifetime, not a transfer of authority.
-The `fence_token` is only incremented on lease transfer (Milestone 7),
-which represents a true handoff of placement authority to a different
-host.
+> **Normative definition.**
+The first lease issued for a `node_id` has `fence_token: 1`. A distinct lease
+issued after the previous lease expires or is revoked MUST reserve a new
+`lease_sequence` and increment `fence_token` by exactly one. Renewal is not a
+distinct issuance and does not increment the token.
 
 > **Normative definition.**
-A lease MAY be transferred to another host.
-Transfer increments the `fence_token` and is used for host failover.
-Under single-node placement (the scope of Phase 5), lease transfer is
-not exercised because there is only one host.
-Lease transfer is deferred to Milestone 7 for multi-node placement.
+A lease MUST NOT be transferred to another host in version `0.1.0`.
+A transfer request MUST fail with `topology.lease.transfer-unsupported` and
+leave the current lease unchanged. Lease transfer is deferred to Milestone 7.
 
 > **Non-normative note.**
 Lease transfer is essential for fault tolerance in multi-node deployments:
 if a host crashes while holding an active lease, the lease is automatically
 revoked on the crashed host; the target host MUST issue a new lease to
 take over placement authority.
-Under single-node placement, lease transfer is not exercised because there
-is only one host; fault tolerance is provided by the durable journal, which
+Under single-node placement, fault tolerance is provided by the durable journal, which
 allows live placement to be reconstructed from desired topology on restart.
 
 ### Reconciliation under failure
@@ -307,13 +314,13 @@ Milestone acceptance requires the following evidence:
 | `cross-milestone-fixtures-passing` | All earlier milestone fixtures that are affected by Phase 5 contracts continue to pass. | Cross-milestone compatibility tests. |
 | `no-cross-tenant-leaks` | No durable topology record grants cross-tenant routing, relationship, grant, or result access. | Failure handling tests. |
 | `recovery-from-clean-state` | Live placement is correctly reconstructed from durable topology after simulated host restart. | Recovery flow tests. |
-| `bounded-resources` | Live agent mailboxes, concurrency, retries, and leases are bounded by the implementation-defined limits. | Resource limit tests. |
+| `bounded-resources` | Live agent mailboxes, concurrency, retries, and leases are bounded by disclosed implementation limits under [Resource bounding under coordination load](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-behavior-and-integration.md#resource-bounding-under-coordination-load). | Resource limit tests. |
 
 > **Non-normative note.**
 Milestone acceptance evidence ensures that Phase 5 contracts are
 correctly implemented and do not introduce regressions in earlier
 milestones.
-The evidence is the primary input for promotion from `status: draft`
+The evidence is the primary input for promotion from `status: candidate`
 to `status: normative`.
 
 ### Results that would invalidate an earlier milestone assumption

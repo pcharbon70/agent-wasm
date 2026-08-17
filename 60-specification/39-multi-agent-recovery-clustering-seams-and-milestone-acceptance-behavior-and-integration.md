@@ -2,7 +2,7 @@
 title: "Multi-Agent Recovery Clustering Seams And Milestone Acceptance Behavior And Integration"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.1.0"
 tags:
   - milestone-06
@@ -21,7 +21,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 5](../.spec/planning/agentic-system/milestone-06-multi-agent-coordination-and-topology/phase-05-multi-agent-recovery-clustering-seams-and-milestone-acceptance.md)
 of
 [Milestone 6](../.spec/planning/agentic-system/milestone-06-multi-agent-coordination-and-topology/README.md)
@@ -86,36 +86,44 @@ directive against the following rules in order:
 1. **Schema validation**: The directive MUST conform to the topology
    schema defined in section 39.1. Missing required fields MUST be
    rejected with `topology.directive.malformed`.
-2. **Owner resolution**: The `topology_owner` MUST resolve to an active
+2. **Topology identity validation**: `topology_identity` MUST equal the fixed
+   Chapter 38 construction from `topology_version`, `topology_owner`, and
+   `topology_sequence`. A mismatch MUST be rejected with
+   `topology.directive.malformed`.
+3. **Owner resolution**: The `topology_owner` MUST resolve to an active
    principal in the durable registry. Unresolved owners MUST be rejected
    with `topology.directive.unavailable`.
-3. **Capability check**: The `topology_owner` MUST have the
+4. **Capability check**: The `topology_owner` MUST have the
    `topology.directive.create` capability. Insufficient capabilities
    MUST be rejected with `topology.directive.unauthorized`.
-4. **Version uniqueness**: The `topology_version` MUST be greater than
+5. **Version uniqueness**: The `topology_version` MUST be greater than
    the current maximum version. Duplicate versions MUST be rejected with
    `topology.directive.duplicate-version`.
-5. **Node list validation**: The `nodes` list MUST be non-empty and
+6. **Node list validation**: The `nodes` list MUST be non-empty and
    each node MUST conform to the node schema. Invalid nodes MUST be
    rejected with `topology.node.malformed`.
-6. **Node agent resolution**: Each node's `agent_address` MUST resolve
+7. **Node identity validation**: Each `node_id` MUST equal the fixed Chapter 38
+   construction from topology version, role, agent address, and position index.
+   A mismatch MUST be rejected with `topology.directive.malformed-node-id`.
+8. **Node agent resolution**: Each node's `agent_address` MUST resolve
    to an active agent in the durable registry. Unresolved agents MUST
    cause the directive to be rejected with `topology.directive.incompatible-agent`.
-7. **Dependency validation**: Each node's `dependencies` MUST reference
+9. **Dependency validation**: Each node's `dependencies` MUST reference
    existing `node_id` values within the same topology. Invalid dependencies
    MUST cause the directive to be rejected with `topology.node.incompatible-dependency`.
-8. **Circular dependency check**: The topology's `nodes` list MUST NOT
+10. **Circular dependency check**: The topology's `nodes` list MUST NOT
    contain circular dependencies. Circular dependencies MUST cause the
    directive to be rejected with `topology.node.incompatible-circular-dependency`.
-9. **Grant attenuation**: The topology's `grants` MUST be a strict subset
+11. **Grant attenuation**: The topology's `grants` MUST be a strict subset
    of the `topology_owner`'s grants as defined in
    [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md).
    Insufficient attenuation MUST be rejected with `topology.directive.unauthorized`.
-10. **Resource limit check**: The topology MUST NOT exceed the
-    implementation-defined maximum number of nodes per topology.
+12. **Resource limit check**: The topology MUST NOT exceed the disclosed
+    maximum-nodes implementation limit under
+    [Implementation limits and fixed timeouts](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-failure-evidence-and-operational-notes.md#implementation-limits-and-fixed-timeouts).
     Exceeding limits MUST be rejected with `topology.directive.exhausted-nodes`.
-11. **Processing timeout**: The directive MUST be processed within the
-    implementation-defined timeout. Exceeding the timeout MUST be rejected
+13. **Processing timeout**: The directive MUST be processed within 30 seconds.
+    Exceeding 30 seconds MUST be rejected
     with `topology.directive.timeout`.
 
 > **Non-normative note.**
@@ -123,7 +131,7 @@ Topology directive validation is designed to fail fast: the host MUST
 reject invalid directives before creating any partial state.
 This is consistent with the atomic commit protocol defined in
 [Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md).
-The processing timeout (step 11) is enforced by the host's directive
+The processing timeout (step 13) is enforced by the host's directive
 processing pipeline and is distinct from the lease timeout defined in
 section 39.1.
 The processing timeout prevents indefinite blocking during directive
@@ -184,18 +192,18 @@ The host MUST enforce the following resource bounds during reconciliation:
 
 | Resource | Bound | Enforcement |
 |----------|-------|-------------|
-| `mailbox_queue_size` | Each live agent's mailbox queue MUST NOT exceed the implementation-defined maximum. | Mailbox lease enforcement. |
-| `concurrent_agents` | The total number of live agent instances MUST NOT exceed the implementation-defined maximum. | Resource limit enforcement. |
-| `retries_per_node` | Each topology node's retry count MUST NOT exceed the implementation-defined maximum. | Lifecycle policy enforcement. |
-| `concurrent_leases` | The total number of active activation leases MUST NOT exceed the implementation-defined maximum. | Resource limit enforcement. |
-| `cancellation_outstanding` | Each topology node's cancellation outstanding count MUST NOT exceed the implementation-defined maximum. | Lifecycle policy enforcement. |
-| `result_retention` | Each topology node's result retention MUST NOT exceed the implementation-defined maximum. | Lifecycle policy enforcement. |
+| `mailbox_queue_size` | Must not exceed the disclosed mailbox-queue implementation limit. | Reject with `topology.mailbox.exhausted-queue`. |
+| `concurrent_agents` | Must not exceed the disclosed concurrent-agents implementation limit. | Reject with `topology.node.exhausted-concurrency`. |
+| `retries_per_node` | Must not exceed the disclosed retries-per-node implementation limit. | Mark failed with `topology.retry.exhausted`. |
+| `concurrent_leases` | Must not exceed the disclosed concurrent-leases implementation limit. | Reject with `topology.lease.exhausted-concurrency`. |
+| `cancellation_outstanding` | Must not exceed the disclosed outstanding-cancellations implementation limit. | Reject with `topology.cancellation.exhausted-outstanding`. |
+| `result_retention` | Must not exceed the disclosed retained-results implementation limit. | Reject with `topology.result.exhausted-retention`. |
 
 > **Non-normative note.**
 Resource bounding ensures that the host does not exhaust system resources
 under coordination load.
-These bounds are documented in the implementation's conformance profile
-as defined in
+These implementation limits are documented in the conformance profile as
+defined in
 [Profile Vocabulary And Architectural Boundaries](01-profile-vocabulary-and-architectural-boundaries.md).
 
 ### Reconciliation behavior

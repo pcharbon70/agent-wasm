@@ -2,8 +2,8 @@
 title: "Stable Identities Versions Errors And Limits"
 kind: specification
 created: "2026-08-08"
-status: draft
-spec_version: "0.1.0"
+status: normative
+spec_version: "1.0.0"
 tags:
   - milestone-01
   - phase-02
@@ -19,7 +19,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 2](../.spec/planning/agentic-system/milestone-01-contracts-profiles-and-artifacts/phase-02-stable-identities-versions-errors-and-limits.md)
 of
 [Milestone 1](../.spec/planning/agentic-system/milestone-01-contracts-profiles-and-artifacts/README.md)
@@ -79,15 +79,18 @@ rule, a uniqueness scope, and comparison rules.
 
 - **Invocation:** One turn of agent computation.
   Invocations are scoped to an agent instance and identified by a
-  monotonically increasing counter or UUID.
+  host-assigned monotonically increasing positive integer.
+
+- **Initialization:** One calculation of initial state for a newly created
+  agent instance. Initializations are scoped one-to-one to an agent instance.
 
 - **Signal:** A versioned envelope carrying a causal record.
-  Signals are scoped to a tenant and identified by a combination of type,
-  source, subject, and correlation identifier.
+  Signals are scoped to a tenant and identified by the tuple of type, source,
+  subject, correlation identifier, and canonical timestamp.
 
-- **Directive:** A typed capability request emitted by a strategy.
-  Directives are scoped to an invocation and identified by a deterministic
-  or invocation-scoped identifier.
+- **Directive:** A typed capability request emitted by initialization or a
+  turn. Directives are scoped to their producing initialization or invocation
+  and array position.
 
 - **Attempt:** One execution of an effect handler for a directive.
   Attempts are scoped to a directive and identified by a monotonically
@@ -110,13 +113,14 @@ MUST NOT expose secrets or implementation-internal state.
 | Tenant | `tenant:<name>` | `tenant:acme-corp` |
 | Principal | `principal:<tenant>/<name>` | `principal:acme-corp/svc-api` |
 | Agent type | `agent:<tenant>/<name>:<version>` | `agent:acme-corp/chatbot:1.2.0` |
-| Agent instance | `agent:<tenant>/<name>/<instance-id>` | `agent:acme-corp/chatbot/u-4f8a2b` |
+| Agent instance | `agent:<tenant>/<name>/u-<counter>` | `agent:acme-corp/chatbot/u-7` |
 | Artifact | `artifact:<digest-algorithm>:<hex-digest>` | `artifact:sha256:a1b2c3d4...` |
-| Invocation | `inv:<agent-instance>:<counter>` | `inv:agent:acme-corp/chatbot/u-4f8a2b:7` |
-| Signal | `signal:<type>:<source>:<subject>:<correlation>` | `signal:api.request:principal:acme-corp/svc-api:corr-9x8y7z` |
-| Directive | `directive:<invocation>:<kind>:<index>` | `directive:inv:agent:acme-corp/chatbot/u-4f8a2b:7:effect:0` |
-| Attempt | `attempt:<directive>:<counter>` | `attempt:directive:inv:agent:acme-corp/chatbot/u-4f8a2b:7:effect:0:1` |
-| Trace | `trace:<invocation>` | `trace:inv:agent:acme-corp/chatbot/u-4f8a2b:7` |
+| Invocation | `inv:<agent-instance>:<counter>` | `inv:agent:acme-corp/chatbot/u-7:9` |
+| Initialization | `init:<agent-instance>` | `init:agent:acme-corp/chatbot/u-7` |
+| Signal | `signal:sha256:<hex-digest>` | `signal:sha256:a1b2c3d4...` |
+| Directive | `directive:<producer>:<kind>:<index>` | `directive:inv:agent:acme-corp/chatbot/u-7:9:effect:0` |
+| Attempt | `attempt:<directive>:<counter>` | `attempt:directive:inv:agent:acme-corp/chatbot/u-7:9:effect:0:1` |
+| Trace | `trace:<invocation>` | `trace:inv:agent:acme-corp/chatbot/u-7:9` |
 
 ### Generation ownership
 
@@ -132,10 +136,29 @@ creating each identity.
 | Agent instance | Host | Registry | Live context; host-owned |
 | Artifact | Guest (then host) | Digest store | Guest produces; host verifies and indexes |
 | Invocation | Host | Turn log | Turn orchestration; host-owned |
+| Initialization | Host | Registry | Fresh-agent initialization; host-owned |
 | Signal | Host (or external) | Signal bus | Ingress point; host validates and routes |
 | Directive | Guest (via reducer) | Outbox | Decision output; host commits and drains |
 | Attempt | Host (effect handler) | Effect log | Execution record; host-owned |
 | Trace | Host | Audit log | Turn evidence; host-owned |
+
+> **Normative definition.**
+Tenant, principal, and agent-type names are admitted canonical input rather
+than generated opaque identifiers. For each `(tenant, agent type)`, the host
+MUST assign agent-instance counters as positive monotonically increasing
+integers and MUST NOT reuse a counter. For each agent instance, invocation
+counters use the same positive monotonic and non-reuse rule. Directive ids use
+the producing initialization or invocation, kind, and zero-based array index;
+attempt ids use a positive monotonically increasing per-directive counter;
+trace identity is derived from invocation identity; artifact and signal
+identities use their fixed digest and tuple derivations. An initialization
+identity is derived from the canonical agent-instance identity and is created
+exactly once for that instance.
+
+The canonical signal identity is `signal:sha256:` followed by the lowercase
+hexadecimal SHA-256 digest of canonical JSON encoding of
+`[tenant_id, type, source, subject, correlation_id, timestamp]`. Hashing the
+array avoids delimiter ambiguity among tuple components.
 
 ### Uniqueness scope
 
@@ -150,8 +173,9 @@ Uniqueness scope defines the namespace in which an identity must be unique.
 | Agent instance | Tenant (agent type + instance-id) | Host registry |
 | Artifact | Global (digest) | Digest store |
 | Invocation | Agent instance (counter) | Host turn manager |
-| Signal | Tenant (type + source + subject + correlation) | Signal bus |
-| Directive | Invocation (kind + index) | Host outbox |
+| Initialization | Agent instance | Host registry |
+| Signal | Tenant (type + source + subject + correlation + timestamp) | Signal bus |
+| Directive | Producer identity (kind + index) | Host outbox |
 | Attempt | Directive (counter) | Host effect handler |
 | Trace | Invocation | Host audit log |
 
@@ -257,9 +281,9 @@ Each error category has a stable family code and diagnostic template.
 | Authorization | `identity.authorization` | Principal lacks authority for the requested operation |
 | Conflict | `identity.conflict` | Manifest composition or state update detects conflict |
 | Trap | `identity.trap` | Guest plug-in execution trapped or violated memory safety |
-| Timeout | `identity.timeout` | Turn or host function exceeded deadline |
+| Limit | `identity.limit` | A named implementation limit, including a duration ceiling, was exhausted |
 | Cancellation | `identity.cancellation` | Turn or effect cancelled by host or principal |
-| Resource | `identity.resource` | Resource limit exhausted (memory, heap, depth, etc.) |
+| Resource | `identity.resource` | Runtime allocation or execution facility failed independently of a named limit |
 | Storage | `identity.storage` | Durable state or journal operation failed |
 | Effect | `identity.effect` | Effect handler execution failed or returned invalid result |
 
@@ -282,10 +306,10 @@ Example:
 {
   "family": "identity.compatibility.protocol_version",
   "agent_type": "agent:acme-corp/chatbot:1.2.0",
-  "declared": "0.2.0",
-  "supported": "0.1.0",
-  "description": "Artifact declares protocol version 0.2.0, but host supports 0.1.0. MAJOR version mismatch.",
-  "remediation": "Update host to support protocol 0.2.0 or use an artifact compatible with 0.1.0."
+  "declared": "2.0.0",
+  "supported": "1.0.0",
+  "description": "Artifact declares protocol version 2.0.0, but host supports 1.0.0. MAJOR version mismatch.",
+  "remediation": "Update host to support protocol 2.0.0 or use an artifact compatible with 1.0.0."
 }
 ```
 
@@ -296,7 +320,9 @@ Example:
 > **Normative definition.**
 Limits bound resource consumption and prevent abuse.
 Each limit has a stable identifier and a default value.
-Hosts MAY override defaults via configuration.
+Hosts MAY configure a lower positive ceiling than a listed default, but MUST
+NOT configure a higher ceiling for the base profile. The effective ceiling is
+an implementation limit and MUST be disclosed in the conformance profile.
 
 | Limit identifier | Scope | Default | Description |
 | --- | --- | --- | --- |
@@ -306,10 +332,18 @@ Hosts MAY override defaults via configuration.
 | `state.max_depth` | Nested state | 32 | Maximum nesting depth |
 | `collection.max_items` | Arrays/objects | 1000 | Maximum items in collection |
 | `string.max_length` | Strings | 1 MiB | Maximum string length |
-| `memory.max_pages` | Wasm memory | 64 | Maximum Wasm memory pages (256 KiB each) |
+| `memory.max_pages` | Wasm memory | 64 | Maximum Wasm memory pages (64 KiB each) |
 | `time.turn_ms` | Turn duration | 5000 | Maximum turn duration in milliseconds |
 | `time.host_function_ms` | Host function | 1000 | Maximum host function duration in milliseconds |
+| `host_calls.max_count` | Guest invocation | 1000 | Maximum synchronous host-function calls per invocation |
 | `diagnostic.max_bytes` | Diagnostic text | 4 KiB | Maximum diagnostic text size |
+| `artifact.max_bytes` | Artifact bundle | 64 MiB | Maximum admitted artifact size |
+| `manifest.max_actions` | Agent manifest | 256 | Maximum action descriptors |
+| `manifest.max_routes` | Agent manifest | 256 | Maximum route declarations |
+| `manifest.max_schemas` | Agent manifest | 64 | Maximum state-schema declarations |
+| `schema.max_depth` | One schema | 32 | Maximum schema nesting depth |
+| `schema.max_fields` | One schema | 1000 | Maximum declared schema fields |
+| `time.artifact_validation_ms` | Artifact admission | 5000 | Maximum artifact-validation duration in milliseconds |
 
 ### Limit enforcement
 
@@ -340,12 +374,9 @@ Unknown fields in authoritative structures (turn requests, turn results,
 directives) are rejected by default.
 Silent fallback is unsafe for authority-bearing requests.
 
-If an implementation chooses to accept unknown fields for backward
-compatibility, it MUST:
-
-1. Document the policy in its conformance profile.
-2. Log the presence of unknown fields at trace level.
-3. Never use unknown fields for authorization or state mutation.
+The host MUST reject unknown fields in authoritative structures. A later
+versioned protocol MAY define an explicit non-authoritative extension point;
+that permission does not apply to any other structure or field.
 
 ### Unknown versions
 
@@ -368,20 +399,20 @@ The warning MUST:
 Deprecated features MUST NOT be used in new artifacts or manifests.
 Hosts SHOULD notify artifact publishers of upcoming deprecations.
 
-## Implementation-defined choices and deferred work
+## Fixed choices, implementation limits, and deferred work
 
-### Implementation-defined choices
+### Fixed choices and internal mechanisms
 
-| Choice | Domain | Required documentation |
-| --- | --- | --- |
-| Default limit values | Limits | Per-limit defaults and configuration mechanism |
-| Unknown field policy | Compatibility | Accept or reject; logging level if accept |
-| Deprecation notification | Compatibility | Notification mechanism and timeline |
-| Version range flexibility | Versions | MINOR version acceptance policy |
-| Diagnostic redaction | Errors | Exact redaction list and override mechanism |
-| Identity generation strategy | Identities | UUID v4, counter, or hybrid; collision handling |
-| Trace retention policy | Traces | Retention duration and archival strategy |
-| Outbox storage backend | Directives | Database, log format, and retention policy |
+Initialization, invocation, directive, attempt, artifact, and trace identities
+use the fixed generation and derivation rules in this chapter and their
+governing protocol chapters. Unknown authoritative fields are rejected. Diagnostic redaction is
+governed by
+[Diagnostic recording policy](05-guest-sdk-contracts-fixtures-and-milestone-acceptance.md#diagnostic-recording-policy).
+
+Trace retention and outbox storage are internal mechanisms. They MAY vary only
+when identity, required durability, availability, protocol output, and failure
+diagnostics remain identical. Relevant retention and configured limit ceilings
+MUST be disclosed in the conformance profile.
 
 ### Deferred work
 
@@ -389,7 +420,6 @@ Hosts SHOULD notify artifact publishers of upcoming deprecations.
 | --- | --- | --- |
 | Cross-tenant identity isolation | Milestone 5 | Requires tenancy and security model |
 | Principal delegation | Milestone 6 | Requires multi-agent coordination |
-| Artifact signature verification | Milestone 5 | Requires provenance and trust model |
 | Limit override via policy | Milestone 5 | Requires capability and policy model |
 | Deprecation lifecycle automation | Milestone 9 | Requires production platform and tooling |
 | Identity revocation | Milestone 5 | Requires security and tenancy model |
@@ -437,10 +467,12 @@ The test MUST verify that:
    rule.
 2. Canonical text representations are deterministic and follow the
    specified format.
-3. Version negotiation succeeds for compatible artifacts.
-4. Diagnostics include all required fields (family code, identities,
+3. Signal and delivery identities use the same SHA-256 tuple digest with their
+   respective canonical prefixes.
+4. Version negotiation succeeds for compatible artifacts.
+5. Diagnostics include all required fields (family code, identities,
    description, phase, optional remediation).
-5. Limit identifiers are included in limit-exceeded diagnostics.
+6. Limit identifiers are included in limit-exceeded diagnostics.
 
 ### Malformed identity inputs
 
@@ -473,14 +505,17 @@ The test MUST verify that:
 
 1. Invocations with out-of-order counters are rejected.
 2. Artifacts with expired digests are rejected.
-3. Signals with expired correlation identifiers are rejected.
+3. Signals older than the fixed TTL are rejected with
+   `signal.expired.timestamp_too_old`, while a signal exactly at the boundary
+   remains eligible for acceptance.
 
 ### Duplicate identities
 
 The host MUST deduplicate identities according to their uniqueness scope.
 The test MUST verify that:
 
-1. Duplicate signals with the same correlation identifier are identified.
+1. Duplicate signals with the same tenant, type, source, subject, correlation
+   identifier, and canonical timestamp are identified.
 2. Duplicate invocations with the same counter are rejected.
 3. No duplicate state revisions are created.
 
@@ -492,12 +527,17 @@ The test MUST verify that:
 1. Inputs exceeding `input.max_bytes` are rejected with a
    `identity.limit.input.max_bytes` diagnostic.
 2. Outputs exceeding `output.max_bytes` are rejected with the corresponding
-   output diagnostic.
-3. Nested structures exceeding `state.max_depth` are rejected.
-4. Collections exceeding `collection.max_items` are rejected.
-5. Strings exceeding `string.max_length` are rejected.
-6. Memory exceeding `memory.max_pages` is rejected.
-7. Turns exceeding `time.turn_ms` are rejected with a timeout diagnostic.
+   `identity.limit.output.max_bytes` diagnostic.
+3. Nested structures exceeding `state.max_depth` are rejected with
+   `identity.limit.state.max_depth`.
+4. Collections exceeding `collection.max_items` are rejected with
+   `identity.limit.collection.max_items`.
+5. Strings exceeding `string.max_length` are rejected with
+   `identity.limit.string.max_length`.
+6. Memory exceeding `memory.max_pages` is rejected with
+   `identity.limit.memory.max_pages`.
+7. Turns exceeding `time.turn_ms` are rejected with an
+   `identity.limit.time.turn_ms` diagnostic.
 
 ### Timeout and cancellation
 
@@ -505,7 +545,7 @@ The host MUST enforce time limits and support cancellation.
 The test MUST verify that:
 
 1. Turns exceeding `time.turn_ms` are interrupted and emit a
-   `identity.timeout.turn_exceeded` diagnostic.
+   `identity.limit.time.turn_ms` diagnostic.
 2. Cancellation signals interrupt in-progress turns and emit an
    `identity.cancellation.requested` diagnostic.
 3. No partial state is committed for timed-out or cancelled turns.
@@ -542,9 +582,14 @@ Any regression MUST be recorded with its approval status.
 
 ## Variability register
 
+This register summarizes the governing clauses linked below; it does not
+define or redeclare permitted variation.
+
+> **Non-normative note.**
+
 | Clause | Type | Selection |
 | --- | --- | --- |
-| Identity types | Required | Fixed by this chapter. |
+| Identity types | Required | Fixed by this chapter, including initialization identity. |
 | Canonical representations | Required | Format and rules fixed by this chapter. |
 | Generation ownership | Required | Fixed by this chapter. |
 | Uniqueness scope | Required | Fixed by this chapter. |
@@ -552,13 +597,13 @@ Any regression MUST be recorded with its approval status.
 | Version fields | Required | Semantic versioning for all fields. |
 | Version compatibility | Required | MAJOR break, MINOR additive, PATCH fix. |
 | Error categories | Required | 11 categories fixed by this chapter. |
-| Limit categories | Required | 9 limits fixed by this chapter. |
-| Default limit values | Implementation-defined | Documented in conformance profile. |
-| Unknown field policy | Required | Reject for authoritative structures; MAY accept for backward compatibility with justification. |
+| Limit categories | Required | 18 named limits fixed by this chapter. |
+| [Configured limit ceilings](#limit-categories) | Implementation limit | Defaults are fixed; lower positive ceilings are disclosed in the conformance profile. |
+| Unknown field policy | Required | Reject for authoritative structures; only explicit versioned non-authoritative extension points may differ. |
+| Higher MINOR versions | MAY | Accept only when additions are optional and do not affect core behavior. |
+| Deprecated features | MAY | Accepted uses emit the fixed warning diagnostic. |
 | Deprecation notification | SHOULD | Notify publishers of upcoming deprecations. |
-| Identity generation strategy | Implementation-defined | UUID v4, counter, or hybrid; collision handling documented. |
-| Trace retention policy | Implementation-defined | Retention duration and archival strategy documented. |
-| Outbox storage backend | Implementation-defined | Database, log format, and retention policy documented. |
+| [Trace and outbox mechanisms](#fixed-choices-and-internal-mechanisms) | MAY (internal) | Variation cannot change identity, durability, output, or failure behavior. |
 
 ## Rationale and evidence (non-normative)
 

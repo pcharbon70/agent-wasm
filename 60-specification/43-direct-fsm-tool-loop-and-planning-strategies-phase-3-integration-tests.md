@@ -2,7 +2,7 @@
 title: "Direct FSM Tool-Loop And Planning Strategies Phase 3 Integration Tests"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.1.0"
 tags:
   - milestone-07
@@ -20,7 +20,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 3](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/phase-03-direct-fsm-tool-loop-and-planning-strategies.md)
 of
 [Milestone 7](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/README.md)
@@ -112,12 +112,12 @@ evidence for direct FSM tool-loop and planning strategies.
 | Test ID | Description | Input | Expected output |
 |---------|-------------|-------|-----------------|
 | `test-fsm-transition-1` | Transition from `idle` to `planning` on `plan_submitted`. | FSM in `idle` state, `plan_submitted` event. | FSM transitions to `planning` state. |
-| `test-fsm-transition-2` | Transition from `planning` to `waiting_for_tool` on tool request. | FSM in `planning` state, tool request event. | FSM transitions to `waiting_for_tool` state. |
+| `test-fsm-transition-2` | Transition from `planning` to `waiting_for_tool` on `tool_requested`. | FSM in `planning` state, durably committed `tool_requested` event. | FSM transitions to `waiting_for_tool` state. |
 | `test-fsm-transition-3` | Transition from `waiting_for_tool` to `planning` on `tool_completed`. | FSM in `waiting_for_tool` state, `tool_completed` event. | FSM transitions to `planning` state. |
 | `test-fsm-transition-4` | Transition from `waiting_for_tool` to `planning` on `tool_failed`. | FSM in `waiting_for_tool` state, `tool_failed` event. | FSM transitions to `planning` state. |
-| `test-fsm-transition-5` | Transition from `planning` to `waiting_for_model` on model request. | FSM in `planning` state, model request event. | FSM transitions to `waiting_for_model` state. |
+| `test-fsm-transition-5` | Transition from `planning` to `waiting_for_model` on `model_requested`. | FSM in `planning` state, durably committed `model_requested` event. | FSM transitions to `waiting_for_model` state. |
 | `test-fsm-transition-6` | Transition from `waiting_for_model` to `planning` on `model_completed`. | FSM in `waiting_for_model` state, `model_completed` event. | FSM transitions to `planning` state. |
-| `test-fsm-transition-7` | Transition from `planning` to `waiting_for_human` on approval request. | FSM in `planning` state, approval request event. | FSM transitions to `waiting_for_human` state. |
+| `test-fsm-transition-7` | Transition from `planning` to `waiting_for_human` on `approval_requested`. | FSM in `planning` state, durably committed `approval_requested` event. | FSM transitions to `waiting_for_human` state. |
 | `test-fsm-transition-8` | Transition from `waiting_for_human` to `terminated` on `human_cancelled`. | FSM in `waiting_for_human` state, `human_cancelled` event. | FSM transitions to `terminated` state. |
 
 #### Tool-loop execution tests
@@ -147,6 +147,7 @@ evidence for direct FSM tool-loop and planning strategies.
 | `test-budget-tracking-1` | Track budget deductions. | Valid strategy execution, budget deduction. | Budget is deducted and remaining budget is updated. |
 | `test-budget-tracking-2` | Track multiple budget types. | Valid strategy execution, multiple budget deductions. | All budgets are deducted and remaining budgets are updated. |
 | `test-budget-tracking-3` | Track budget to exhaustion. | Valid strategy execution, budget exhaustion. | Budget is exhausted and strategy is terminated. |
+| `test-budget-tracking-4` | Track the fixed tool budget. | Complete 50 tool requests under the default budget, process the fiftieth result, and attempt a fifty-first `tool_requested`. | The first 50 requests execute, zero-cost result processing remains permitted, and the fifty-first request emits `tool_budget_exhausted` before commit or execution. |
 
 #### Snapshot restoration tests
 
@@ -219,8 +220,8 @@ and boundary-limit inputs fail with stable diagnostics where applicable.
 
 | Test ID | Description | Input | Expected output |
 |---------|-------------|-------|-----------------|
-| `test-unavailable-1` | Handle model unavailable. | Model unavailable. | Diagnostic `model_unavailable` is emitted, retry or terminate. |
-| `test-unavailable-2` | Handle tool unavailable. | Tool unavailable. | Diagnostic `tool_unavailable` is emitted, retry or terminate. |
+| `test-unavailable-1` | Handle model unavailable. | Pinned model unavailable. | Canonical `model.request.unavailable_model` is preserved and the `model_unavailable` FSM event transitions to `planning`; no retry occurs without a new intent. |
+| `test-unavailable-2` | Handle tool unavailable. | Tool inactive in the registry. | Canonical `tool.execution.unavailable_tool` is preserved and the `tool_unavailable` FSM event transitions to `planning`. |
 | `test-unavailable-3` | Handle snapshot store unavailable. | Snapshot store unavailable. | Diagnostic `snapshot_store_unavailable` is emitted, retry or terminate. |
 
 #### Invalid snapshot tests
@@ -234,13 +235,17 @@ and boundary-limit inputs fail with stable diagnostics where applicable.
 
 | Test ID | Description | Input | Expected output |
 |---------|-------------|-------|-----------------|
-| `test-nonprogress-loop-1` | Terminate on non-progress loop. | Non-progress loop detected. | Diagnostic `nonprogress_loop_detected` is emitted, FSM transitions to `terminated`. |
+| `test-nonprogress-loop-1` | Enter the same state five times at one `progress_revision`. | Non-progress counter reaches 5 on the fifth entry. | Diagnostic `nonprogress_loop_detected` is emitted and FSM terminates; four entries do not terminate. |
+| `test-nonprogress-loop-2` | Enter a state four times, admit a previously unseen valid result, then enter it four more times. | The result increments `progress_revision` exactly once and resets the state-entry counter to 1. | No non-progress diagnostic is emitted. |
+| `test-nonprogress-loop-3` | Retry, emit diagnostics and evidence, deduct budget, and advance only the clock between entries. | None of those observations increments `progress_revision`. | The fifth unchanged entry terminates deterministically. |
 
 #### Repeated tool request tests
 
 | Test ID | Description | Input | Expected output |
 |---------|-------------|-------|-----------------|
-| `test-repeated-tool-request-1` | Terminate on repeated tool request. | Repeated tool request detected. | Diagnostic `repeated_tool_request_detected` is emitted, FSM transitions to `terminated`. |
+| `test-repeated-tool-request-1` | Request the same `tool_id` five times while the canonical result digest remains equal or null. | Repeated-tool counter reaches 5 on the fifth request. | Diagnostic `repeated_tool_request_detected` is emitted and FSM terminates; four requests do not terminate. |
+| `test-repeated-tool-request-2` | Request one tool four times, admit a different canonical result digest, then request it four more times. | The digest change resets the counter to 1. | No repeated-tool diagnostic is emitted. |
+| `test-repeated-tool-request-3` | Change `tool_id` after four repeated requests. | Tool identity change resets the counter to 1. | No repeated-tool diagnostic is emitted. |
 
 #### Contradictory plan tests
 

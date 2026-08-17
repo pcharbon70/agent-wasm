@@ -2,7 +2,7 @@
 title: "Guest SDK CLI Simulator Templates Fixtures And Debugging Failure Evidence And Operational Notes"
 kind: specification
 created: "2026-08-10"
-status: draft
+status: normative
 spec_version: "0.2.0"
 tags:
   - milestone-09
@@ -23,7 +23,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 2](../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/phase-02-guest-sdk-cli-simulator-templates-fixtures-and-debugging.md)
 of
 [Milestone 9](../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/README.md)
@@ -145,11 +145,11 @@ Evidence is retained for operational debugging and compliance auditing.
 Evidence is retrievable via the `evidence inspect` CLI command or SDK
 function with appropriate access controls.
 
-### 47.3.3 Implementation-Defined Choices
+### 47.3.3 Conformance Summary
 
 > **Non-normative note.**
-The following choices are implementation-defined and must be documented
-in the conformance profile.
+The following table summarizes required minima, permitted extensions, and
+fixed policy values from the governing contract.
 
 | Choice | Description | Default |
 | --- | --- | --- |
@@ -160,7 +160,7 @@ in the conformance profile.
 | Template patterns | Template patterns to include. | `direct` and `fsm`. |
 | Debugging view access methods | Debugging view access methods to support. | CLI and SDK. |
 | Compatibility negotiation fields | Compatibility negotiation fields to include. | All fields listed in Section 47.1.7. |
-| Deprecation policy durations | Deprecation policy stage durations. | `deprecated`: 6 months, `sunset`: 3 months. |
+| Deprecation policy durations | Deprecation policy stage durations. | Fixed: `deprecated` 6 months, then `sunset` 3 months. |
 | Offline capabilities | Offline capabilities to support. | `artifact build`, `fixture test`, `local run`, `replay`. |
 | Actionable failure hint generation | How hints are generated (manual, automated). | Manual. |
 
@@ -215,7 +215,7 @@ See [Variability register](#variability-register).
 | Diagnostic field set | Section 47.3.2 | Required | Must include all fields listed in the bounded diagnostics table. |
 | Diagnostic redaction | Section 47.3.2 | Required | Must redact secrets, stack traces, and irrelevant user data. |
 | Actionable failure fields | Section 47.3.2 | Required | Must include `hint` and `reference` fields. |
-| Implementation-defined choices documentation | Section 47.3.3 | Required | Must document all implementation-defined choices in the conformance profile. |
+| Conformance summary | Section 47.3.3 | Required | Must preserve the required minima and fixed policy values. |
 | Deferred work enforcement | Section 47.3.4 | MUST | Must NOT implement deferred work without evidence from the corresponding future phase. |
 
 ## Rationale and evidence (non-normative)
@@ -230,7 +230,7 @@ context for operational debugging.
 Actionable failures include hints and references to enable developers
 to resolve issues without consulting support.
 
-Implementation-defined choices are documented to enable conformance
+Explicitly bounded choices and fixed policy values enable conformance
 verification and interoperability.
 Deferred work is explicitly identified to prevent scope creep and ensure
 that future phases build on the verified foundation of Phase 2.

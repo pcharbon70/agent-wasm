@@ -2,7 +2,7 @@
 title: "Examples Runbooks SLO Evidence And Production Acceptance Behavior And Integration"
 kind: specification
 created: "2026-08-10"
-status: draft
+status: normative
 spec_version: "0.2.0"
 tags:
   - milestone-09
@@ -22,7 +22,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 5](../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/phase-05-examples-runbooks-slo-evidence-and-production-acceptance.md)
 of
 [Milestone 9](../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/README.md)
@@ -91,19 +91,29 @@ Runbook execution is:
 
 ### 50.2.3 SLO Measurement Behavior
 
-> **Non-normative note.**
+> **Normative definition.**
 SLOs are measured with the following behavior:
 
-1. Collect metrics (admission success rate, turn latency, etc.).
-2. Calculate SLO compliance (percentage of time within target).
-3. Track error budget consumption (percentage of budget used).
-4. Alert on SLO violations (when compliance falls below target).
-5. Alert on error budget exhaustion (when budget falls below threshold).
+1. At each UTC minute boundary, select unsampled source records in the exact
+   rolling 30-day half-open window from Section 50.1.3.
+2. Classify exact eligible and bad units for the objective.
+3. Calculate the exact observed value, target result, and error-budget fields.
+4. Persist the measurement record and ordered source-record digests.
+5. Emit `slo.violation` when status first transitions into `violated`.
+6. Emit `slo.budget.exhausted` when a positive budget first reaches zero or a
+   zero-budget objective first transitions into `violated`.
 
-> **Non-normative note.**
+An unavailable measurement emits `slo.measurement.unavailable`, does not count
+as met or violated, and blocks production acceptance. Repeated measurements in
+the same status do not repeat transition diagnostics. Recovery to `met` resets
+the transition so a later violation or exhaustion emits again. There is no
+deployment-selected window, percentile method, target, exclusion, or alert
+threshold.
+
+> **Normative definition.**
 SLO measurement is:
 - Automated (via metrics collection and calculation).
-- Real-time (SLO status updated continuously).
+- Minute-bounded (status updated at each UTC minute boundary).
 - Historical (SLO data retained for trend analysis).
 
 ### 50.2.4 Evidence Generation Behavior
@@ -123,6 +133,11 @@ Evidence generation is:
 - Automated (via test suites and tooling).
 - Tamper-evident (cryptographic hashing).
 - Immutable (cannot be modified after generation).
+
+A deletion request targeting production acceptance evidence MUST be rejected
+without changing availability, identity, bytes, digest, or storage. Operator
+authorization, elapsed time, backend migration, and storage-tier movement do
+not alter this result.
 
 ### 50.2.5 Production Acceptance Behavior
 
@@ -196,6 +211,19 @@ Release execution is:
 - Owned (by release manager).
 - Audited (each step logged and tracked).
 
+Release timing and scheduling are non-normative internal process choices.
+They MUST NOT omit, reorder, or change any release execution or production
+acceptance step, and the same build and evidence MUST produce the same gate
+decision regardless of schedule.
+
+### 50.2.9 Evidence-retention precedence
+
+For production acceptance evidence, Section 50.1.4 replaces Chapter 34's
+general operator-deletion exception and post-retention deletion permission.
+Chapter 34 continues to govern other evidence. A wrapper, runbook, release
+process, or storage backend MUST preserve this classification and MUST NOT
+translate a rejected deletion into a successful retention operation.
+
 ## Variability and limits
 
 See [Variability register](#variability-register).
@@ -207,11 +235,17 @@ See [Variability register](#variability-register).
 | Example execution steps | Section 50.2.1 | Required | Must include all steps listed in the table. |
 | Runbook execution steps | Section 50.2.2 | Required | Must include all steps listed in the table. |
 | SLO measurement steps | Section 50.2.3 | Required | Must include all steps listed in the table. |
+| SLO alert thresholds | [SLO Measurement Behavior](#5023-slo-measurement-behavior) | Required | Alert on target violation and when remaining error budget reaches zero. |
+| SLO window and formulas | [SLO Measurement Behavior](#5023-slo-measurement-behavior) | Required | Use the fixed 30-day window, UTC minute schedule, exact source units, formulas, and transition diagnostics. |
+| Unavailable SLO measurement | [SLO Measurement Behavior](#5023-slo-measurement-behavior) | Required | Emit `slo.measurement.unavailable` and block production acceptance. |
 | Evidence generation steps | Section 50.2.4 | Required | Must include all steps listed in the table. |
+| Production evidence deletion | Section 50.2.4 | Prohibited | Reject deletion without changing evidence or availability. |
 | Production acceptance steps | Section 50.2.5 | Required | Must include all steps listed in the table. |
 | Support matrix update steps | Section 50.2.6 | Required | Must include all steps listed in the table. |
 | Residual risk review steps | Section 50.2.7 | Required | Must include all steps listed in the table. |
 | Release execution steps | Section 50.2.8 | Required | Must include all steps listed in the table. |
+| Release scheduling | [Release Execution Behavior](#5028-release-execution-behavior) | Internal mechanism | May vary only if release steps and acceptance decisions are identical. |
+| Evidence-retention precedence | Section 50.2.9 | Explicit replacement | Chapter 34 deletion permissions do not apply to production acceptance evidence. |
 
 ## Rationale and evidence (non-normative)
 

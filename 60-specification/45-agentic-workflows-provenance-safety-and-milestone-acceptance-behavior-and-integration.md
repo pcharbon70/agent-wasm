@@ -2,7 +2,7 @@
 title: "Agentic Workflows Provenance Safety And Milestone Acceptance Behavior And Integration"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.2.0"
 tags:
   - milestone-07
@@ -23,7 +23,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 5](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/phase-05-agentic-workflows-provenance-safety-and-milestone-acceptance.md)
 of
 [Milestone 7](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/README.md)
@@ -169,10 +169,14 @@ Workflows MUST terminate under the following budget constraints:
 > **Normative definition.**
 When a budget is exhausted, the host MUST:
 1. Terminate the workflow.
-2. Mark the workflow status as `failed` (or `completed` if partial results are acceptable).
-3. Emit a `workflow.budget_exhausted` diagnostic.
+2. Mark the workflow status as `failed`.
+3. Emit a `workflow_budget_exhausted` diagnostic unless a more specific
+   Chapter 43 budget diagnostic caused the termination.
 4. Emit a `workflow.budget_exhausted` evidence entry.
 5. Preserve the workflow state and result signals for later inspection.
+
+Preserved intermediate results do not make a budget-exhausted workflow
+`completed` and MUST NOT be published as a successful final result.
 
 > **Normative definition.**
 Workflows MUST resume deterministically from durable strategy snapshots and
@@ -261,6 +265,18 @@ MUST NOT select a different provider, model, connection, or credential
 custodian. A binding change applies only to a new model intent after user
 approval.
 
+### Cross-chapter failure precedence
+
+When a Chapter 43 strategy budget causes workflow termination, its exact
+`iteration_budget_exhausted`, `turn_budget_exhausted`,
+`token_budget_exhausted`, `tool_budget_exhausted`, `cost_budget_exhausted`, or
+`time_budget_exhausted` diagnostic is canonical. Chapter 45 still marks the
+workflow `failed` and emits `workflow.budget_exhausted` evidence, but MUST NOT
+replace the specific diagnostic with `workflow_budget_exhausted`. For an
+aggregate workflow budget failure not already classified by Chapter 43,
+`workflow_budget_exhausted` is canonical. The dotted
+`workflow.budget_exhausted` name is evidence only.
+
 > **Normative definition.**
 Cost evidence includes the following metrics:
 
@@ -294,23 +310,15 @@ Residual model-quality limitations include the following:
 - **Permitted presentation**: The host MAY present the configured budgets to the operator.
 - **Limit**: Budgets MUST be enforced at all times.
 
-### 45.2.2 Hostile output custom rules
+### 45.2.2 Budget-exhaustion outcome
 
-- **Permission**: The host MAY support a host-configurable declarative validation pipeline beyond built-in rules (schema, length, content filters). Different tenants have different requirements — a healthcare tenant needs HIPAA-sensitive filtering, a fintech tenant needs PII/redaction rules. Custom rules should be expressed declaratively (regex patterns, schema extensions, policy scripts) rather than arbitrary code, so the host can audit and sandbox them.
-- **Recommendation**: The host SHOULD document any custom validation rules and ensure they compose with built-in filters in a defined order.
-- **Permitted presentation**: The host MAY present custom validation rules to the operator.
-- **Limit**: Custom rules MUST not bypass built-in safety boundaries. Earlier rules take precedence over later ones.
+- **Requirement**: Budget exhaustion always produces workflow status `failed`.
+- **Permitted presentation**: Preserved intermediate results MAY be shown as
+  incomplete diagnostic context.
+- **Limit**: Intermediate results MUST NOT be presented as a successful final
+  result or change the terminal status to `completed`.
 
-### 45.2.3 Deterministic resume partial results
-
-- **Permission**: The host MAY support partial results on deterministic resume, but only when explicitly opted in by the workflow author via a workflow-level field (`partial_results_allowed: true/false`). Some workflows (e.g., multi-step research) are fine with partial results — "here's what we found so far." Others (e.g., financial transactions) are not — partial execution is meaningless. The opt-in mechanism lets the workflow author declare intent. The resume behavior itself is deterministic — the same snapshot always produces the same continuation.
-- **Recommendation**: The host SHOULD return partial results when the workflow author has opted in and partial results are available.
-- **Permitted presentation**: The host MAY present partial results to the user.
-- **Limit**: Partial results MUST be clearly marked as incomplete. Without explicit opt-in, the host MUST NOT return partial results automatically.
-
-### 45.2.4 Residual limitation quantification
-
-- **Permission**: The host MAY quantify residual model-quality limitations (e.g., hallucination rate) and expose them in operator dashboards and audit logs. Quantified metrics are operational data, not normative thresholds — the framework cannot enforce model quality, which depends on the model, not the framework. Saying "hallucination rate < 5%" in a spec implies the framework can enforce it, which it cannot. Thresholds belong in tenant-level policy, not the framework spec.
-- **Recommendation**: The host SHOULD report quantified limitations in operator dashboards so operators can make informed decisions (e.g., "model A has 2% hallucination rate, model B has 8% — choose based on your use case").
-- **Permitted presentation**: The host MAY present quantified limitations to the operator.
-- **Limit**: Quantified limitations MUST be based on empirical data and MUST NOT be used as normative compliance thresholds. The spec requires completeness of the provenance reference structure; quantified reporting is a host implementation concern.
+Custom hostile-output rules, partial results on resume, and quantified residual
+limitations are deferred under
+[Deferred work](45-agentic-workflows-provenance-safety-and-milestone-acceptance-failure-evidence-and-operational-notes.md#deferred-work)
+and are not permitted variability in version `0.2.0`.

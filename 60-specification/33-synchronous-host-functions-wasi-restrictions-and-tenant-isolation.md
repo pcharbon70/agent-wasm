@@ -2,7 +2,7 @@
 title: "Synchronous Host Functions WASI Restrictions And Tenant Isolation"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.1.0"
 tags:
   - milestone-05
@@ -18,7 +18,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 4](../.spec/planning/agentic-system/milestone-05-capabilities-plugins-security-and-tenancy/phase-04-synchronous-host-functions-wasi-restrictions-and-tenant-isolation.md)
 of
 [Milestone 5](../.spec/planning/agentic-system/milestone-05-capabilities-plugins-security-and-tenancy/README.md)
@@ -51,7 +51,7 @@ Phase 4 MILESTONE ACCEPTANCE requires:
 5. **Evidence recording**: All integration test evidence MUST be recorded
    as machine-readable YAML reports in the `50-journal/` directory.
 6. **Conformance profile**: The conformance profile MUST document all
-   implementation-defined choices listed in this chapter.
+   profile selections declared by visible callouts in this chapter.
 
 > **Normative definition.**
 Phase 4 FAILS MILESTONE ACCEPTANCE if:
@@ -248,11 +248,12 @@ vector.
 It also prevents a malicious or buggy plugin from accidentally or
 deliberately re-binding a built-in import.
 
-> **Normative implementation-defined choice.**
-The host defines the exact algorithm used to resolve import names to
-namespace entries.
-The resolution algorithm MUST be deterministic and MUST be documented
-in the host's conformance profile.
+> **Normative definition.**
+Import-resolution implementation is internal. Resolution MUST perform exact
+matching on module-level name and canonical function signature in both
+namespaces, reject zero matches with `import.unresolved`, and reject matches in
+both namespaces with `import.namespace-collision`. Every implementation MUST
+produce the same result for the same admitted namespace tables.
 
 > **Normative definition.**
 The application namespace MUST be a subset of the capabilities declared
@@ -429,19 +430,18 @@ initiated by an agent.
 Direct operator invocations and timer-initiated invocations MAY omit
 the agent identifier.
 
-> **Normative implementation-defined choice.**
-The host defines the exact mechanism used to enforce memory isolation
-between tenants (separate WebAssembly heaps, memory segments, or
-address-space separation).
-The mechanism MUST guarantee that cross-tenant access is impossible
-without an explicit trap.
+> **Normative definition.**
+The mechanism used to enforce memory isolation between tenants is internal.
+Whether it uses separate WebAssembly heaps, memory segments, or address-space
+separation, cross-tenant access MUST trap and no tenant-visible bytes or state
+may differ by mechanism.
 
-> **Normative implementation-defined choice.**
-The host defines the exact mechanism used to enforce state isolation
-between tenants (separate databases, table prefixes, in-memory maps,
-or cryptographic separation).
-The mechanism MUST guarantee that cross-tenant state access requires
-an explicit policy approval.
+> **Normative definition.**
+The mechanism used to enforce state isolation between tenants is internal.
+Whether it uses separate databases, table prefixes, in-memory maps, or
+cryptographic separation, cross-tenant state access MUST require explicit
+policy approval and every mechanism MUST produce the same authorization and
+state results.
 
 ### Failure outcomes for contract and data model
 
@@ -559,18 +559,27 @@ Without it, a cross-tenant leak is indistinguishable from a within-tenant
 effect in the audit log.
 
 > **Normative implementation-defined choice.**
-The host defines the exact representation of `invocation_id` (format,
-entropy source, and collision guarantee).
+The host selects either canonical lowercase UUID v4 or a lowercase 64-digit
+hexadecimal value generated from 256 cryptographically random bits as the
+implementation-defined representation of `invocation_id`.
 The representation MUST be globally unique across the host's lifetime
 and MUST be recorded in every audit log entry produced by the
 invocation.
+The selected representation MUST be documented in the conformance profile.
+The observable identifier syntax and length may differ between the two
+representations; invocation binding and uniqueness semantics MUST NOT differ.
 
 > **Normative implementation-defined choice.**
-The host defines the exact mechanism used to enforce `deadline_ms`
-including the timer resolution, the pre-emption model, and the overhead
-budget reserved for deadline checking.
+The host selects either cooperative pre-emption at host callbacks or runtime interrupt
+pre-emption as the implementation-defined mechanism used to enforce
+`deadline_ms`. Timer resolution and the deadline-checking overhead budget are
+finite positive whole milliseconds.
 The enforcement MUST complete within the remaining time of the deadline
 minus the host's documented deadline-checking overhead.
+The selected mechanism, timer resolution, pre-emption model, and overhead
+budget MUST be documented in the conformance profile.
+Observable interruption timing may differ by no more than the recorded timer
+resolution and overhead budget.
 
 ### Instance modes
 
@@ -675,18 +684,29 @@ This priority ensures that isolation is never compromised for performance.
 `fresh` is the safe default; other modes are optimizations that require
 explicit policy or manifest approval.
 
-> **Normative implementation-defined choice.**
-The host defines the exact algorithm used to detect state leakage during
-`reset` recycling, including the memory comparison strategy and the
-tolerance for implementation-defined initialization bytes.
-The detection algorithm MUST be documented in the conformance profile.
+> **Normative definition.**
+The state-leakage detection algorithm used during `reset` recycling is
+internal. The observation point is immediately after the host clears guest
+memory and before it reruns `_start` or any equivalent initialization entry
+point. At that observation point every byte of guest memory MUST be zero. Any
+non-zero byte is leakage: the host MUST discard the instance, create a fresh
+instance, and emit `instance.reset-leakage-detected` without running `_start` on
+the contaminated instance. After the zero-memory check succeeds, the host MUST
+rerun `_start`; non-zero bytes produced by module data initialization or
+`_start` are valid only when the resulting memory is byte-identical to a fresh
+instance's post-`_start` memory for the same artifact and capability context.
+Different detection algorithms MUST produce the same decisions at both
+observation points.
 
 > **Normative implementation-defined choice.**
-The host defines the pool size, eviction policy, and health-check
-frequency for `pooled` instances.
+Pool size is an implementation-defined finite positive `u32`; eviction MUST be
+either FIFO or LRU; and health checks MUST run either before every checkout or
+at a finite positive whole-second interval.
 These parameters MUST be documented in the conformance profile and
 MUST not allow a single tenant's pool to starve other tenants of
 instances.
+Observable pool-capacity exhaustion, eviction order, and checkout latency may
+differ according to the recorded selections; isolation results MUST NOT differ.
 
 ### Test residue
 
@@ -709,7 +729,7 @@ The following residue categories MUST be tested for every invocation:
 [Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md) | Rolled back per atomic commit protocol | Rolled back | Rolled back |
 | `artifact` | Artifact memory and exports | Initialized per module's `_start` or empty if no `_start` | Reset to initial state per instance mode rules | Reset to initial state | Reset to initial state |
 | `success` | Output buffer | Contains exactly the function's declared output, within `output_limit_bytes` | Empty or truncated per truncation policy | Empty or truncated | Empty or truncated |
-| `trap` | Guest memory | Zeroed or in implementation-defined safe state | Zeroed or in implementation-defined safe state | Zeroed or in implementation-defined safe state | Zeroed or in implementation-defined safe state |
+| `trap` | Guest memory | For recycled instances, zero before `_start` and equal to the fresh post-`_start` oracle after reinitialization | Same reset observations before reuse; otherwise destroy or quarantine | Same reset observations before reuse; otherwise destroy or quarantine | Same reset observations before reuse; otherwise destroy or quarantine |
 | `timeout` | All scopes | N/A (invocation did not complete) | N/A | Host MUST roll back all effects and emit `invocation.deadline-exceeded` | N/A |
 | `cancellation` | All scopes | N/A (invocation did not complete) | N/A | N/A | Host MUST roll back all effects and emit `invocation.cancelled` |
 | `memory-pressure` | Host memory | Within declared `max_native_alloc_bytes` | Within declared bounds | Within declared bounds | Within declared bounds |
@@ -787,18 +807,23 @@ does not require a full memory dump.
 Implementations MAY use checksums, region watches, or capability
 tracking to detect residue without incurring prohibitive overhead.
 
-> **Normative implementation-defined choice.**
-The host defines the exact mechanism used to capture pre- and
-post-invocation snapshots for each residue category.
-The mechanism MUST be deterministic and MUST be documented in the
-conformance profile.
+> **Normative definition.**
+The mechanism used to capture pre- and post-invocation snapshots for each
+residue category is internal. It MUST be deterministic, cover every byte or
+state element in the category, and produce the same residue verdict and
+evidence hash for the same observations.
 
 > **Normative implementation-defined choice.**
-The host defines the format and retention policy for residue diff
-reports.
+The host selects either JSON or YAML as the implementation-defined residue diff report
+format and a finite whole-day retention period no shorter than the governing
+Chapter 34 evidence-retention period.
 The format MUST be parseable by automated test harnesses, and the
 retention policy MUST support forensic analysis of isolation
 violations.
+The selected format and retention policy MUST be documented in the
+conformance profile.
+Observable report bytes and post-minimum availability may differ according to
+the recorded selections; report content and residue verdicts MUST NOT differ.
 
 ### Failure outcomes for behavior and integration
 
@@ -881,19 +906,23 @@ convention `phase4.<failure-outcome>.<subtype>` where
 > **Normative definition.**
 The host MUST emit a bounded diagnostic for every failure outcome
 listed in the previous subsection.
-A bounded diagnostic is a structured report that contains exactly
-the following fields:
+A bounded diagnostic has exactly the Chapter 04 `Diagnostic` top-level fields.
+The stable `phase4.*`, `invocation.*`, `instance.*`, or `residue.*` identifier is
+`code`; `severity` is `error`; and `details` contains `phase`, `contract`,
+`profile`, `failed_boundary`, `failure_category`, `invocation_id`, `tenant_id`,
+and `evidence_hash`. Conditional identifiers have JSON `null` when not
+applicable, so the top-level and detail shapes do not vary.
 
-| Field | Required | Content |
-|-------|----------|---------|
-| `error_code` | Yes | Stable diagnostic identifier following the naming convention defined in [Failure outcomes](#failure-outcomes-for-synchronous-host-functions). |
-| `phase` | Yes | The phase name, `phase-04-synchronous-host-functions-wasi-restrictions-and-tenant-isolation`. |
-| `contract` | Yes | The subsection of this chapter where the failure boundary was crossed. |
-| `profile` | Yes | The instance mode, tenant scope, or capability scope in effect at the time of failure. |
-| `failed_boundary` | Yes | A human-readable description of the specific invariant or bound that was violated. |
-| `invocation_id` | Conditional | Present if the failure occurred during an invocation; omitted for load-time or registration-time failures. |
-| `tenant_id` | Conditional | Present if the failure is tenant-scoped; omitted if the failure is system-scoped. |
-| `evidence_hash` | Yes | A cryptographic hash of the minimal evidence record that supports the diagnostic, computed as defined in the host conformance profile. |
+| Failure category | Family |
+|------------------|--------|
+| Malformed | `identity.validation.host_function` |
+| Incompatible | `identity.compatibility.host_function` |
+| Conflicting | `identity.conflict.host_function` |
+| Unauthorized | `identity.authorization.host_function` |
+| Exhausted | `identity.limit.host_function` |
+| Unavailable | `identity.resource.host_function` |
+
+No additional top-level diagnostic member is permitted.
 
 > **Normative definition.**
 The diagnostic MUST NOT contain any of the following:
@@ -914,8 +943,8 @@ record that includes:
 - A counter of how many times the same boundary was crossed within
   the current agent activation.
 
-The exact hashing algorithm and evidence record format are
-implementation-defined choices documented in the conformance profile.
+The evidence record MUST be encoded as Canonical JSON and `evidence_hash` MUST
+be the lowercase hexadecimal SHA-256 digest of those bytes.
 
 > **Non-normative note.**
 Bounded diagnostics ensure that operators and automated test harnesses
@@ -925,34 +954,19 @@ The evidence hash enables forensic correlation between a diagnostic
 and the underlying state that produced it without retaining the
 raw state itself.
 
-### Implementation-defined choices
+### Fixed diagnostic and evidence behavior
 
-> **Normative implementation-defined choice.**
-The following choices are implementation-defined and MUST be documented
-in the conformance profile.
-These choices supplement the implementation-defined choices listed in
-[Eligibility criteria](#eligibility-criteria-for-synchronous-host-functions),
-[Import namespace](#import-namespace),
-[Tenant isolation model](#tenant-isolation-model), and
-[Instance modes](#instance-modes).
-
-1. **Error code catalog**: The exact error code catalog for the
-   `phase4.<failure-outcome>.<subtype>` naming convention, including
-   the list of subtypes for each failure outcome.
-2. **Evidence record format**: The exact format of the minimal evidence
-   record used to compute `evidence_hash`, including the fields, types,
-   and ordering.
-3. **Evidence hashing algorithm**: The cryptographic hashing algorithm
-   used to compute `evidence_hash`, including the digest size and
-   collision resistance guarantee.
-4. **Diagnostic serialization format**: The wire format for bounded
-   diagnostics (JSON, MessagePack, CBOR, or another documented format).
-5. **Tenant identifier revocation**: The exact procedure used to
-   invalidate a `tenant_id` after a tenant-isolation violation,
-   including the propagation delay and the audit log entry format.
-6. **Diagnostic retention and query**: The retention policy, query
-   interface, and retention period for bounded diagnostics, including
-   the maximum retention period required for forensic analysis.
+> **Normative definition.**
+The diagnostic catalog consists only of codes specified by a normative rule in
+this chapter; a conformance profile cannot add codes. Diagnostics use Canonical
+JSON and the exact Chapter 04 top-level structure. Minimal evidence records use
+the fixed fields above and lowercase hexadecimal SHA-256 evidence hashes.
+After a tenant-isolation violation, tenant invalidation MUST be durable before
+the failing invocation returns, and every subsequent invocation for that
+tenant MUST be rejected. Diagnostics and their evidence MUST be retained and
+queryable for the governing Chapter 34 evidence-retention period. Storage,
+indexing, and query mechanisms are internal and MUST NOT alter diagnostic
+bytes, invalidation timing, or evidence availability.
 
 > **Non-normative note.**
 These implementation-defined choices do not alter the conformance
@@ -1171,8 +1185,9 @@ mode defined in [Instance modes](#instance-modes).
    This test establishes the `fresh` oracle against which all other
    modes are measured.
 2. **Reset mode recycling**: Create a `reset` instance, invoke it
-   twice, and verify that the second invocation sees a memory state
-   identical to the post-`_start` state of the first invocation.
+   twice, verify that every memory byte is zero after clearing and before the
+   second `_start`, and verify that the second invocation sees a memory state
+   identical to a fresh instance's post-`_start` state.
    Verify that the residue matrix for the second invocation matches
    the `fresh` oracle.
 3. **Pooled mode tenant isolation**: Create a `pooled` pool with at
@@ -1205,6 +1220,9 @@ produce stable diagnostics and leave no unauthorized residue.
 A failure handling test MUST exercise at least one input per failure
 category defined below and verify both the diagnostic output and the
 residue matrix.
+Every failure test MUST verify the exact Chapter 04 top-level shape, the
+category-specific `identity.*.host_function` family, the expected domain
+`code`, `severity: "error"`, and every required `details` member.
 
 #### Malformed inputs
 
@@ -1316,8 +1334,10 @@ and resource isolation.
 
 1. **Reset state leakage**: Invoke a `reset` instance by tenant A,
    write deterministic state into the guest's linear memory,
-   then invoke the same instance by tenant B and verify that
-   tenant B observes zero bytes of tenant A's state.
+   then clear it for reuse and verify every byte is zero before `_start` runs.
+   Invoke the same instance by tenant B and verify that tenant B observes no
+   bytes of tenant A's state and sees the same post-`_start` bytes as a fresh
+   instance.
    If the host recycles the instance, this test MUST detect
    the recycling and still verify isolation.
 2. **Reset export leakage**: Invoke a `reset` instance, modify
@@ -1329,6 +1349,12 @@ and resource isolation.
    from the capability record, then trigger a reset and invoke
    again and verify that the instance cannot invoke
    `wasi:cli/stdout`.
+4. **Reset contamination detection**: Force one non-zero byte to remain after
+   the clear operation and before `_start`; verify that `_start` is not run on
+   that instance, the instance is discarded, a fresh instance is created, and
+   `instance.reset-leakage-detected` is emitted. Repeat with a module whose
+   legitimate post-`_start` data is non-zero and verify that matching fresh
+   initialization is not diagnosed as leakage.
 
 #### Pooled mode
 
@@ -1478,7 +1504,7 @@ they MUST be added to this list.
 
 1. **Regression detection**: For each affected milestone fixture,
    record whether the fixture passes, fails, or produces
-   implementation-defined variability under Phase 4.
+   approved profiled variability under Phase 4.
 2. **Approved variability**: If a fixture produces variability that
    is documented in the Phase 4 conformance profile and does not
    violate any isolation invariant, record the variability as
@@ -1548,47 +1574,57 @@ phase's planning directory as a Markdown document named
 The report MUST be referenced from the phase's planning document
 and from this specification chapter.
 
-> **Normative implementation-defined choice.**
-The exact format of the integration test report is an
-implementation-defined choice, subject to the requirements above.
-The format MUST be human-readable Markdown and MUST be parseable
+> **Normative unspecified presentation.**
+The integration test report layout is bounded unspecified presentation: it MAY
+use heading-and-table or heading-and-definition-list Markdown, subject to the
+requirements above. It MUST be human-readable Markdown and MUST be parseable
 by the `validate_archive.py` verification tool for structural
 compliance with the archive conventions defined in
 [AGENTS.md](../AGENTS.md).
 
 ## Variability register
 
+The register below indexes profile selections and other variability governed by
+the linked clauses. It does not independently license variation.
+
+> **Non-normative note.**
+
 | Item | Permission | Recommendation | Constraint |
 |------|------------|----------------|------------|
-| Import resolution algorithm | Implementation-defined | Document in conformance profile | Must be deterministic and prevent shadowing |
-| Memory isolation mechanism | Implementation-defined | Document in conformance profile | Must guarantee cross-tenant trap on access |
-| State isolation mechanism | Implementation-defined | Document in conformance profile | Must require explicit policy approval for cross-tenant access |
-| Cancellation enforcement | Implementation-defined | Document in conformance profile | Must complete cancellation within 2x declared bound |
-| Deadline enforcement granularity | Implementation-defined | Document in conformance profile | Must enforce deadline as hard limit |
-| Output limit enforcement | Implementation-defined | Document in conformance profile | Must trap or truncate at limit without publishing partial output |
-| Tenant identifier validation | Implementation-defined | Document in conformance profile | Must validate on every invocation |
-| WASI interface binding granularity | Implementation-defined | Document in conformance profile | Must re-evaluate on every instance creation |
-| Guest profile evaluation gate | Must evaluate at composition/authorization gate | None | Cannot enable WASI after gate closes |
-| Host function bound enforcement | Must trap on bound exceedance | None | Bound exceedance is explicit runtime failure |
-| Invocation context binding | Must bind all eight context fields to every callback | Document required vs conditional fields in conformance profile | Missing required field MUST reject invocation |
-| Deadline enforcement mechanism | Implementation-defined | Document timer resolution and pre-emption model | Must enforce deadline as hard limit with documented overhead |
-| Output limit enforcement mechanism | Implementation-defined | Document truncation vs discard policy | Must not publish output exceeding limit |
-| Grants filtering | Must filter host functions by grants | Document grant-check algorithm | Must emit grant-missing diagnostic on insufficient grants |
-| Instance mode selection priority | Must follow four-rule priority | Document trust assumptions per rule | Isolation MUST never be compromised for performance |
-| Fresh instance oracle compliance | Must be at least as restrictive as fresh | Document any deviation from fresh semantics | Relaxing any isolation invariant is a violation |
-| Reset leakage detection | Implementation-defined | Document memory comparison strategy | Must discard instance and create fresh on leakage |
-| Pool size and eviction policy | Implementation-defined | Document size, eviction, and health-check frequency | Must not allow single-tenant pool starvation |
-| Agent-pinning lifetime | Must destroy pinned instance with agent deactivation | Document activation-lifetime binding | Must not persist pinned instance across agent lifetimes |
-| Residue verification mechanism | Implementation-defined | Document snapshot and diff strategy | Must cover all nine residue categories |
-| Residue diff report format | Implementation-defined | Document parseable format | Must support automated test harnesses and forensic analysis |
-| Extism variable reset | Must reset input, output, and error buffers | Document pre-invocation state restoration | Failure to reset is an isolation violation |
+| [Import resolution algorithm](#import-namespace) | Required internal mechanism | Exact name and signature lookup in both namespaces | Must reject zero or cross-namespace duplicate matches |
+| [Memory isolation mechanism](#tenant-isolation-model) | Required internal mechanism | No profile selection | Must guarantee cross-tenant trap on access |
+| [State isolation mechanism](#tenant-isolation-model) | Required internal mechanism | No profile selection | Must require explicit policy approval for cross-tenant access |
+| [Cancellation enforcement](#eligibility-criteria-for-synchronous-host-functions) | Implementation-defined | Document in conformance profile | Must complete cancellation within 2x declared bound |
+| [Deadline enforcement granularity](#invocation-context-binding) | Implementation-defined | Document in conformance profile | Must enforce deadline as hard limit |
+| [Output limit enforcement](#invocation-context-binding) | Implementation-defined | Document in conformance profile | Must trap or truncate at limit without publishing partial output |
+| [Tenant identifier validation](#tenant-isolation-model) | Required | Validate on every invocation | Must trap on a missing or invalid identifier |
+| [WASI interface binding granularity](#default-to-no-wasi-and-guest-profile) | Required | Re-evaluate on every instance creation | Must not bind an unrecorded interface |
+| [Guest profile evaluation gate](#default-to-no-wasi-and-guest-profile) | Must evaluate at composition/authorization gate | None | Cannot enable WASI after gate closes |
+| [Host function bound enforcement](#eligibility-criteria-for-synchronous-host-functions) | Must trap on bound exceedance | None | Bound exceedance is explicit runtime failure |
+| [Invocation context binding](#invocation-context-binding) | Must bind all eight context fields to every callback | Document required vs conditional fields in conformance profile | Missing required field MUST reject invocation |
+| [Deadline enforcement mechanism](#invocation-context-binding) | Implementation-defined | Document timer resolution and pre-emption model | Must enforce deadline as hard limit with documented overhead |
+| [Output limit enforcement mechanism](#invocation-context-binding) | Implementation-defined | Document truncation vs discard policy | Must not publish output exceeding limit |
+| [Grants filtering](#invocation-context-binding) | Must filter host functions by grants | Document grant-check algorithm | Must emit grant-missing diagnostic on insufficient grants |
+| [Instance mode selection priority](#instance-modes) | Must follow four-rule priority | Document trust assumptions per rule | Isolation MUST never be compromised for performance |
+| [Fresh instance oracle compliance](#instance-modes) | Must be at least as restrictive as fresh | Document any deviation from fresh semantics | Relaxing any isolation invariant is a violation |
+| [Reset leakage detection](#instance-modes) | Required internal mechanism | Observe immediately after clear and before `_start`, then compare post-`_start` bytes with a fresh instance | Pre-`_start` memory must be zero; post-`_start` memory may be non-zero only when it matches the fresh oracle |
+| [Pool size and eviction policy](#instance-modes) | Implementation-defined | Document size, eviction, and health-check frequency | Must not allow single-tenant pool starvation |
+| [Agent-pinning lifetime](#instance-modes) | Must destroy pinned instance with agent deactivation | Document activation-lifetime binding | Must not persist pinned instance across agent lifetimes |
+| [Residue verification mechanism](#test-residue) | Required internal mechanism | No profile selection | Must cover all nine residue categories and produce identical verdicts and hashes |
+| [Residue diff report format](#migration-artifact-handling) | Implementation-defined | Document parseable format | Must support automated test harnesses and forensic analysis |
+| [Extism variable reset](#test-residue) | Must reset input, output, and error buffers | Document pre-invocation state restoration | Failure to reset is an isolation violation |
 
 ## Operational variability register
 
+The register below indexes operational profile selections and requirements
+governed by the linked clauses. It does not independently license variation.
+
+> **Non-normative note.**
+
 | Item | Permission | Recommendation | Constraint |
 |------|------------|----------------|------------|
-| Diagnostic formatting | Implementation-defined | Document in conformance profile | Must produce parseable output |
-| Audit log retention | Implementation-defined | Document in conformance profile | Must support forensic analysis |
-| Failure detection granularity | Implementation-defined | Document in conformance profile | Must detect all eight behavior-and-integration failure outcomes in this section |
-| Residue diff report retention | Implementation-defined | Document in conformance profile | Must support isolation-violation forensics |
-| Invocation_id uniqueness guarantee | Implementation-defined | Document entropy source and collision bound | Must be globally unique across host lifetime |
+| [Diagnostic formatting](#fixed-diagnostic-and-evidence-behavior) | Required | Canonical JSON with exact Chapter 04 top-level structure | Profile extensions are prohibited |
+| [Diagnostic and audit retention](#fixed-diagnostic-and-evidence-behavior) | Required | Governing Chapter 34 evidence-retention period | Must remain queryable for the full period |
+| [Failure detection granularity](#failure-outcomes-for-behavior-and-integration) | Required | Detect every defined outcome | Must detect all eight behavior-and-integration failure outcomes in this section |
+| [Residue diff report retention](#migration-artifact-handling) | Implementation-defined | Document in conformance profile | Must support isolation-violation forensics |
+| [`invocation_id` representation](#invocation-context-binding) | Implementation-defined | Document entropy source and collision bound | Must be globally unique across host lifetime |

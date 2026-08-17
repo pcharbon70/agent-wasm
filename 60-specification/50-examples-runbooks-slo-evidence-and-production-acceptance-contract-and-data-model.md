@@ -2,7 +2,7 @@
 title: "Examples Runbooks SLO Evidence And Production Acceptance Contract And Data Model"
 kind: specification
 created: "2026-08-10"
-status: draft
+status: normative
 spec_version: "0.2.0"
 tags:
   - milestone-09
@@ -22,7 +22,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 5](../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/phase-05-examples-runbooks-slo-evidence-and-production-acceptance.md)
 of
 [Milestone 9](../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/README.md)
@@ -123,6 +123,49 @@ The following service level objectives are maintained:
 | `isolation` | Tenant isolation (no cross-tenant data leakage). | 100%. | 0%. |
 | `evidence-completeness` | Evidence completeness for milestone acceptance. | 100%. | 0%. |
 
+> **Normative definition.**
+Every SLO measurement uses the half-open rolling window `[T - 30 days, T)`,
+where `T` is a UTC minute boundary. The host computes one measurement at every
+UTC minute boundary. Events exactly at the start are included; events exactly
+at `T` are deferred to the next measurement. Durations use integer
+nanoseconds. Counts and durations MUST NOT be sampled or estimated.
+
+> **Normative definition.**
+Each SLO measurement record contains `objective`, `window_start`, `window_end`,
+`eligible_units`, `bad_units`, `observed_value`, `target`,
+`error_budget_total`, `error_budget_consumed`, `error_budget_remaining`,
+`status`, and the ordered digests of its source records. `status` is `met`,
+`violated`, or `unavailable`. Zero eligible units produce `unavailable`, not a
+successful measurement, and block production acceptance. Source digests are
+ordered by ascending source timestamp and then ascending digest bytes;
+duplicate source records remain duplicate entries.
+
+> **Normative definition.**
+The exact objective calculations are:
+
+| Objective | Eligible and bad units | Observed value and target comparison |
+| --- | --- | --- |
+| `admission` | Eligible units are all completed signal and instruction admission decisions; bad units are rejected decisions other than caller cancellation before validation. | `(eligible_units - bad_units) / eligible_units`; `met` when at least `0.999`. |
+| `turn-latency` | Eligible units are completed turns with valid start and completion timestamps; bad units are turns whose duration is at least 500,000,000 ns. | Sort eligible durations ascending and select rank `ceil(0.95 * eligible_units)`, using one-based ranks; `met` when the selected duration is strictly less than 500,000,000 ns. |
+| `durability` | Eligible units are acknowledged durable state commits; bad units are eligible commits detected missing or digest-mismatched after restart, recovery, or integrity verification. | `(eligible_units - bad_units) / eligible_units`; `met` only at exactly `1`. |
+| `effect-delay` | Eligible units are effects with both durable-ready and execution-start timestamps; bad units have delay at least 100,000,000 ns. | Nearest-rank p95 as defined for `turn-latency`; `met` when strictly less than 100,000,000 ns. |
+| `recovery` | Eligible units are completed host-failure recovery episodes; bad units are episodes lasting at least 300,000,000,000 ns. | Maximum eligible recovery duration; `met` when strictly less than 300,000,000,000 ns. |
+| `availability` | Eligible units are nanoseconds during which the deployment is scheduled to serve; bad units are eligible nanoseconds in which readiness is not `healthy`. Maintenance remains eligible. Readiness is piecewise constant from each durable readiness transition until the next; absence of a known state at the window start makes the measurement unavailable. | `(eligible_units - bad_units) / eligible_units`; `met` when at least `0.999`. |
+| `isolation` | Eligible units are completed tenant-boundary access attempts and required isolation probes; bad units are unauthorized cross-tenant reads, writes, disclosures, or effects. | `(eligible_units - bad_units) / eligible_units`; `met` only at exactly `1`. |
+| `evidence-completeness` | Eligible units are required evidence slots for each production-acceptance candidate evaluated in the window; bad units are absent, invalid, unverifiable, or inaccessible required records. | `(eligible_units - bad_units) / eligible_units`; `met` only at exactly `1`. |
+
+For `admission` and `availability`, budget consumed in percentage points is
+exactly `100 * bad_units / eligible_units` and budget remaining is
+`max(0, 0.1 - consumed)`. For
+`turn-latency`, `effect-delay`, and `recovery`, budget consumed is
+`max(0, observed_duration - target_duration)` and remaining is respectively
+`max(0, 50 ms - consumed)`, `max(0, 10 ms - consumed)`, or
+`max(0, 1 minute - consumed)`. A strict duration target is violated when the
+observed duration equals its target. The three zero-budget objectives have
+`error_budget_total`, `error_budget_consumed`, and `error_budget_remaining`
+equal to zero. They are exhausted only when their status is `violated`, not
+while it is `met`.
+
 > **Non-normative note.**
 SLOs are measured via:
 - Metrics (e.g., admission success rate, turn latency percentiles).
@@ -147,6 +190,22 @@ Production acceptance evidence includes:
 | `conformance-evidence` | Conformance test suite evidence (all tests passing). |
 | `security-evidence` | Security audit evidence (vulnerabilities, compliance). |
 | `performance-evidence` | Performance test evidence (load, soak, fault scenarios). |
+
+> **Normative definition.**
+Every production acceptance evidence record and its canonical bytes MUST be
+retained indefinitely and MUST NOT be deleted. A host MAY migrate, replicate,
+or change the storage tier or backend only when the evidence identity,
+canonical bytes, digest, tenant isolation, authorization, and retrieval
+behavior remain unchanged. A deletion request for production acceptance
+evidence MUST be rejected without modifying the evidence.
+
+This rule explicitly replaces the operator-deletion exception and finite
+post-retention availability permitted for general evidence by
+[Host-owned evidence recording](34-provenance-signing-audit-security-and-milestone-acceptance.md#host-owned-evidence-recording).
+For every record classified as production acceptance evidence, an operator
+action, elapsed retention period, storage-tier change, or backend migration
+does not authorize deletion or unavailability. Chapter 34 continues to govern
+evidence that is not production acceptance evidence.
 
 > **Non-normative note.**
 Evidence is:
@@ -224,9 +283,13 @@ See [Variability register](#variability-register).
 | Example set | Section 50.1.1 | Required | Must include all examples listed in the table. |
 | Runbook set | Section 50.1.2 | Required | Must include all runbooks listed in the table. |
 | SLO set | Section 50.1.3 | Required | Must include all SLOs listed in the table. |
-| SLO targets | Section 50.1.3 | Implementation-defined | Must document target values for all SLOs. |
-| SLO error budgets | Section 50.1.3 | Implementation-defined | Must document error budget values for all SLOs. |
+| SLO targets | [Service Level Objectives](#5013-service-level-objectives-slos) | Required | Must use every target exactly as listed in the SLO table. |
+| SLO error budgets | [Service Level Objectives](#5013-service-level-objectives-slos) | Required | Must use every error budget exactly as listed in the SLO table. |
+| SLO measurement window | [Service Level Objectives](#5013-service-level-objectives-slos) | Required | Use the exact rolling 30-day half-open window at every UTC minute boundary. |
+| SLO formulas | [Service Level Objectives](#5013-service-level-objectives-slos) | Required | Use the exact eligible units, bad units, nearest-rank percentile, strict comparisons, and budget formulas. |
 | Evidence types | Section 50.1.4 | Required | Must include all evidence types listed in the table. |
+| Evidence retention | [Production Acceptance Evidence](#5014-production-acceptance-evidence) | Fixed requirement | Retain canonical evidence indefinitely; reject deletion; storage mechanisms may vary only with identical evidence and retrieval behavior. |
+| Evidence-deletion precedence | [Production Acceptance Evidence](#5014-production-acceptance-evidence) | Explicit replacement | Chapter 34 operator and post-retention deletion permissions do not apply to production acceptance evidence. |
 | Support matrix components | Section 50.1.5 | Required | Must include all components listed in the table. |
 | Residual risks | Section 50.1.6 | Required | Must include all risks listed in the table. |
 | Release ownership roles | Section 50.1.7 | Required | Must include all roles listed in the table. |

@@ -3,7 +3,7 @@ title: "Agent Registry Activation Cancellation And Completion"
 kind: specification
 created: "2026-08-08"
 status: normative
-spec_version: "0.1.0"
+spec_version: "1.0.0"
 tags:
   - milestone-03
   - phase-03
@@ -19,7 +19,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 3](../.spec/planning/agentic-system/milestone-03-host-actor-runtime-and-lifecycle/phase-03-agent-registry-activation-cancellation-and-completion.md)
 of
 [Milestone 3](../.spec/planning/agentic-system/milestone-03-host-actor-runtime-and-lifecycle/README.md)
@@ -64,13 +64,14 @@ RegistryRecord {
   agent_type: string,
   agent_version: string,
   instance_id: InstanceId,
-  artifact_digest: Digest,
+  artifact_digest: ArtifactDigest,
   lifecycle_policy: LifecyclePolicy,
   durable_revision: u64,
   activation_status: ActivationStatus
 }
 
 InstanceId = string
+ArtifactDigest = string
 
 LifecyclePolicy {
   activation: ActivationPolicy,
@@ -81,7 +82,8 @@ LifecyclePolicy {
 ActivationPolicy {
   kind: ActivationKind,
   eager_config: EagerConfig?,
-  lazy_config: LazyConfig?
+  lazy_config: LazyConfig?,
+  on_signal_type: string?
 }
 
 ActivationKind = "eager" | "lazy" | "on-signal" | "disabled"
@@ -131,8 +133,10 @@ ActivationState {
 }
 ```
 
-`TenantId`, `AgentId`, `Digest`, and `UnixTimestamp` are defined in
+`TenantId`, `AgentId`, and `UnixTimestamp` are defined in
 [Mailboxes Ordering Bounds Fairness And Turn Leases](21-mailboxes-ordering-bounds-fairness-and-turn-leases.md).
+`ArtifactDigest` is the canonical `artifact:sha256:<hex>` identity defined by
+[Artifact digests](03-agent-manifests-artifacts-schemas-and-registries.md#artifact-digests).
 
 | Field | Type | Required | Purpose |
 |-------|------|----------|---------|
@@ -141,7 +145,7 @@ ActivationState {
 | `agent_type` | string | Yes | Logical agent type (e.g., "customer-support") |
 | `agent_version` | string | Yes | Semantic version of the agent type |
 | `instance_id` | InstanceId | Yes | Unique instance identifier |
-| `artifact_digest` | Digest | Yes | Digest of the compiled artifact |
+| `artifact_digest` | ArtifactDigest | Yes | Canonical identity of the admitted artifact |
 | `lifecycle_policy` | LifecyclePolicy | Yes | Lifecycle behavior configuration |
 | `durable_revision` | u64 | Yes | Last committed state revision |
 | `activation_status` | ActivationStatus | Yes | Current activation state |
@@ -151,8 +155,9 @@ The `instance_id` is unique per `(tenant_id, agent_id)` tuple.
 The host MUST reject duplicate instance IDs with `registry.instance.duplicate`.
 
 > **Normative definition.**
-The `durable_revision` is the last state revision that has been committed
-to durable storage.
+The `durable_revision` is the last state revision committed as authoritative
+state. Milestone 3 keeps that state in memory; Milestone 4 supplies durable
+storage.
 The host MUST NOT allow state revisions to regress below `durable_revision`.
 
 ### Registry operations
@@ -178,7 +183,7 @@ RegistryOperations {
   create: (CreateRequest) -> RegistryRecord,
   resolve: (InstanceId) -> RegistryRecord?,
   activate: (ActivateRequest) -> ActivationResult,
-  initialize: (InitializeRequest) -> InitializationResult,
+  initialize: (RegistryInitializeRequest) -> InitializationResult,
   suspend: (InstanceId) -> ActivationResult,
   hibernate: (InstanceId) -> ActivationResult,
   thaw: (InstanceId) -> ActivationResult,
@@ -192,7 +197,7 @@ CreateRequest {
   agent_id: AgentId,
   agent_type: string,
   agent_version: string,
-  artifact_digest: Digest,
+  artifact_digest: ArtifactDigest,
   lifecycle_policy: LifecyclePolicy
 }
 
@@ -206,8 +211,9 @@ ActivationResult {
   diagnostics: Diagnostic[]
 }
 
-InitializeRequest {
+RegistryInitializeRequest {
   instance_id: InstanceId,
+  initialization_id: string,
   initial_state: JsonObject?
 }
 
@@ -239,12 +245,18 @@ TerminationResult {
 | `agent_id` | AgentId | Yes | Unique agent identifier |
 | `agent_type` | string | Yes | Logical agent type |
 | `agent_version` | string | Yes | Agent type version |
-| `artifact_digest` | Digest | Yes | Compiled artifact digest |
+| `artifact_digest` | ArtifactDigest | Yes | Canonical identity of the admitted artifact |
 | `lifecycle_policy` | LifecyclePolicy | Yes | Lifecycle behavior configuration |
 | `instance_id` | InstanceId | Yes | Unique instance identifier |
+| `initialization_id` | string | Yes | Canonical initialization identity derived from the instance |
 | `initialize` | bool | Yes | Whether to initialize on activation |
 | `initial_state` | JsonObject? | No | Initial state for initialization |
 | `reason` | string | Yes | Reason for cancellation |
+
+For registry initialization, `initialization_id` MUST equal
+`init:<canonical-agent-instance>` and the resulting `initial_revision` MUST be
+1. The host supplies the same identity in the protocol `InitializeRequest` and
+requires the `InitializeResponse` to echo it.
 
 ### Durable completion/cancellation state
 
@@ -315,8 +327,14 @@ The `activation_policy.kind` field selects the activation policy.
 The host MUST enforce the activation policy for every registry record.
 
 > **Normative definition.**
-The host MUST document the activation policy for each registry record in
-the conformance profile.
+For `eager`, `eager_config` MUST be present and the host MUST begin activation
+during creation. For `lazy`, `lazy_config` MUST be present and the first
+accepted turn request MUST begin activation. For `on-signal`,
+`on_signal_type` MUST be a valid signal type and only an admitted signal with
+that exact type begins activation. For `disabled`, no event or request begins
+activation. Fields belonging to another activation kind MUST be null. A
+registry create request that violates these rules is malformed and MUST fail
+with `registry.request.malformed`.
 
 ### Activation behavior
 
@@ -420,20 +438,16 @@ without exposing secrets or implementation internal state.
 | `registry.cancellation` | Cancellation failures | `failed` |
 | `registry.capacity` | Capacity failures | `exhausted` |
 
-### Implementation-defined choices
+### Internal mechanisms and fixed behavior
 
-> **Normative implementation-defined choice.**
-The following choices are implementation-defined and do not create
-conformance obligations.
-The Variability register below catalogs all such choices.
-
-1. **Activation policy enforcement**: The host MAY choose how to enforce activation policies. The enforcement mechanism MUST be documented in the conformance profile.
-
-2. **Durable state storage**: The host MAY choose the durable state storage mechanism. The storage mechanism MUST be documented in the conformance profile.
-
-3. **Disposable projection release**: The host MAY choose how to release disposable projections. The release mechanism MUST be documented in the conformance profile.
-
-4. **Registry persistence**: The host MAY choose how to persist registry records. The persistence mechanism MUST be documented in the conformance profile.
+> **Normative definition.**
+During Milestone 3, registry records and `DurableState` MUST use in-memory
+storage and MUST be lost on host restart. Activation-policy enforcement,
+in-memory layout, and disposable-projection release are internal mechanisms.
+Every such mechanism MUST be observationally equivalent with respect to
+lifecycle transitions, revisions, activation diagnostics, restart state, and
+resource release. An internal mechanism MUST NOT persist an engine, process,
+socket, worker, or other live-resource handle.
 
 ### Deferred work
 
@@ -461,7 +475,8 @@ lifecycle pipeline.
 Expected behavior:
 
 - Input: valid create request with tenant_id, agent_id, agent_type, artifact_digest, and lifecycle_policy.
-- Expected output: RegistryRecord with ActivationStatus.Pending.
+- Expected output: RegistryRecord with `ActivationStatus.Pending` for a valid
+  lazy lifecycle policy.
 - Expected error: null.
 
 ### Negative: malformed request
@@ -552,6 +567,24 @@ Expected behavior:
 - Expected output: null.
 - Expected error: `registry.cancellation.failed`.
 
+### Fixed lifecycle and storage behavior
+
+> **Normative conformance criterion.**
+The Phase 3 integration tests MUST additionally verify:
+
+1. `eager` begins activation during creation, `lazy` begins activation on the
+   first accepted turn request, `on-signal` begins activation only for an exact
+   `on_signal_type` match, and `disabled` never begins activation.
+2. Missing kind-specific configuration, configuration for another kind, and an
+   invalid `on_signal_type` fail with `registry.request.malformed`.
+3. Cancellation, completion, and termination release every disposable
+   projection, and a later activation receives only fresh projections.
+4. A host restart loses the Milestone 3 registry and `DurableState` records and
+   never reconstructs a live-resource handle from either record.
+5. Initialization supplies and echoes the canonical initialization identity,
+   assigns initial revision 1, and rejects any mismatched identity before
+   committing state or startup directives.
+
 ### Cross-milestone fixture regression
 
 > **Normative conformance criterion.**
@@ -575,16 +608,19 @@ Any approved variability MUST be documented in the Milestone 3 exit report.
 
 ## Variability register
 
-| Clause | Type | Selection |
-|--------|------|-----------|
-| Registry record structure | Required | Fields fixed by this chapter |
-| Registry operations | Required | 10 operations fixed by this chapter |
-| Durable state structure | Required | Fields fixed by this chapter |
-| Activation policies | Required | eager, lazy, on-signal, disabled, fixed by this chapter |
-| Activation behavior | Required | 5 scenarios fixed by this chapter |
-| Disposable projections | Required | Must be disposable, fixed by this chapter |
+The register summarizes fixed behavior and internal mechanisms. It does not
+independently license variation.
 
-Other variability choices are documented in the section on host-defined selections.
+| Clause | Type | Selection | Constraint |
+|--------|------|-----------|------------|
+| Registry record structure | Required | Fields fixed by this chapter | Reject malformed records |
+| Registry operations | Required | Ten operations fixed by this chapter | Preserve lifecycle preconditions and diagnostics |
+| Durable state structure | Required | Fields fixed by this chapter | Revisions never regress |
+| [Activation policies](#activation-policies) | Runtime record selection | `eager`, `lazy`, `on-signal`, or `disabled` | Kind-specific fields and trigger behavior are fixed |
+| Activation behavior | Required | Scenarios fixed by this chapter | Preserve transitions and diagnostics |
+| [Milestone 3 storage](#internal-mechanisms-and-fixed-behavior) | Required | In memory only | Registry and state records are lost on host restart |
+| [Disposable projections](#disposable-projections) | Internal mechanism | No profile selection | Release on terminal lifecycle transitions and never persist live-resource handles |
+| Activation enforcement and storage layout | Internal mechanism | No profile selection | Preserve lifecycle, revision, diagnostic, restart, and release observations |
 
 ## Rationale and evidence (non-normative)
 
@@ -606,7 +642,8 @@ The activation policies provide:
 
 The durable state provides:
 
-- Persistent agent state across host restarts.
+- Authoritative lifecycle state independent of disposable live projections
+  within the Milestone 3 host process.
 - Separation between durable state and disposable projections.
 
 The failure modes provide:

@@ -2,7 +2,7 @@
 title: "Provider-Neutral Model Requests Responses Streaming And Usage Failure Evidence And Operational Notes"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.2.0"
 tags:
   - milestone-07
@@ -24,7 +24,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 1](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/phase-01-provider-neutral-model-requests-responses-streaming-and-usage.md)
 of
 [Milestone 7](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/README.md).
@@ -79,6 +79,7 @@ and
 | `model.binding.unauthorized` | Caller or tenant cannot use the binding. | Non-retryable authorization failure. |
 | `model.binding.conflict` | Concurrent configuration attempted to update the same revision. | Retry configuration after reload. |
 | `model.connection.unavailable` | Recorded connection is inactive or unavailable. | Retry only if the same connection recovers. |
+| `model.connection.revision_mismatch` | Binding or durable request omits or changes the pinned connection revision or credential lease. | User reconfiguration or durable-record repair required. |
 | `model.request.unavailable_provider` | Pinned provider is unavailable. | Retry only against the same pinned request. |
 | `model.request.unavailable_model` | Pinned model is unavailable or removed. | User reconfiguration for a new intent. |
 
@@ -100,6 +101,7 @@ and
 | `model.request.late_response` | Result arrives after deadline or cancellation. | Not automatically retryable. |
 | `model.request.cancelled` | Authorized cancellation terminated the request. | New intent required. |
 | `model.request.ambiguous_billing` | Provider and host usage calculations disagree. | Reconciliation required. |
+| `model.receipt.invalid_no_credential` | A no-credential receipt is used for an authenticated connection or does not match the pinned local connection revision. | Non-retryable result-admission failure. |
 | `model.response.malformed_text` | Text event or final text violates encoding or bounds. | Adapter or provider correction required. |
 | `model.response.malformed_structured` | Structured payload is malformed before schema validation. | Adapter or provider correction required. |
 | `model.response.malformed_usage` | Usage metrics are negative, inconsistent, or over bounds. | Reconciliation required. |
@@ -128,6 +130,10 @@ On every failure, the host MUST preserve these invariants:
    and never contain credentials, authentication headers, handle references,
    arbitrary endpoint URLs, unbounded provider errors, or raw custodian
    responses.
+
+The connection identity in invariant 3 includes its exact revision and
+credential lease linkage. A `NoCredentialReceipt` is bounded receipt evidence,
+not a credential-use receipt, and MUST NOT create lease or handle evidence.
 
 ### Bounded diagnostics
 
@@ -193,17 +199,25 @@ credential-use denials; safety refusals; tool mismatches; structured-output
 failures; or invalid receipts. These require user action, a new intent, or an
 operator reconciliation decision.
 
-### Implementation-defined choices
+### Implementation limits and fixed rules
 
 | Choice | Documentation requirement |
 | --- | --- |
-| Maximum concurrent requests and streams | Publish tenant and connection limits and queue behavior. |
-| Request and cancellation timeout | Publish hard bounds and clock source. |
-| Stream buffer size | Publish byte and event limits and backpressure behavior. |
-| Retry count and backoff | Publish bounds; preserve pinned selection and idempotency. |
-| Usage reconciliation algorithm | Publish provider observation and host calculation precedence. |
-| Diagnostic visibility | Publish which roles may see provider/model identifiers. |
-| Evidence retention | Publish retention and tenant isolation. |
+| Maximum concurrent requests and streams | Positive implementation limits published per tenant and connection; exhaustion uses `model.request.exhausted_concurrency` or `model.request.exhausted_stream`. |
+| Request and cancellation timeout | Earlier of the request deadline and the published host policy limit; expiry uses `model.request.timeout`. |
+| Stream buffer size | Positive byte and event implementation limits with bounded backpressure; exhaustion uses `model.request.exhausted_stream`. |
+| Usage reconciliation | Preserve provider observation and host calculation and enforce the more conservative authorized amount. |
+| Diagnostic visibility | Provider/model identifiers are visible only to the authorized user and audit roles. |
+| Evidence retention | Retain until the associated release leaves the support matrix and no open incident references the evidence; enforce tenant isolation and redaction throughout. |
+| Local unauthenticated receipt | Exact `NoCredentialReceipt` union member from Section 41.1; reject any use on an authenticated connection with `model.receipt.invalid_no_credential`. |
+
+### Internal mechanisms (non-normative)
+
+Retry scheduling, backoff calculation, registry storage, and evidence-storage
+backends are internal mechanisms. They may vary only when they preserve the
+retry classification above, pinned selection and idempotency, timeout
+boundaries, tenant isolation, retained evidence, and every externally visible
+diagnostic and terminal outcome.
 
 ### Deferred work
 
@@ -225,12 +239,17 @@ The contract requires revision if evidence shows that:
 
 ## Variability register
 
+The following table summarizes the variability governed by linked
+declarations.
+
+> **Non-normative note.**
+
 | Item | Permission | Recommendation | Constraint |
 | --- | --- | --- | --- |
 | Diagnostic provider/model visibility | Optional | Restrict to user and audit roles | Never expose credential or handle material |
 | Correlation fingerprints | Optional | Domain-separated non-authority-bearing digest | Must not be usable for credential access |
-| Retry policy | Implementation-defined | Retry only reconciled transient failures | Must preserve recorded selection |
-| Evidence retention | Implementation-defined | Retain through release and incident windows | Must enforce tenant isolation and redaction |
+| [Retry policy](#internal-mechanisms-non-normative) | Internal mechanism | Retry only reconciled transient failures | Must preserve recorded selection and observable outcomes |
+| [Evidence retention](#implementation-limits-and-fixed-rules) | Fixed requirement | Retain until the associated release leaves support and no open incident references the evidence | Must enforce tenant isolation and redaction |
 | Automatic routing and fallback | Deferred | Require explicit user reconfiguration | Must not occur at runtime |
 
 ## Rationale and evidence (non-normative)

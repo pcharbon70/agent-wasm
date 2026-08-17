@@ -2,7 +2,7 @@
 title: "Examples Runbooks SLO Evidence And Production Acceptance Phase 5 Integration Tests"
 kind: specification
 created: "2026-08-10"
-status: draft
+status: normative
 spec_version: "0.2.0"
 tags:
   - milestone-09
@@ -22,7 +22,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 5](../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/phase-05-examples-runbooks-slo-evidence-and-production-acceptance.md)
 of
 [Milestone 9](../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/README.md)
@@ -71,10 +71,12 @@ The test MUST verify that:
 2. All runbooks execute successfully (dependency-failure, queue-overload,
    stuck-turn, repeated-effect, runtime-divergence, artifact-revocation,
    tenant-incident, recovery, rollback).
-3. All SLOs are measured correctly (admission, turn-latency, durability,
-   effect-delay, recovery, availability, isolation, evidence-completeness).
-4. All SLOs meet or exceed targets (admission >= 99.9%, turn-latency <= 500ms,
-   durability = 100%, effect-delay <= 100ms, recovery <= 5 minutes,
+3. All SLOs are measured from unsampled source records using the exact
+   30-day window, UTC minute boundary, eligible units, bad units, percentile,
+   target, and budget formulas for admission, turn-latency, durability,
+   effect-delay, recovery, availability, isolation, and evidence-completeness.
+4. All SLOs meet or exceed targets (admission >= 99.9%, turn-latency < 500ms,
+   durability = 100%, effect-delay < 100ms, recovery < 5 minutes,
    availability >= 99.9%, isolation = 100%, evidence-completeness = 100%).
 5. All evidence types are generated correctly (slo-evidence, runbook-evidence,
    example-evidence, conformance-evidence, security-evidence, performance-evidence).
@@ -104,7 +106,9 @@ The test MUST verify that:
 
 1. Invalid example inputs produce `example.run.failed` diagnostic.
 2. Invalid runbook symptoms produce `runbook.diagnosis.failed` diagnostic.
-3. Invalid SLO metrics produce `slo.violation` diagnostic.
+3. Invalid or unverifiable SLO source records produce
+   `slo.measurement.unavailable` and block production acceptance rather than
+   producing a target violation.
 4. Invalid evidence inputs produce `evidence.generation.failed` diagnostic.
 5. Invalid production acceptance inputs produce `acceptance.conformance.failed` diagnostic.
 6. Invalid support matrix inputs produce `support.matrix.update.failed` diagnostic.
@@ -122,7 +126,9 @@ The test MUST verify that:
 
 1. Duplicate example executions with same inputs produce stable diagnostic.
 2. Duplicate runbook executions with same symptom produce stable diagnostic.
-3. Duplicate SLO measurements with same time window produce stable diagnostic.
+3. Recomputing an SLO measurement for the same objective, window, and ordered
+   source digests returns the same measurement record without a duplicate
+   diagnostic or repeated transition alert.
 4. Duplicate evidence generations with same scenario produce stable diagnostic.
 5. Duplicate production acceptance executions with same evidence produce stable diagnostic.
 6. No state, journal, or outbox entries are created for the rejected operations.
@@ -134,11 +140,17 @@ Examples, runbooks, SLOs, evidence, and production acceptance MUST
 enforce configured boundaries and limits.
 The test MUST verify that:
 
-1. SLO targets are enforced (e.g., admission success rate below 99.9% triggers violation).
-2. SLO error budgets are enforced (e.g., budget falls below threshold triggers exhaustion).
+1. SLO targets use exact inclusive or strict comparisons, including violation
+   when a duration equals its strict upper target.
+2. Positive error budgets emit `slo.budget.exhausted` on the first measurement
+   reaching zero; zero-budget objectives emit it only on transition into
+   `violated`.
 3. Evidence storage limits are enforced (e.g., storage full triggers failure).
-4. Evidence retention limits are enforced (e.g., retention period exceeded triggers deletion).
-5. Release schedule limits are enforced (e.g., release frequency exceeds limit triggers rejection).
+4. Production acceptance evidence remains available indefinitely and deletion
+   attempts are rejected with `evidence.deletion.prohibited`, including
+   operator requests after Chapter 34's general retention period.
+5. Release scheduling does not omit or reorder release steps and does not
+   change the acceptance decision for the same build and evidence.
 6. No state, journal, or outbox entries are created for the rejected operations.
 7. The diagnostic identifies the boundary or limit that was exceeded.
 
@@ -151,12 +163,13 @@ The test MUST verify that:
 
 1. Example execution timeouts produce `example.run.failed` diagnostic.
 2. Runbook execution timeouts produce `runbook.diagnosis.failed` diagnostic.
-3. SLO measurement timeouts produce `slo.violation` diagnostic.
+3. SLO measurement timeouts produce `slo.measurement.unavailable` diagnostic.
 4. Evidence generation timeouts produce `evidence.generation.failed` diagnostic.
 5. Production acceptance timeouts produce `acceptance.conformance.failed` diagnostic.
 6. Unavailable example repository produces `example.run.failed` diagnostic.
 7. Unavailable runbook data produces `runbook.diagnosis.failed` diagnostic.
-8. Unavailable SLO metrics produces `slo.violation` diagnostic.
+8. Unavailable SLO source records produce `slo.measurement.unavailable`
+   diagnostic and block production acceptance.
 9. Unavailable evidence storage produces `evidence.storage.failed` diagnostic.
 10. Unavailable production acceptance gate produces `acceptance.conformance.failed` diagnostic.
 11. Cancellation of example execution produces stable diagnostic.
@@ -221,10 +234,16 @@ SLOs MUST be measured and met.
 The test MUST verify that:
 
 1. SLO metrics are collected correctly.
-2. SLO compliance is calculated correctly.
-3. SLO error budget consumption is tracked correctly.
-4. SLO alerts fire correctly (violation, budget exhaustion).
-5. All SLOs meet or exceed targets.
+2. Each UTC minute calculation uses exactly `[T - 30 days, T)`, including the
+   start boundary and excluding `T`.
+3. Nearest-rank p95, maximum recovery duration, ratios, strict duration
+   comparisons, and error-budget arithmetic match Section 50.1.3 exactly.
+4. `slo.violation` fires only on transition into `violated`, and
+   `slo.budget.exhausted` follows the positive- and zero-budget transition
+   rules.
+5. Zero eligible units or unverifiable sources produce
+   `slo.measurement.unavailable` and block acceptance.
+6. All SLOs meet or exceed targets.
 
 ### 50.4.10 Evidence immutability verification
 
@@ -232,7 +251,9 @@ Evidence MUST be immutable and tamper-evident.
 The test MUST verify that:
 
 1. Evidence cannot be modified after generation.
-2. Evidence cannot be deleted (except by authorized deletion of non-evidence data).
+2. Production acceptance evidence cannot be deleted by any requester or
+   retention policy; deletion returns `evidence.deletion.prohibited` without
+   changing the record.
 3. Evidence is tamper-evident (cryptographic hashing detects modifications).
 4. Evidence generation failures produce `evidence.generation.failed` diagnostic.
 5. Evidence storage failures produce `evidence.storage.failed` diagnostic.
@@ -272,7 +293,9 @@ See [Variability register](#variability-register).
 | Example reproducibility verification | Section 50.4.7 | MUST | Must verify example reproducibility. |
 | Runbook effectiveness verification | Section 50.4.8 | MUST | Must verify runbook effectiveness. |
 | SLO compliance verification | Section 50.4.9 | MUST | Must verify SLO compliance. |
+| SLO window and formula verification | Sections 50.4.1, 50.4.4, and 50.4.9 | MUST | Must verify exact boundaries, source units, percentiles, comparisons, budget arithmetic, transitions, and unavailable outcomes. |
 | Evidence immutability verification | Section 50.4.10 | MUST | Must verify evidence immutability and tamper-evidence. |
+| Evidence deletion precedence | Sections 50.4.4 and 50.4.10 | MUST | Must verify Chapter 34 deletion permissions do not apply to production acceptance evidence. |
 | Production acceptance gate verification | Section 50.4.11 | MUST | Must verify production acceptance gate blocks releases. |
 
 ## Rationale and evidence (non-normative)

@@ -2,7 +2,7 @@
 title: "Child Lifecycle Cancellation Monitoring And Restart Policy Contract And Data Model"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.1.0"
 tags:
   - milestone-06
@@ -19,7 +19,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 2](../.spec/planning/agentic-system/milestone-06-multi-agent-coordination-and-topology/phase-02-child-lifecycle-cancellation-monitoring-and-restart-policy.md)
 of
 [Milestone 6](../.spec/planning/agentic-system/milestone-06-multi-agent-coordination-and-topology/README.md)
@@ -69,8 +69,8 @@ Related chapters:
 
 > **Normative definition.**
 A child-create directive is the host-owned instruction that spawns a new
-live actor as a child of an existing parent agent, establishing a durable
-`child` relationship, allocating an address in the
+live actor as a child of an existing parent agent, establishing durable paired
+`child` and `parent` relationships, allocating an address in the
 [Agent Registry Activation Cancellation And Completion](22-agent-registry-activation-cancellation-and-completion.md),
 and binding the child to a deterministic request identity, lifecycle policy,
 grant scope, and initial state.
@@ -81,29 +81,88 @@ Every child-create directive MUST include the following fields:
 | Field | Content | Source |
 |-------|---------|--------|
 | `directive_id` | A deterministic request identity derived from parent address, artifact digest, manifest digest, initial state hash, owner address, lifecycle policy reference, grant scope hash, and a monotonic sequence number. | Directive construction. |
+| `directive_sequence` | The monotonic per-parent `u64` sequence reserved for this distinct directive. | Parent directive construction. |
+| `parent_address` | The `TenantQualifiedAgentAddress` of the existing parent agent. | Authenticated directive context. |
+| `child_address` | The canonical `TenantQualifiedAgentAddress` reserved for the prospective child before consent is signed. | Host address allocator. |
 | `artifact` | The WASM artifact digest and selection that the child's live actor will execute. | [Agent Manifests Artifacts Schemas And Registries](03-agent-manifests-artifacts-schemas-and-registries.md). |
 | `manifest` | The reviewed manifest record that declares the artifact's declared capabilities, input schema, output schema, and trust tier. | [Agent Manifests Artifacts Schemas And Registries](03-agent-manifests-artifacts-schemas-and-registries.md). |
 | `initial_state` | The serialized initial state document that becomes the child's first snapshot revision. | [State Operations Patches Revisions And Conflicts](12-state-operations-patches-revisions-and-conflicts.md). |
 | `owner` | The `TenantQualifiedAgentAddress` of the parent agent that created the child. | [Agent Identity Addressing Ownership And Dependency Relations](35-agent-identity-addressing-ownership-and-dependency-relations.md). |
 | `lifecycle_policy` | A reference to one of the restart policies defined in section 36.1, selecting the behavioral class for this child. | This chapter. |
 | `grants` | The attenuated grant scope inherited from the parent, subject to the limits defined in [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md). | [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md). |
+| `parent_consent` | The existing parent's ordinary signed target-consent record for the `parent` relationship from child to parent. | Parent agent principal. |
+| `bootstrap_consent` | The one-use `ChildBootstrapConsent` that authorizes the prospective child to become the target of the paired `child` relationship. | Authorized user or operator. |
 | `request_context` | Optional tenant-qualified metadata describing the originating user request or upstream directive that triggered the creation. | Host runtime. |
 
 > **Normative definition.**
-The `directive_id` is computed by hashing the concatenation of the parent
-agent address, artifact digest, manifest digest, initial state hash,
-owner address, lifecycle policy reference, grant scope hash, and a
-monotonic per-parent sequence counter, then encoding the resulting digest
-in the canonical string representation defined in
-[Agent Identity Addressing Ownership And Dependency Relations](35-agent-identity-addressing-ownership-and-dependency-relations.md).
+
+```
+ChildBootstrapConsent {
+  directive_id: string,
+  parent_address: TenantQualifiedAgentAddress,
+  prospective_child_address: TenantQualifiedAgentAddress,
+  artifact_digest: ArtifactDigest,
+  manifest_digest: string,
+  relationships: ["child:parent-to-child", "parent:child-to-parent"],
+  issued_by: PrincipalAddress,
+  issued_at: ISO8601,
+  expires_at: ISO8601,
+  nonce: string,
+  signature: bytes
+}
+```
+
+`issued_by.kind` MUST be `user` or `operator`. The signature MUST be Ed25519
+over the SHA-256 digest of the Canonical JSON encoding of the record with
+`signature` omitted. The authorizer MUST be authenticated, authorized to create
+the exact child, and in the same tenant unless an explicit cross-tenant grant
+authorizes the creation. `relationships` has the exact order and values shown.
+
+> **Normative definition.**
+The `directive_id` is the lowercase hexadecimal SHA-256 digest of a canonical
+byte sequence. In the order listed below, each of the first seven UTF-8
+components is encoded as an unsigned 64-bit big-endian byte length followed by
+exactly that many bytes:
+
+1. parent agent address;
+2. artifact digest;
+3. manifest digest;
+4. initial state hash;
+5. owner address;
+6. lifecycle policy reference;
+7. grant scope hash; and
+8. the unsigned 64-bit big-endian value of `directive_sequence`, a monotonic per-parent sequence
+   counter, appended as exactly eight bytes without a length prefix.
+
+The parent and owner components are their canonical address strings from
+Chapter 35. The artifact and manifest components are their exact canonical
+digest strings from Chapter 03. The initial-state and grant-scope components
+are lowercase hexadecimal SHA-256 digests of their Canonical JSON encodings
+under [Chapter 04](04-turn-lifecycle-protocols-and-canonical-encoding.md#canonical-json-encoding).
+The lifecycle-policy component is the exact lowercase policy name from this
+chapter. `directive_sequence` starts at 1, increases by one for each distinct
+directive constructed by that parent, and MUST NOT be reused. A retransmission
+MUST reuse the original `directive_sequence` and `directive_id` rather than
+construct a new directive. Zero or reuse for a distinct directive is malformed
+and MUST be rejected with `child.create.malformed`.
+The per-parent sequence allocator and the mapping from reserved sequence to
+`directive_id` MUST be durable and reserved atomically before directive
+emission.
+
+No separator, alternate hash algorithm, alternate component order, or wider
+counter scope is permitted.
+The resulting `directive_id` MUST contain exactly 64 lowercase hexadecimal
+characters; any other representation is malformed and MUST be rejected with
+`child.create.malformed`.
 The `directive_id` is deterministic: the same inputs in the same order
 always produce the same `directive_id`, regardless of the host process,
 engine instance, or physical node on which the directive is evaluated.
 
 > **Normative definition.**
 Deterministic `directive_id` values serve three purposes: (1) they enable
-exact deduplication of concurrent child-create requests that carry the
-same semantic content; (2) they provide a stable reference for lifecycle
+exact deduplication of retransmissions of the same constructed directive while
+keeping distinct same-content directives unique through the per-parent
+counter; (2) they provide a stable reference for lifecycle
 event correlation, allowing any `child.lifecycle.*` event to be traced
 back to the originating directive without requiring additional context;
 and (3) they enable replay of the child creation sequence from the durable
@@ -124,16 +183,35 @@ before admission:
    manifest that does not declare the artifact MUST be rejected with
    the diagnostic `child.create.manifest-artifact-mismatch`.
 4. The `initial_state` MUST be structurally valid against the manifest's
-   declared input schema.
+   declared input schema and MUST NOT exceed 65536 bytes. Exceeding this fixed
+   limit MUST be rejected with `child.create.initial-state-limit`.
 5. The `lifecycle_policy` reference MUST name a policy defined by this
    chapter's normative policy table.
 6. The `grants` scope MUST not exceed the parent's current grant scope.
-7. A child-create directive whose `directive_id` matches an already-admitted
+7. `parent_address` MUST be the authenticated parent constructing the directive,
+   `owner` MUST equal `parent_address`, and `child_address` MUST equal the
+   uncommitted address reservation named by both relationship records.
+8. `parent_consent` MUST be valid ordinary target consent for the `parent`
+   relationship from `child_address` to `parent_address`.
+9. `bootstrap_consent` MUST satisfy the fixed child-consent bootstrap in
+   Chapter 35, bind `directive_id`, `parent_address`, `child_address`, the two
+   fixed relationship directions, artifact and manifest digests, and remain
+   unused and unexpired. Through `directive_id`, it also binds initial state,
+   owner, lifecycle policy, grants, and `directive_sequence` without a circular
+   signature dependency.
+10. `directive_id` MUST equal the fixed SHA-256 construction above for the
+    directive fields and `directive_sequence`; a mismatch MUST be rejected with
+    `child.create.malformed`.
+11. A child-create directive whose `directive_id` matches an already-admitted
    directive (recorded in the durable state journal) MUST be rejected with
    the diagnostic `child.create.duplicate-directive-id`.
+12. The canonical string representation of the parent, owner, and allocated
+   child address MUST NOT exceed 256 characters. Exceeding this fixed
+   child-lifecycle address bound MUST be rejected with
+   `child.create.address-limit` before any registry entry is created.
 
 > **Non-normative note.**
-The seven validation rules above ensure that child creation is a
+The twelve validation rules above ensure that child creation is a
 governed, auditable, and replayable operation.
 Each rule maps to a specific existing chapter's contract, and failure
 at any rule prevents the child from entering any observable state.
@@ -147,10 +225,11 @@ The host MUST atomically commit the following state changes when admitting
 a child-create directive through the atomic commit protocol defined in
 [Atomic State Journal And Directive-Outbox Commits](26-atomic-state-journal-and-directive-outbox-commits.md):
 
-1. Write the child agent's registry entry (status: `pending`, address:
-   derived from the directive's deterministic construction).
-2. Create the `parent` relationship from parent to child and the
-   `child` relationship from child to parent.
+1. Write the child agent's registry entry with `status: pending` and the
+   directive's reserved `child_address`.
+2. Create the `child` relationship from parent to child and the `parent`
+   relationship from child to parent, consuming the validated
+   `parent_consent` and `bootstrap_consent` in the same commit.
 3. Record the `directive_id` in the durable journal with status
    `admitted`.
 4. Initialize the child's mailbox with the `child.lifecycle.accepted`
@@ -194,9 +273,28 @@ and semantic meaning.
 | `child.lifecycle.terminated` | The child's live actor is forcibly stopped by the host without a graceful cancellation flow. | `child_address`, `termination_id`, `reason`, `snapshot_at_termination`. |
 | `child.lifecycle.orphaned` | The parent agent that created the child is deleted, terminated, or becomes unresolvable while the child is still active. | `child_address`, `former_parent_address`, `orphan_reason`. |
 
+> **Normative definition.**
+`maximum_child_failure_message_bytes` is a named implementation limit. It MUST
+be a finite integer of at least 1024 and MUST be disclosed in the conformance
+profile; the default is 4096 bytes. A longer `failure_message` MUST be truncated
+at a valid UTF-8 boundary, and the host MUST emit
+`child.lifecycle.failure-message-truncated` with the original byte count and a
+SHA-256 digest of the untruncated message.
+
+> **Normative definition.**
+The canonical encoded payload of a child lifecycle event MUST NOT exceed 65536
+bytes. An event-causing request that would exceed this fixed bound MUST be
+rejected before state mutation with `child.lifecycle.event-payload-limit`.
+For child lifecycle events, this narrower bound and diagnostic explicitly
+replace the general 1 MiB `signal.oversized` rule in
+[Signal size bounds](10-signals-causality-routing-and-delivery.md#signal-size-bounds).
+
 > **Non-normative note.**
 The eight event types above cover the complete set of lifecycle transitions
 that a child agent can experience from creation through final resolution.
+Operational notification signals such as `child.lifecycle.retrying` and
+`child.lifecycle.pending-operator-approval` are not lifecycle event types and
+MUST NOT be accepted in a monitor subscription's `event_types` set.
 The separation between `cancelled` and `terminated` is intentional:
 `cancelled` indicates a graceful, acknowledged cancellation initiated by
 a directive; `terminated` indicates a forceful stop by the host, such as
@@ -253,8 +351,8 @@ Common causes include: engine instance failure, physical node failure,
 resource exhaustion (memory, CPU, storage), operator override, or
 infrastructure-level cancellation that cannot be propagated through the
 graceful cancellation flow defined below.
-The host MUST capture the child's snapshot at the moment of termination
-and record it as `snapshot_at_termination` in the evidence record defined
+The host MUST record the child's last completed durable revision as
+`snapshot_at_termination` in the evidence record defined
 in
 [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md).
 
@@ -262,8 +360,10 @@ in
 The `child.lifecycle.orphaned` event is emitted when the host detects
 that a child's parent agent is no longer resolvable in the durable
 registry or has reached a terminal status.
-Orphan detection is performed by the host's lifecycle monitor at
-intervals documented in the conformance profile.
+The host's lifecycle monitor MUST evaluate orphan status at least once every
+60 seconds. Its scheduling mechanism is internal, but for the same registry
+history it MUST emit the same orphan event no later than 60 seconds after the
+parent becomes terminal or unresolvable.
 When an orphan is detected, the host MUST evaluate the child's lifecycle
 policy to determine whether the child should be restarted, terminated,
 or held in a suspended state pending operator intervention.
@@ -298,6 +398,26 @@ Every cancellation MUST include the following fields:
 | `deadline` | An ISO 8601 timestamp after which the cancellation MUST be escalated to termination if acknowledgement has not been received. | Cancellation request. |
 | `propagation_direction` | The direction of cancellation propagation: `top-down` (from parent to child), `bottom-up` (from child to parent), or `bidirectional` (both directions). | Cancellation request. |
 | `grant_revocation_scope` | The scope of grants to revoke: `all`, `derived-only`, or `none`. | Cancellation request. |
+
+> **Normative definition.**
+The canonical `cancellation_id` MUST NOT exceed 256 characters. An otherwise
+valid cancellation with a longer identifier MUST be rejected with
+`child.cancellation.id-limit` without emitting an event or changing child
+state.
+
+> **Normative definition.**
+The `deadline` field is required; there is no default. It MUST be no earlier
+than receipt of the cancellation and no later than 600 seconds after receipt.
+A missing deadline or a deadline before receipt MUST be rejected with
+`child.cancellation.malformed`. A deadline more than 600 seconds after receipt
+MUST be rejected with `child.cancellation.deadline-limit` without emitting a
+cancellation event or changing child state. Deadline detection is internal, but
+every mechanism MUST make the same acknowledgement-versus-timeout decision at
+the specified instant.
+
+The optional human-readable cancellation-reason message MUST NOT exceed 1024
+characters. A longer message MUST be rejected with
+`child.cancellation.reason-limit` without changing child state.
 
 > **Normative definition.**
 The cancellation reason taxonomy is:
@@ -395,8 +515,9 @@ Hard stop behaviour is defined by the following invariants:
    escalation to termination.
 2. The host MUST NOT process additional signals for the child after
    hard stop.
-3. The host MUST capture the child's snapshot at the moment of hard
-   stop and record it as `snapshot_at_termination` in the evidence log.
+3. The host MUST record the child's last completed durable revision as
+   `snapshot_at_termination` in the evidence log. Mid-turn memory MUST NOT be
+   used as a recovery snapshot.
 4. The host MUST emit a `child.lifecycle.terminated` event into the
    child's mailbox with reason `hard-stop`.
 5. The host MUST revoke all grants associated with the child according
@@ -418,22 +539,17 @@ Hard stop is consistent with the Extism invocation boundary defined in
 [Extism Invocation Boundary Instances And Output Validation](20-extism-invocation-boundary-instances-and-output-validation.md).
 The Extism host MUST support immediate termination of a running instance
 without waiting for the guest to complete its current turn.
-The snapshot captured at hard stop is the guest's memory state at the
-moment the host issues the termination command, which may be mid-turn.
-This is acceptable because the snapshot is recorded as evidence and
-the child's next activation (if any) will start from a fresh initial
-state or from the last completed revision, as defined by the
-lifecycle policy.
+The snapshot captured at hard stop is the last completed durable revision.
+Volatile mid-turn memory MAY be retained only as redacted evidence and MUST NOT
+be used to reactivate the child.
 
-> **Normative implementation-defined choice.**
-The mechanism by which the host issues hard stop to the Extism instance
-is implementation-defined.
-Acceptable mechanisms include: sending a SIGKILL-equivalent signal to
-the guest process, invoking an Extism-native termination function, or
-using a host-level timeout that aborts the turn at its boundary.
-The implementation MUST document its hard stop mechanism in the
-conformance profile and MUST ensure that hard stop completes within a
-bounded time documented in the conformance profile.
+> **Normative definition.**
+The mechanism used to issue hard stop is internal. Every mechanism MUST prevent
+all further guest execution and signal processing, revoke grants, record the
+same last-completed snapshot and lifecycle event, and complete within 30
+seconds. Failure to complete within 30 seconds MUST emit
+`child.hard_stop.exhausted`, quarantine the instance, and leave the child in
+`terminated` state.
 
 > **Non-normative note.**
 The bounded-time requirement for hard stop is important because a host
@@ -514,7 +630,7 @@ A monitor subscription MUST include the following fields:
 
 | Field | Content | Source |
 |-------|---------|--------|
-| `subscriber_address` | The `TenantQualifiedAgentAddress` of the subscribing principal (parent, peer, or operator). | Subscription request. |
+| `subscriber_address` | The `AddressablePrincipal` of the subscriber. Parents and peers use `TenantQualifiedAgentAddress`; users and operators use `PrincipalAddress`. | Subscription request. |
 | `target_child` | The `TenantQualifiedAgentAddress` of the child to observe, or `null` to observe all children of the subscriber's tenant. | Subscription request. |
 | `event_types` | A subset of the eight child lifecycle event types defined in section 36.1, or `all` to observe every event type. | Subscription request. |
 | `subscription_id` | A deterministic identifier derived from the subscriber address, target child address, event types set, and a monotonic sequence counter. | Subscription construction. |
@@ -532,16 +648,12 @@ This design ensures that monitor subscriptions survive host restarts
 without requiring re-registration, and that subscribers do not hold
 resources that could leak if the host process crashes.
 
-> **Normative implementation-defined choice.**
-The mechanism by which the host evaluates active subscriptions against
-emitted events is implementation-defined.
-Acceptable mechanisms include: in-memory subscription tables evaluated
-at event emission time with durable subscription records for persistence
-across restarts, a subscription-aware event bus that fans events to
-matching subscribers, or a polling mechanism where subscribers query a
-durable event log for events matching their subscription criteria.
-The implementation MUST document its subscription evaluation mechanism
-in the conformance profile.
+> **Normative definition.**
+The mechanism used to evaluate active subscriptions is internal. For the same
+durable subscriptions and ordered lifecycle events, every mechanism MUST
+deliver the same `child.lifecycle.observed` signals in the same order, without
+duplicates beyond the specified at-least-once delivery behavior and without
+holding a durable live handle.
 
 > **Non-normative note.**
 The prohibition on persisting live monitor handles is a deliberate
@@ -559,7 +671,16 @@ or orphaned-and-deleted), the host MUST automatically close any open
 monitor subscriptions for that child by emitting a `subscription.closed`
 evidence record and removing the subscription from the active table.
 Closed subscriptions are NOT removed from the durable subscription log
-and MAY be replayed by subscribers that missed earlier events.
+for 24 hours and MAY be replayed by subscribers that missed earlier events
+during that period. At 24 hours the host MUST remove the closed subscription
+from the log and record a `subscription.retention-expired` evidence event.
+
+> **Normative definition.**
+`maximum_active_monitor_subscriptions_per_subscriber` is a named implementation
+limit. It MUST be a finite integer of at least 100 and MUST be disclosed in the
+conformance profile; the default is 100. An otherwise valid subscription that
+would exceed the disclosed limit MUST be rejected with
+`child.monitor.subscription-limit` without creating a durable record.
 
 > **Normative definition.**
 Every child lifecycle event emitted into the child's mailbox MUST also
@@ -628,14 +749,10 @@ is considered a terminal condition, such as batch processing tasks,
 one-time computations, or children whose sole purpose is to produce a
 single result.
 
-> **Normative implementation-defined choice.**
-The host MUST document the circumstances under which a `never` policy
-child is eligible for restart.
 Under no circumstances MAY the host restart a `never` policy child as
 a consequence of its own lifecycle policy evaluation.
-A `never` policy child MAY be restarted only if an operator issues an
-explicit restart directive through a mechanism outside the scope of this
-chapter, which is not a conformance requirement.
+An operator-issued restart mechanism is outside this chapter's scope and
+does not alter the `never` lifecycle policy.
 
 > **Normative definition.**
 The `bounded-retry` restart policy is the most commonly used policy for
@@ -657,6 +774,13 @@ The following parameters define the `bounded-retry` policy:
 | `non_restartable_failure_codes` | A list of failure codes for which the child is NOT restartable. | `policy-violation`, `malformed-state`, `unauthorized` |
 
 > **Normative definition.**
+`maximum_restart_attempts` is a named implementation limit. It MUST be a finite
+integer of at least 3 and MUST be disclosed in the conformance profile; the
+default is 3. A `bounded-retry` policy whose `max_attempts` exceeds the
+disclosed limit MUST be rejected with `child.lifecycle.restart.limit-exceeded`
+before child creation or policy replacement changes durable state.
+
+> **Normative definition.**
 The `bounded-retry` policy evaluates the child's failure code at each
 termination event.
 If the failure code is in the `non_restartable_failure_codes` list,
@@ -672,15 +796,16 @@ exponential backoff with a ceiling, as defined by the formula
 `delay(n) = min(initial_delay * (backoff_multiplier ** n), max_delay)`
 where `n` is the zero-indexed attempt number.
 The host MUST pause the child's live actor during the delay period and
-MUST NOT emit any lifecycle events other than the periodic `child.lifecycle.retrying`
-heartbeat (see the event types section below).
+MUST NOT emit any lifecycle event during that period. It MUST emit a periodic
+`child.lifecycle.retrying` operational notification signal containing
+`child_address`, `attempt_number`, `next_retry_at`, and `remaining_attempts`.
+This signal is not a lifecycle event and does not participate in lifecycle
+event sequencing or monitor-subscription matching.
 
 > **Non-normative note.**
-The formula above illustrates the exponential backoff computation
-used by the `bounded-retry` restart policy.
-It is provided for clarity and does not impose a specific implementation
-requirement beyond the bounded-time behavior defined in the surrounding
-normative text.
+The formula above defines the observable exponential backoff computation
+used by the `bounded-retry` restart policy. Implementations may vary internally,
+but MUST produce the exact delays required by the formula.
 
 > **Non-normative note.**
 The exponential backoff with a ceiling prevents both immediate retry
@@ -729,21 +854,23 @@ When a child with the `operator-approved` policy terminates due to a
 non-graceful reason, the host MUST:
 
 1. Transition the child to `suspended-pending-operator-approval` status.
-2. Emit a `child.lifecycle.pending-operator-approval` event into the
+2. Emit a `child.lifecycle.pending-operator-approval` operational notification
+   signal into the
    operator's mailbox (as defined in
    [Sensors Schedules Timers And External Signal Ingress](23-sensors-schedules-timers-and-external-signal-ingress.md)).
 3. Hold the child in the `suspended-pending-operator-approval` status
    until the operator issues an explicit restart directive or the child
    is explicitly terminated by the operator.
 
-> **Normative implementation-defined choice.**
-The mechanism by which the host notifies the operator of a
-`suspended-pending-operator-approval` child is implementation-defined.
-Acceptable mechanisms include: emitting a signal into the operator's
-mailbox, sending an out-of-band notification (email, webhook,
-messaging system), or setting a flag in the operator's dashboard.
-The implementation MUST document its operator notification mechanism
-in the conformance profile.
+> **Normative definition.**
+The host MUST notify the operator by emitting the
+`child.lifecycle.pending-operator-approval` operational notification signal,
+containing `child_address`, `operator_address`, `suspended_at`, and
+`reminder_number`, into the operator's mailbox. This signal is not a lifecycle
+event and does not participate in lifecycle event sequencing or
+monitor-subscription matching.
+Out-of-band email, webhook, or dashboard notifications MAY mirror that signal,
+but they MUST NOT replace it or alter restart authorization or timing.
 
 > **Normative definition.**
 An operator restart directive for a `operator-approved` policy child
@@ -751,7 +878,7 @@ MUST include the following fields:
 
 | Field | Content | Source |
 |-------|---------|--------|
-| `operator_address` | The `TenantQualifiedAgentAddress` of the operator issuing the directive. | Operator request. |
+| `operator_address` | The `PrincipalAddress` with `kind: "operator"` of the operator issuing the directive. | Operator request. |
 | `target_child` | The `TenantQualifiedAgentAddress` of the child to restart. | Operator request. |
 | `restart_nonce` | A random value that prevents replay of operator directives. | Operator request. |
 | `approved_at` | The ISO 8601 timestamp of operator approval. | Operator request. |
@@ -762,6 +889,12 @@ captures a previous operator approval and re-issues it to restart a
 child that the operator no longer wishes to restart.
 The nonce is recorded in the durable audit log and MUST be unique
 across all restart directives for the same child.
+
+> **Normative definition.**
+The `restart_nonce` MUST contain at least 128 bits of entropy from a
+cryptographically secure random source. A nonce with less entropy or a reused
+nonce MUST be rejected with `child.lifecycle.restart.nonce-invalid` before any
+restart state transition.
 
 > **Non-normative note.**
 The `operator-approved` policy is appropriate for child agents that
@@ -796,8 +929,8 @@ rules:
 2. If the termination directive is admitted before the child-create
    directive, the child-create directive MUST be rejected with the
    diagnostic `child.create.terminated-before-created` and the child
-   address MUST be reserved for the duration of the termination
-   processing to prevent a race-condition-based address reuse attack.
+   address MUST be reserved for exactly 30 seconds after termination admission
+   to prevent a race-condition-based address reuse attack.
 3. If both directives are admitted in the same journal commit, the
    child-create directive takes precedence and the termination
    directive is queued for application after the child reaches a
@@ -809,8 +942,7 @@ Without address reservation, an adversary could issue a termination
 directive for an address, then issue a child-create directive for the
 same address, causing the newly created child to inherit the terminated
 status and potentially bypass lifecycle policy evaluation.
-The reservation duration must be documented in the conformance profile
-and MUST be at least as long as the maximum termination processing time.
+The fixed 30-second reservation equals the hard-stop completion deadline.
 
 #### Parent loss
 
@@ -835,7 +967,7 @@ The host MUST handle parent loss according to the following rules:
    NOT restarted because parent loss is not an infrastructure failure.
 6. For the `operator-approved` policy: the child transitions to
    `suspended-pending-operator-approval` status and the operator
-   is notified via the mechanism defined in the restart-on-infrastructure-failure section.
+   is notified as defined in [Restart policies](#restart-policies).
 
 > **Non-normative note.**
 The differential handling of parent loss by restart policy reflects the
@@ -863,8 +995,8 @@ The host MUST handle initialization failure according to the following
 rules:
 
 1. If the child does not emit `child.lifecycle.initialized` within the
-   bounded initialization timeout (documented in the conformance
-   profile), the host MUST emit a `child.lifecycle.failed` event with
+   fixed 60-second initialization timeout, the host MUST emit a
+   `child.lifecycle.failed` event with
    failure code `initialization-timeout` and apply the child's restart
    policy to determine whether the child is restarted.
 2. If the child emits a `child.lifecycle.failed` event during
@@ -881,9 +1013,7 @@ rules:
 > **Non-normative note.**
 The bounded initialization timeout prevents children from being stuck
 in the `pending` status indefinitely due to a hung initialization.
-The timeout must be documented in the conformance profile and MUST be
-longer than the maximum expected initialization time for any valid
-manifest, with headroom for infrastructure latency.
+The timeout is 60 seconds from emission of `child.lifecycle.activated`.
 The differentiation between restartable and non-restartable initialization
 failures is consistent with the `bounded-retry` policy's treatment of
 other failure codes: transient initialization issues (such as missing
@@ -895,9 +1025,8 @@ structural issues (such as invalid initial state) are not.
 > **Normative definition.**
 Restart exhaustion occurs when a child with the `bounded-retry` policy
 has been restarted the maximum number of times (`max_attempts`) and
-has failed again, or when a child with the `operator-approved` policy
-has been terminated and the operator has not issued a restart directive
-within a reasonable time.
+has failed again. An `operator-approved` child does not exhaust while waiting;
+it remains suspended indefinitely as defined below.
 The host MUST handle restart exhaustion according to the following rules:
 
 1. For the `bounded-retry` policy: when the child has been restarted
@@ -907,8 +1036,9 @@ The host MUST handle restart exhaustion according to the following rules:
 2. For the `operator-approved` policy: the child remains in
    `suspended-pending-operator-approval` status indefinitely until the
    operator issues a restart directive or a termination directive.
-   The host MUST periodically (at intervals documented in the conformance
-   profile) emit a `child.lifecycle.pending-operator-approval` reminder
+   The host MUST emit a `child.lifecycle.pending-operator-approval` operational
+   reminder signal
+   every 3600 seconds
    into the operator's mailbox until the operator acts.
 
 > **Non-normative note.**
@@ -1093,69 +1223,70 @@ conflict on a behavior question, the following precedence rules apply:
 
 ## Variability register
 
-The following table enumerates every `MAY`, `SHOULD`, `SHOULD NOT`,
-implementation-defined choice, implementation limit, and permitted
-variation in this section, synchronized with the specification area's
-variability register.
+The register below summarizes fixed behavior, internal mechanisms, named
+implementation limits, and permitted variations governed by the linked
+clauses. It does not independently license variation.
+
+> **Non-normative note.**
 
 | Clause | Variability class | Selection |
 |--------|------------------|-----------|
-| 36.1 Child-create directives | Normative implementation-defined choice | The separator character used in the deterministic `directive_id` hash input. Must not collide with any component of the parent address, artifact digest, manifest digest, initial state hash, owner address, lifecycle policy reference, or grant scope hash. |
-| 36.1 Child-create directives | Normative implementation-defined choice | The exact hash function (SHA-256, SHA-3, BLAKE2s, or equivalent) used to compute the `directive_id`. Must produce a collision-resistant digest of at least 256 bits. |
-| 36.1 Child-create directives | Normative implementation-defined choice | The monotonic sequence counter scope: per-parent, per-tenant, or global. Must be documented in the conformance profile. |
-| 36.1 Child lifecycle events | Normative implementation-defined choice | The maximum size of the `failure_message` field in `child.lifecycle.failed` events, in bytes. Must be at least 1024 bytes and documented in the conformance profile. |
-| 36.1 Cancellation scope and propagation | Normative implementation-defined choice | The default `deadline` duration for cancellations not explicitly specifying a deadline. Must be at least 30 seconds and documented in the conformance profile. |
-| 36.1 Cancellation scope and propagation | Normative implementation-defined choice | The maximum `deadline` duration. Must be at least 600 seconds (10 minutes) and documented in the conformance profile. |
-| 36.1 Cancellation scope and propagation | Normative implementation-defined choice | The mechanism by which the host detects that a child has not acknowledged a cancellation within the `deadline`. Must be documented in the conformance profile. |
-| 36.1 Hard-stop behavior | Normative implementation-defined choice | The mechanism by which the host issues hard stop to the Extism instance (SIGKILL-equivalent signal, Extism-native termination function, or host-level turn boundary timeout). Must be documented in the conformance profile. |
-| 36.1 Hard-stop behavior | Normative implementation-defined choice | The bounded time within which hard stop must complete. Must be at most 30 seconds and documented in the conformance profile. |
-| 36.1 Hard-stop behavior | Normative implementation-defined choice | The snapshot capture granularity at hard stop: full memory snapshot, last-completed-turn snapshot, or partial-turn snapshot. Must be documented in the conformance profile. |
-| 36.1 Orphan detection | Normative implementation-defined choice | The interval at which the host's lifecycle monitor performs orphan detection. Must be at most 60 seconds and documented in the conformance profile. |
-| 36.1 Orphan detection | Normative implementation-defined choice | The resolution strategy for orphaned children whose lifecycle policy is `operator-approved` and no operator is available: hold indefinitely, terminate, or migrate to a default owner. Must be documented in the conformance profile. |
-| 36.2 Monitor subscriptions | Normative implementation-defined choice | The mechanism by which the host evaluates active subscriptions against emitted events (in-memory tables, subscription-aware event bus, or polling). Must be documented in the conformance profile. |
-| 36.2 Monitor subscriptions | Normative implementation-defined choice | The maximum number of active monitor subscriptions per subscriber. Must be at least 100 and documented in the conformance profile. |
-| 36.2 Monitor subscriptions | Normative implementation-defined choice | The retention period for closed monitor subscriptions in the durable subscription log. Must be at least 24 hours and documented in the conformance profile. |
-| 36.2 Restart policies | Normative implementation-defined choice | The default parameter values for the `bounded-retry` restart policy (max_attempts, initial_delay, max_delay, backoff_multiplier, restartable_failure_codes, non_restartable_failure_codes). Must be documented in the conformance profile. |
-| 36.2 Restart policies | Normative implementation-defined choice | The mechanism by which the host notifies the operator of a `suspended-pending-operator-approval` child (mailbox signal, webhook, email, dashboard flag). Must be documented in the conformance profile. |
-| 36.2 Restart policies | Normative implementation-defined choice | The maximum restart_nonce entropy (in bits) for operator-approved restart directives. Must be at least 128 bits and documented in the conformance profile. |
-| 36.2 Failure scenarios | Normative implementation-defined choice | The address reservation duration for create/terminate races, in seconds. Must be at least 30 seconds and documented in the conformance profile. |
-| 36.2 Failure scenarios | Normative implementation-defined choice | The bounded initialization timeout for child live actors, in seconds. Must be at least 60 seconds and documented in the conformance profile. |
-| 36.2 Failure scenarios | Normative implementation-defined choice | The periodic reminder interval for `operator-approved` children in `suspended-pending-operator-approval` status, in seconds. Must be at most 3600 seconds (1 hour) and documented in the conformance profile. |
+| [36.1 Child-create directives](#child-create-directives) | Required | Length-prefixed canonical input, SHA-256, and a per-parent `u64` sequence counter. |
+| [36.1 Child relationship bootstrap consent](#child-create-directives) | Required | One-use Ed25519 consent over the exact prospective child creation; consume atomically with correctly directed `child` and `parent` relationships. |
+| [36.1 Child lifecycle events](#child-event-types) | Named implementation limit | `maximum_child_failure_message_bytes`, at least 1024 bytes; default 4096. |
+| [36.1 Child address bound](#child-create-directives) | Required fixed limit | 256 canonical characters; use `child.create.address-limit`. |
+| [36.1 Initial-state bound](#child-create-directives) | Required fixed limit | 65536 bytes; use `child.create.initial-state-limit`. |
+| [36.1 Lifecycle-event bound](#child-event-types) | Required fixed limit | 65536 canonical bytes; use `child.lifecycle.event-payload-limit` instead of the general signal-size diagnostic. |
+| [36.1 Cancellation scope and propagation](#cancellation-scope-reason-deadline-and-propagation) | Required | `deadline` is required and must be between receipt time and receipt plus 600 seconds. |
+| [36.1 Cancellation identifier bound](#cancellation-scope-reason-deadline-and-propagation) | Required fixed limit | 256 canonical characters; use `child.cancellation.id-limit`. |
+| [36.1 Cancellation reason bound](#cancellation-scope-reason-deadline-and-propagation) | Required fixed limit | 1024 characters; use `child.cancellation.reason-limit`. |
+| [36.1 Cancellation deadline detection](#cancellation-scope-reason-deadline-and-propagation) | Internal mechanism | Must make the same decision at the specified deadline instant. |
+| [36.1 Hard-stop behavior](#hard-stop-behavior) | Internal mechanism | Must preserve termination, grant-revocation, snapshot, event, and diagnostic outcomes. |
+| [36.1 Hard-stop deadline](#hard-stop-behavior) | Required | Complete within 30 seconds or emit `child.hard_stop.exhausted`. |
+| [36.1 Hard-stop snapshot](#hard-stop-behavior) | Required | Record the last completed durable revision; never recover from mid-turn memory. |
+| [36.1 Orphan detection](#child-event-types) | Required | Evaluate at least every 60 seconds. |
+| [36.2 Operator-approved orphan handling](#failure-scenarios) | Required | Hold indefinitely until an operator restart or termination directive. |
+| [36.2 Monitor subscription evaluation](#monitor-subscriptions-and-durable-lifecycle-notifications) | Internal mechanism | Preserve matching, ordering, delivery, and duplicate behavior. |
+| [36.2 Active monitor subscriptions](#monitor-subscriptions-and-durable-lifecycle-notifications) | Named implementation limit | `maximum_active_monitor_subscriptions_per_subscriber`, at least 100; default 100. |
+| [36.2 Subscriber and operator addressing](#monitor-subscriptions-and-durable-lifecycle-notifications) | Required | Agents use `TenantQualifiedAgentAddress`; non-agent users and operators use canonical `PrincipalAddress`. |
+| [36.2 Closed subscription retention](#monitor-subscriptions-and-durable-lifecycle-notifications) | Required | Retain for 24 hours, then remove with evidence. |
+| [36.2 Bounded-retry defaults](#restart-policies) | Required | Use the fixed parameter table in the governing clause. |
+| [36.2 Restart attempts](#restart-policies) | Named implementation limit | `maximum_restart_attempts`, at least 3; default 3. |
+| [36.2 Operator notification](#restart-policies) | Required | Deliver the mailbox signal; mirrors are optional and non-authoritative. |
+| [36.2 Restart nonce](#restart-policies) | Required | At least 128 bits of cryptographic entropy and no reuse. |
+| [36.2 Create/terminate reservation](#failure-scenarios) | Required | Reserve the address for 30 seconds. |
+| [36.2 Initialization timeout](#failure-scenarios) | Required | 60 seconds after activation. |
+| [36.2 Operator reminder](#failure-scenarios) | Required | Emit every 3600 seconds while approval is pending. |
+| [36.3 Diagnostic format](#fixed-diagnostic-and-evidence-behavior) | Required | Canonical UTF-8 JSON using the exact Chapter 04 top-level structure and bounded child-lifecycle details. |
+| [36.3 Evidence retention](#fixed-diagnostic-and-evidence-behavior) | Required | Retain while non-terminal and for 365 days after terminal resolution. |
+| [36.3 Diagnostic delivery](#fixed-diagnostic-and-evidence-behavior) | Required | Return to requester, append to evidence, and notify operator mailbox when applicable. |
+| [36.3 Restart-state sampling](#fixed-diagnostic-and-evidence-behavior) | Required | Record every attempt boundary and policy-state transition. |
+| [36.1 Volatile hard-stop evidence](#hard-stop-behavior) | Optional | Retain only redacted evidence | Must never be used for reactivation. |
+| [36.2 Closed-subscription replay](#monitor-subscriptions-and-durable-lifecycle-notifications) | Optional | Replay only during the fixed 24-hour retention period | Must preserve event order and at-least-once behavior. |
+| [36.2 Operator notification mirrors](#restart-policies) | Optional | Mailbox delivery remains authoritative | Mirrors must not alter authorization or timing. |
+| [36.3 Continuous restart-state sampling](#fixed-diagnostic-and-evidence-behavior) | Optional | Add to required boundary records | Must not replace a required record. |
 
-### Implementation limits
+### Fixed bounds and implementation limits
 
-| Limit | Minimum value | Notes |
-|-------|--------------|-------|
-| Maximum child address length | 256 characters | Consistent with
-  [Agent Identity Addressing Ownership And Dependency Relations](35-agent-identity-addressing-ownership-and-dependency-relations.md). |
-| Maximum `directive_id` length | 256 characters | Deterministic hash digest encoding. |
-| Maximum `cancellation_id` length | 256 characters | Deterministic hash digest encoding. |
-| Maximum lifecycle event payload size | 64 KB | Consistent with
-  [Signal Envelopes Causality Routing And Delivery](10-signals-causality-routing-and-delivery.md). |
-| Maximum cancellation reason message length | 1024 characters | Human-readable message field. |
-| Maximum grant revocation scope list | Unbounded by default | Hosts MAY impose local limits through policy. |
-| Maximum active monitor subscriptions per subscriber | 100 | Consistent with mailbox turn lease limits. |
-| Maximum operator restart_nonce entropy | 128 bits | Prevents replay attacks. |
-| Maximum subscription closed-log retention | Unbounded by default | Hosts MAY impose local limits; must be at least 24 hours. |
+| Bound | Class | Required value or floor | Exhaustion behavior |
+|-------|-------|-------------------------|---------------------|
+| Child address | Fixed limit | 256 canonical characters | Reject with `child.create.address-limit`. |
+| `directive_id` representation | Required formation rule | Exactly 64 lowercase hexadecimal characters | Reject malformed representations with `child.create.malformed`. |
+| `cancellation_id` | Fixed limit | 256 canonical characters | Reject with `child.cancellation.id-limit`. |
+| Child `initial_state` | Fixed limit | 65536 bytes | Reject with `child.create.initial-state-limit`. |
+| Lifecycle event payload | Fixed limit | 65536 canonical bytes | Reject with `child.lifecycle.event-payload-limit`. |
+| Cancellation reason message | Fixed limit | 1024 characters | Reject with `child.cancellation.reason-limit`. |
+| `maximum_child_failure_message_bytes` | Named implementation limit | At least 1024 bytes; default 4096 | Truncate at a UTF-8 boundary and emit `child.lifecycle.failure-message-truncated`. |
+| `maximum_active_monitor_subscriptions_per_subscriber` | Named implementation limit | At least 100; default 100 | Reject with `child.monitor.subscription-limit`. |
+| `maximum_restart_attempts` | Named implementation limit | At least 3; default 3 | Reject with `child.lifecycle.restart.limit-exceeded`. |
 
-### Permitted variations
+### Closed vocabularies
 
-The following variations are permitted by this specification and MUST
-be documented in the conformance profile when selected:
-
-1. **Additional cancellation reason codes**: Hosts MAY define additional
-   cancellation reason codes beyond the taxonomy defined in this section,
-   provided they do not conflict with the existing codes and are documented
-   in the conformance profile.
-2. **Additional child lifecycle event types**: Hosts MAY define additional
-   child lifecycle event types for implementation-specific observations
-   (e.g., `child.lifecycle.migration-started`), provided they do not
-   conflict with the existing event types and are documented in the
-   conformance profile.
-3. **Additional propagation directions**: Hosts MAY define additional
-   propagation directions beyond `top-down`, `bottom-up`, and
-   `bidirectional`, provided they are documented in the conformance profile
-   and do not violate the acknowledgement flow defined in this section.
+The cancellation reason taxonomy, the eight child lifecycle event types, and the
+three propagation directions are closed. An unknown value is malformed and
+MUST be rejected with `child.cancellation.malformed` or
+`child.monitor.malformed`, as applicable. Adding a value requires a versioned
+normative revision; a conformance profile cannot extend these vocabularies.
 
 ### Exclusions
 
@@ -1195,6 +1326,8 @@ cancellation monitoring and restart policy:
    monitor subscription quota, grant scope).
 6. **Unavailable**: The child agent, the host's lifecycle monitor, or a
    required dependency is unavailable.
+7. **Timeout**: A required acknowledgement or hard-stop operation exceeds its
+   fixed deadline.
 
 > **Normative definition.**
 Each failure outcome MUST be mapped to a specific error code and diagnostic
@@ -1213,52 +1346,81 @@ monitoring and restart policy:
 | `child.create.malformed` | Child-create directive fails schema validation |
 | `child.create.manifest-artifact-mismatch` | Manifest does not declare the artifact (see [Agent Manifests Artifacts Schemas And Registries](03-agent-manifests-artifacts-schemas-and-registries.md)) |
 | `child.create.duplicate-directive-id` | Directive ID matches already-admitted directive |
+| `relationship.creation.unauthorized-consent` | Required parent consent or one-use prospective-child bootstrap consent is missing or invalid |
+| `child.create.terminated-before-created` | Termination for the reserved child address was admitted before creation |
 | `child.create.unauthorized` | Owner address not active in durable registry (see [Agent Registry Activation Cancellation And Completion](22-agent-registry-activation-cancellation-and-completion.md)) |
 | `child.create.incompatible` | Lifecycle policy reference does not name a defined policy |
 | `child.create.exhausted` | Restart budget or subscription quota exhausted (see [Retry Timer Recovery Replay Hibernate And Migration](28-retry-timer-recovery-replay-hibernate-and-migration.md)) |
+| `child.create.address-limit` | Parent, owner, or allocated child address exceeds 256 canonical characters |
+| `child.create.initial-state-limit` | Child initial state exceeds 65536 bytes |
 | `child.create.unavailable` | Agent registry or manifest registry unavailable |
 | `child.lifecycle.unauthorized` | Subscriber lacks `observe.child.lifecycle` capability (see [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md)) |
+| `child.lifecycle.event-payload-limit` | Lifecycle event payload exceeds 65536 bytes |
 | `child.lifecycle.subscription.conflict` | Multiple subscription requests for same child and event set concurrently |
+| `child.lifecycle.failure-message-truncated` | Failure message exceeded the disclosed byte limit and was truncated with digest evidence |
 | `child.lifecycle.grant_revocation.unauthorized` | Cancelling principal lacks grant revocation capability |
 | `child.lifecycle.restart.exhausted` | `bounded-retry` policy `max_attempts` reached |
+| `child.lifecycle.restart.limit-exceeded` | `max_attempts` exceeds `maximum_restart_attempts` |
+| `child.lifecycle.restart.nonce-invalid` | Restart nonce has insufficient entropy or was already used |
 | `child.lifecycle.restart.policy-violation` | Non-restartable failure code encountered |
 | `child.lifecycle.parent-loss.unauthorized` | Operator lacks parent-loss resolution capability |
 | `child.cancellation.unauthorized` | Cancelling principal lacks cancellation capability for target child |
+| `child.cancellation.malformed` | Cancellation directive is missing a required field or has an invalid field shape |
 | `child.cancellation.conflict` | Cancellation conflicts with in-flight restart or lifecycle transition |
+| `child.cancellation.deadline-limit` | Cancellation deadline is more than 600 seconds after receipt |
+| `child.cancellation.id-limit` | Cancellation identifier exceeds 256 canonical characters |
+| `child.cancellation.reason-limit` | Cancellation reason exceeds 1024 characters |
 | `child.cancellation.unavailable` | Child live actor or mailbox unavailable during cancellation |
 | `child.hard_stop.exhausted` | Hard stop exceeds bounded time |
 | `child.acknowledgement.timeout` | Cancellation acknowledgement timeout (see [Extism Invocation Boundary Instances And Output Validation](20-extism-invocation-boundary-instances-and-output-validation.md)) |
+| `child.monitor.malformed` | Monitor subscription uses an unknown lifecycle event type or invalid field shape |
+| `child.monitor.subscription-limit` | Active monitor subscriptions exceed the disclosed per-subscriber limit |
 | `child.monitor.unavailable` | Lifecycle monitor or subscription evaluation unavailable |
 
 > **Normative definition.**
+Each diagnostic uses one of the following stable Chapter 02 family codes:
+
+| Family | Domain codes |
+|--------|--------------|
+| `identity.validation.child_lifecycle` | `child.create.malformed`, `child.lifecycle.restart.nonce-invalid`, `child.cancellation.malformed`, `child.monitor.malformed` |
+| `identity.compatibility.child_lifecycle` | `child.create.manifest-artifact-mismatch`, `child.create.incompatible`, `child.lifecycle.restart.policy-violation` |
+| `identity.conflict.child_lifecycle` | `child.create.duplicate-directive-id`, `child.create.terminated-before-created`, `child.lifecycle.subscription.conflict`, `child.cancellation.conflict` |
+| `identity.authorization.child_lifecycle` | `child.create.unauthorized`, `relationship.creation.unauthorized-consent`, `child.lifecycle.unauthorized`, `child.lifecycle.grant_revocation.unauthorized`, `child.lifecycle.parent-loss.unauthorized`, `child.cancellation.unauthorized` |
+| `identity.limit.child_lifecycle` | `child.create.exhausted`, `child.create.address-limit`, `child.create.initial-state-limit`, `child.lifecycle.event-payload-limit`, `child.lifecycle.failure-message-truncated`, `child.lifecycle.restart.exhausted`, `child.lifecycle.restart.limit-exceeded`, `child.cancellation.deadline-limit`, `child.cancellation.id-limit`, `child.cancellation.reason-limit`, `child.hard_stop.exhausted`, `child.acknowledgement.timeout`, `child.monitor.subscription-limit` |
+| `identity.resource.child_lifecycle` | `child.cancellation.unavailable`, `child.monitor.unavailable` |
+| `identity.storage.child_lifecycle` | `child.create.unavailable` |
+
+> **Normative definition.**
 Each error code MUST be accompanied by a human-readable diagnostic message.
-The diagnostic message MUST identify the phase contract, profile, and failed
-boundary without exposing secrets.
+The diagnostic's `details` MUST identify the phase contract, profile, and
+failed boundary without exposing secrets.
 
 ### Bounded diagnostics
 
 > **Normative definition.**
-The host MUST emit bounded diagnostics for each failure outcome.
-The diagnostics MUST include:
+The host MUST emit bounded diagnostics for each failure outcome using the exact
+top-level `Diagnostic` structure defined in
+[Turn Lifecycle Protocols And Canonical Encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md#diagnostics):
+`family`, `code`, `severity`, `message`, and `details`.
+`family` MUST be the family assigned above and `code` MUST be the specific
+closed-table domain code. `severity` MUST be `error`, except
+`child.lifecycle.failure-message-truncated` uses `warning`. `message` MUST be a
+human-readable description that does not expose secrets.
 
-1. **Error code**: The specific error code from the table above.
-2. **Context**: The operation that failed (e.g., child-create admission,
-   cancellation propagation, restart evaluation, subscription delivery).
-3. **Entity identifiers**: The `child_address`, `directive_id`,
-   `cancellation_id`, `subscription_id`, or `subscriber_address` involved
-   (without exposing sensitive data).
-4. **Timestamp**: The time the error occurred.
-5. **Retryable**: Whether the operation can be retried.
-6. **Restart policy impact**: If the failure interacts with a restart
-   policy, the diagnostic MUST indicate whether the failure is restartable
-   or terminal per the policy definition.
+The `details` object MUST include `phase`, `contract`, `profile`,
+`failed_boundary`, `context`, `entity_identifiers`, `timestamp`, and
+`retryable`. `entity_identifiers` contains the applicable `child_address`,
+`directive_id`, `cancellation_id`, `subscription_id`, or `subscriber_address`
+without exposing sensitive data. If the failure interacts with a restart
+policy, `details` MUST also include `restart_policy_impact` with value
+`restartable` or `terminal`.
 
 > **Normative definition.**
 The host MUST NOT expose internal implementation details, secrets, or
 sensitive data in diagnostics.
 
 > **Non-normative note.**
-The `Restart policy impact` field is a critical differentiator for this
+The `restart_policy_impact` detail is a critical differentiator for this
 chapter's diagnostics.
 Because child lifecycle failures are evaluated against restart policies,
 an operator MUST be able to distinguish from the diagnostic alone whether
@@ -1271,7 +1433,8 @@ This is consistent with the bounded-diagnostic requirement defined in
 > **Normative definition.**
 The host MUST record the following evidence for each failure outcome:
 
-1. **Error code and diagnostic**: As defined in the diagnostics section.
+1. **Diagnostic family, code, and canonical diagnostic**: As defined in the
+   diagnostics section.
 2. **Child address**: The `TenantQualifiedAgentAddress` of the affected child.
 3. **Directive identity** (if applicable): The `directive_id` or
    `cancellation_id` associated with the failed operation.
@@ -1295,29 +1458,31 @@ The `restart_policy_state` field is specific to child lifecycle and
 enables operators to reconstruct the full restart sequence for a failed
 child without consulting additional subsystem logs.
 
-### Implementation-defined choices
+### Fixed diagnostic and evidence behavior
 
-> **Normative implementation-defined choice.**
-The following choices are implementation-defined and MUST be documented in the
-conformance profile:
+> **Normative definition.**
+The error-code table above is closed. A diagnostic MUST NOT use an unlisted
+domain `code`. Diagnostics MUST be UTF-8 canonical JSON encodings of the exact
+Chapter 04 top-level structure and MUST use the canonical member ordering defined by
+[Turn Lifecycle Protocols And Canonical Encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md#canonical-json-encoding).
 
-1. **Error code taxonomy extension**: Hosts MAY define additional error
-   codes beyond the table above for implementation-specific observations.
-   Additional codes MUST not conflict with the existing codes and MUST be
-   documented in the conformance profile.
-2. **Diagnostic format**: The exact format of diagnostic messages is
-   implementation-defined, provided they satisfy the bounded-diagnostic
-   requirements above.
-3. **Evidence retention**: The retention period for failure evidence records
-   is implementation-defined, provided it is at least as long as the
-   maximum restart budget (e.g., `max_attempts` for `bounded-retry`) plus
-   the operator-approved suspension period.
-4. **Diagnostic delivery**: The mechanism by which diagnostics are delivered
-   to operators (log file, structured output, external monitoring system)
-   is implementation-defined.
-5. **Restart policy state sampling**: The granularity of restart policy
-   state recording (e.g., every attempt boundary vs. continuous state) is
-   implementation-defined.
+> **Normative definition.**
+Failure evidence for a child that has not reached terminal status MUST be
+retained while that status persists. After terminal resolution, the evidence
+MUST be retained for 365 days and then deleted through an audited deletion.
+
+> **Normative definition.**
+A diagnostic MUST be returned to the requesting principal when a request is
+active and MUST always be appended to the durable evidence log. A diagnostic
+requiring operator action MUST also be emitted into the operator mailbox. Logs,
+webhooks, and dashboards MAY mirror these deliveries but MUST NOT replace or
+change them.
+
+> **Normative definition.**
+Restart policy state MUST be recorded at every attempt start, attempt
+completion, attempt failure, backoff scheduling decision, approval decision,
+and lifecycle-policy state transition. Continuous sampling MAY add evidence but
+MUST NOT replace any required boundary record.
 
 ### Deferred work
 
@@ -1362,8 +1527,8 @@ assumptions:
 4. **Cancellation acknowledgement latency**: If cancellation acknowledgement
    latency exceeds the `deadline`, the deadline or cancellation flow MUST
    be revised.
-5. **Hard stop bounded time**: If hard stop exceeds the bounded time
-   documented in the conformance profile, the Extism invocation boundary
+5. **Hard stop bounded time**: If hard stop exceeds the fixed 30-second
+   deadline, the Extism invocation boundary
    MUST be revised to support faster termination.
 6. **Duplicate event frequency**: If duplicate event delivery frequency is
    higher than expected, the mailbox ordering and delivery guarantees
@@ -1388,7 +1553,7 @@ dependency boundaries of the multi-agent coordination subsystem.
 Integration tests MUST exercise observable contracts rather than private
 implementation structure.
 This section defines the canonical test scenarios that MUST be run before
-this chapter may be promoted from `status: draft` to `status: normative`.
+this chapter may be promoted from `status: candidate` to `status: normative`.
 
 > **Normative definition.**
 The following test objectives are the normative goals for Phase 2 integration
@@ -1427,7 +1592,8 @@ behavior, and the retention requirements for test evidence.
 | Test ID | Description |
 |---------|-------------|
 | `P2-SF-001` | Create a child with a valid child-create directive and verify that all five atomic commit steps are executed (registry entry, parent/child relationships, directive journal entry, mailbox initialization, evidence emission). |
-| `P2-SF-002` | Create a child with a deterministic `directive_id` and verify that two identical directives produce the same `directive_id`. |
+| `P2-SF-001A` | Verify the paired relationships are `child` from parent to child and `parent` from child to parent, the parent supplies ordinary target consent, and the prospective child's one-use bootstrap consent is consumed atomically. |
+| `P2-SF-002` | Evaluate the identity construction twice from the same fixed component and `directive_sequence` test vector and verify the same `directive_id`; increment only the sequence and verify a different ID; restart the host and verify the per-parent allocator resumes without reuse. |
 | `P2-SF-003` | Create a child with all four restart policy types and verify that each policy is correctly recorded in the registry entry. |
 | `P2-SF-004` | Create a child with an attenuated grant scope and verify that the child's grants are strictly a subset of the parent's grants as defined in
 [Capability Policy Attenuation Limits And Enforcement](31-capability-policy-attenuation-limits-and-enforcement.md). |
@@ -1444,8 +1610,8 @@ durable state journal as defined in
 Test `P2-SF-002` validates the determinism invariant of `directive_id`
 construction.
 This is a critical property for replay and deduplication.
-Without determinism, the same semantic directive could produce different
-identities on different hosts, breaking the durable journal replay
+Without determinism, the same constructed directive and reserved counter could
+produce different identities on different hosts, breaking the durable journal replay
 guarantees defined in
 [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md).
 
@@ -1472,7 +1638,7 @@ events under both success and failure conditions.
 | Test ID | Description |
 |---------|-------------|
 | `P2-SF-011` | Create a monitor subscription for a child's lifecycle events and verify that the subscriber receives a `child.lifecycle.observed` signal for every matching event. |
-| `P2-SF-012` | Create a monitor subscription with `event_types: all` and verify that the subscriber receives signals for all eight event types. |
+| `P2-SF-012` | Create a tenant-wide monitor subscription with `target_child: null` and `event_types: all`; exercise separate children as needed and verify that the subscriber receives signals for all eight event types but does not receive operational notification signals. |
 | `P2-SF-013` | Create a monitor subscription with a specific `event_types` subset and verify that the subscriber does NOT receive signals for events outside the subset. |
 | `P2-SF-014` | Create a monitor subscription with `target_child: null` and verify that the subscriber receives signals for all children of the subscriber's tenant. |
 | `P2-SF-015` | Delete a child and verify that the monitor subscription is automatically closed with a `subscription.closed` evidence record. |
@@ -1542,8 +1708,9 @@ and the state invariants that MUST hold after the failure.
 | `P2-FH-001` | Child-create directive with missing `artifact` field. | `child.create.malformed` |
 | `P2-FH-002` | Child-create directive with `artifact` field that is not a valid digest. | `child.create.malformed` |
 | `P2-FH-003` | Child-create directive with `initial_state` that is not valid JSON. | `child.create.malformed` |
-| `P2-FH-004` | Cancellation directive with missing `cancellation_id` field. | `child.cancellation.unavailable` |
-| `P2-FH-005` | Monitor subscription with `event_types` containing an unknown event type. | `child.lifecycle.unauthorized` |
+| `P2-FH-003A` | Child-create directive with missing, expired, reused, incorrectly scoped, or invalidly signed `parent_consent` or `bootstrap_consent`. | `relationship.creation.unauthorized-consent` |
+| `P2-FH-004` | Cancellation directive with missing `cancellation_id` field. | `child.cancellation.malformed` |
+| `P2-FH-005` | Monitor subscription with `event_types` containing an unknown event type. | `child.monitor.malformed` |
 
 > **Normative definition.**
 Each malformed input test MUST verify that the host: (1) rejects the
@@ -1565,7 +1732,7 @@ guarantees defined in
 |---------|-------------|---------------------|
 | `P2-FH-006` | Child-create directive with `lifecycle_policy` that does not name a defined policy. | `child.create.incompatible` |
 | `P2-FH-007` | Child-create directive with `manifest` digest that does not correspond to `artifact` digest. | `child.create.manifest-artifact-mismatch` |
-| `P2-FH-008` | Cancellation directive with `reason` code not in the cancellation reason taxonomy. | `child.cancellation.unauthorized` |
+| `P2-FH-008` | Cancellation directive with `reason` code not in the cancellation reason taxonomy. | `child.cancellation.malformed` |
 
 > **Normative definition.**
 Each incompatible input test MUST verify that the host rejects the directive
@@ -1621,24 +1788,44 @@ state corruption and resource leaks.
 
 | Test ID | Description | Expected behavior |
 |---------|-------------|-------------------|
-| `P2-FH-015` | Child-create directive with `initial_state` at the maximum payload size (64 KB). | Directive is admitted successfully if structurally valid. |
-| `P2-FH-016` | Child-create directive with `initial_state` exceeding the maximum payload size (64 KB). | Directive is rejected with `child.create.malformed`. |
-| `P2-FH-017` | Monitor subscription at the maximum active subscription limit (100 per subscriber). | Subscription is admitted successfully. |
-| `P2-FH-018` | Monitor subscription exceeding the maximum active subscription limit (101 per subscriber). | Subscription is rejected with `child.create.exhausted`. |
-| `P2-FH-019` | `bounded-retry` policy with `max_attempts` at the implementation-defined maximum. | Policy is applied correctly with the maximum number of restart attempts. |
-| `P2-FH-020` | Cancellation with `deadline` at the maximum allowed duration. | Cancellation is admitted and the deadline is enforced. |
+| `P2-FH-015` | Child-create directive with `initial_state` of exactly 65536 bytes. | Directive is admitted successfully if structurally valid. |
+| `P2-FH-016` | Child-create directive with `initial_state` of 65537 bytes. | Directive is rejected with `child.create.initial-state-limit`. |
+| `P2-FH-017` | Monitor subscription at `maximum_active_monitor_subscriptions_per_subscriber`. | Subscription is admitted successfully. |
+| `P2-FH-018` | Monitor subscription at `maximum_active_monitor_subscriptions_per_subscriber + 1`. | Subscription is rejected with `child.monitor.subscription-limit`. |
+| `P2-FH-019` | `bounded-retry` policy with `max_attempts` equal to the disclosed `maximum_restart_attempts` implementation limit. | Policy is applied correctly with the maximum number of restart attempts. |
+| `P2-FH-020` | Cancellation with `deadline` exactly 600 seconds after receipt. | Cancellation is admitted and the deadline is enforced. |
+| `P2-FH-021` | `bounded-retry` policy with `max_attempts` equal to `maximum_restart_attempts + 1`. | Policy is rejected with `child.lifecycle.restart.limit-exceeded`. |
+| `P2-FH-022` | Cancellation with `deadline` 601 seconds after receipt. | Cancellation is rejected with `child.cancellation.deadline-limit`. |
+| `P2-FH-023` | Canonical child address of exactly 256 characters. | Child creation proceeds if all other fields conform. |
+| `P2-FH-024` | Canonical parent, owner, or allocated child address of 257 characters. | Child creation is rejected with `child.create.address-limit`. |
+| `P2-FH-025` | `directive_id` that is not exactly 64 lowercase hexadecimal characters. | Child creation is rejected with `child.create.malformed`. |
+| `P2-FH-025A` | Well-formed `directive_id` that does not equal the fixed construction for the directive fields and `directive_sequence`. | Child creation is rejected with `child.create.malformed`. |
+| `P2-FH-025B` | `directive_sequence: 0` or reuse of a reserved sequence for a distinct directive. | Child creation is rejected with `child.create.malformed`. |
+| `P2-FH-026` | `cancellation_id` of exactly 256 canonical characters. | Cancellation proceeds if all other fields conform. |
+| `P2-FH-027` | `cancellation_id` of 257 canonical characters. | Cancellation is rejected with `child.cancellation.id-limit`. |
+| `P2-FH-028` | Canonical lifecycle event payload of exactly 65536 bytes. | Event is emitted if all fields conform. |
+| `P2-FH-029` | Canonical lifecycle event payload of 65537 bytes. | Event-causing request is rejected with `child.lifecycle.event-payload-limit`, not `signal.oversized`. |
+| `P2-FH-030` | Cancellation reason message of exactly 1024 characters. | Cancellation proceeds if all other fields conform. |
+| `P2-FH-031` | Cancellation reason message of 1025 characters. | Cancellation is rejected with `child.cancellation.reason-limit`. |
+| `P2-FH-032` | `failure_message` exactly at `maximum_child_failure_message_bytes`. | Message is retained without truncation diagnostic. |
+| `P2-FH-033` | `failure_message` one byte over `maximum_child_failure_message_bytes`. | Message is truncated at a UTF-8 boundary and `child.lifecycle.failure-message-truncated` contains the original byte count and SHA-256 digest. |
+| `P2-FH-034` | Cancellation with a deadline before receipt. | Cancellation is rejected with `child.cancellation.malformed`. |
+| `P2-FH-035` | Cancellation with an unknown `propagation_direction`. | Cancellation is rejected with `child.cancellation.malformed`. |
+| `P2-FH-036` | Any failure case above. | Diagnostic has exactly the Chapter 04 top-level fields, the assigned `identity.*` family, the expected domain `code`, and all required bounded `details`. |
 
 > **Normative definition.**
 Each boundary-limit input test MUST verify that the host correctly enforces
-the implementation limits defined in the "Implementation limits" table of
-this chapter without crashing, panicking, or producing undefined behavior.
+the fixed bounds and named implementation limits defined in the
+"Fixed bounds and implementation limits" table of this chapter without
+crashing, panicking, or entering a state not defined by this specification.
 
 > **Non-normative note.**
 The boundary-limit input tests validate the capacity planning layer.
 Without these tests, an adversary could intentionally submit boundary-limit
 inputs to cause resource exhaustion, denial of service, or memory corruption.
-The limits defined in the implementation limits table are the minimum
-conformance requirements; implementations MAY enforce stricter limits.
+Tests MUST use the disclosed values of named implementation limits. A host MUST
+NOT enforce a lower ceiling than a required floor or a different fixed ceiling
+than this chapter specifies.
 
 ### Cancellation tests
 
@@ -1702,8 +1889,8 @@ and those that do not.
 | Test ID | Description |
 |---------|-------------|
 | `P2-CT-013` | Issue a hard stop (via escalation from cancellation timeout) and verify that the child's live actor is immediately stopped without processing additional signals. |
-| `P2-CT-014` | Verify that the child's snapshot is captured at the moment of hard stop and recorded as `snapshot_at_termination`. |
-| `P2-CT-015` | Verify that the hard stop completes within the bounded time documented in the conformance profile. |
+| `P2-CT-014` | Verify that the child's last completed durable revision is recorded as `snapshot_at_termination` and that mid-turn memory is not used for recovery. |
+| `P2-CT-015` | Verify that the hard stop completes within 30 seconds. |
 | `P2-CT-016` | Verify that the `child.lifecycle.terminated` event is emitted with reason `hard-stop` and that no further lifecycle events are emitted for the child after hard stop. |
 
 > **Non-normative note.**
@@ -1712,9 +1899,9 @@ defined in section 36.1.
 The bounded-time test `P2-CT-015` is critical because a hard stop that
 takes too long defeats the purpose of hard stop as an immediate,
 unconditional stop mechanism.
-The snapshot capture test `P2-CT-014` validates the observability
-guarantee that operators can inspect the child's state at the moment
-of hard stop for forensic analysis.
+The snapshot test `P2-CT-014` validates that recovery evidence identifies the
+last completed durable revision without treating volatile mid-turn state as a
+recoverable snapshot.
 
 ### Restart policy tests
 
@@ -1750,7 +1937,7 @@ creation time.
 | `P2-RT-006` | Create a child with `lifecycle_policy: bounded-retry` and a failure code in `restartable_failure_codes` and verify that the child IS restarted. |
 | `P2-RT-007` | Create a child with `lifecycle_policy: bounded-retry` and a failure code in `non_restartable_failure_codes` and verify that the child is NOT restarted and transitions directly to terminal status. |
 | `P2-RT-008` | Create a child with `lifecycle_policy: bounded-retry` and a failure code in neither list and verify that the host treats it as non-restartable and transitions the child to terminal status. |
-| `P2-RT-009` | Verify that the `child.lifecycle.retrying` heartbeat event is emitted during the backoff delay period and that no other lifecycle events are emitted. |
+| `P2-RT-009` | Verify that the `child.lifecycle.retrying` operational notification signal is emitted during the backoff delay period, is not assigned a lifecycle `sequence_number`, and no lifecycle events are emitted. |
 | `P2-RT-010` | Create a child with `lifecycle_policy: bounded-retry` and verify that the restart policy state (attempt count, next backoff delay, remaining budget) is correctly tracked and recorded in evidence. |
 
 > **Non-normative note.**
@@ -1784,10 +1971,10 @@ key differentiator from `bounded-retry`.
 | Test ID | Description |
 |---------|-------------|
 | `P2-RT-016` | Create a child with `lifecycle_policy: operator-approved` and verify that after a non-graceful termination, the child transitions to `suspended-pending-operator-approval` status and is NOT restarted. |
-| `P2-RT-017` | Verify that the operator receives a `child.lifecycle.pending-operator-approval` event in their mailbox after the child transitions to suspended status. |
+| `P2-RT-017` | Verify that the operator receives a `child.lifecycle.pending-operator-approval` operational notification signal in their mailbox after the child transitions to suspended status and that it is not treated as a lifecycle event. |
 | `P2-RT-018` | Issue a valid operator restart directive for a `operator-approved` policy child and verify that the child is restarted. |
-| `P2-RT-019` | Issue an operator restart directive with a previously-used `restart_nonce` and verify that the directive is rejected with `child.cancellation.conflict`. |
-| `P2-RT-020` | Verify that the periodic reminder events are emitted at the interval documented in the conformance profile while the child is in `suspended-pending-operator-approval` status. |
+| `P2-RT-019` | Issue an operator restart directive with a previously-used `restart_nonce` and verify that the directive is rejected with `child.lifecycle.restart.nonce-invalid`. |
+| `P2-RT-020` | Verify that periodic operational reminder signals are emitted every 3600 seconds while the child is in `suspended-pending-operator-approval` status. |
 | `P2-RT-021` | Verify that an operator termination directive for a `operator-approved` policy child transitions the child to terminal status without restart. |
 
 > **Non-normative note.**
@@ -1869,7 +2056,7 @@ subsystems (such as the agent registry, mailboxes, and durable journal).
 > **Normative definition.**
 Integration test evidence is the durable, auditable record that the Phase 2
 integration tests were executed and the results.
-Evidence is the primary input for promotion from `status: draft` to
+Evidence is the primary input for promotion from `status: candidate` to
 `status: normative`.
 
 > **Normative definition.**
@@ -1914,7 +2101,7 @@ A run of all Phase 2 integration tests passes if and only if:
    [Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md).
 
 > **Normative definition.**
-Promotion from `status: draft` to `status: normative` requires:
+Promotion from `status: candidate` to `status: normative` requires:
 
 1. A passing run of all Phase 2 integration tests as defined above.
 2. A passing run of all cross-milestone compatibility tests as defined

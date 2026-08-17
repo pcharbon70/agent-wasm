@@ -2,7 +2,7 @@
 title: "Capability Policy Attenuation Limits And Enforcement"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.2.0"
 tags:
   - milestone-05
@@ -20,7 +20,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 2](../.spec/planning/agentic-system/milestone-05-capabilities-plugins-security-and-tenancy/phase-02-capability-policy-attenuation-limits-and-enforcement.md)
 of
 [Milestone 5](../.spec/planning/agentic-system/milestone-05-capabilities-plugins-security-and-tenancy/README.md)
@@ -54,7 +54,7 @@ Phase 2 MILESTONE ACCEPTANCE requires:
 4. **Evidence recording**: All integration test evidence MUST be recorded
    as machine-readable YAML reports in the `50-journal/` directory.
 5. **Conformance profile**: The conformance profile MUST document all
-   implementation-defined choices listed in this chapter.
+   profile selections declared by visible callouts in this chapter.
 
 > **Normative definition.**
 Phase 2 FAILS MILESTONE ACCEPTANCE if:
@@ -249,8 +249,9 @@ decision.
 > **Normative definition.**
 The `attenuation` field is present only when the outcome is `attenuated`.
 The `approval` field is present only when the outcome is `approval-required`.
-The `metadata` field is implementation-defined and MUST NOT be used for
-authorization decisions.
+The `metadata` field is opaque to policy semantics. Consumers MUST NOT require
+any metadata member or use metadata to alter the decision outcome, reason,
+attenuation, approval, authorization, or tenant-isolation behavior.
 
 > **Normative definition.**
 The host MUST NOT execute a requested capability when the decision outcome
@@ -374,11 +375,18 @@ Conformance profiles MAY define bundle-level versioning as an extension.
 ### Attenuation Overhead Measurement
 
 > **Normative definition.**
-Attenuation enforcement overhead measurement is implementation-defined.
-Implementations MUST document their own metrics for policy evaluation latency
-and attenuation enforcement overhead in the conformance profile.
-Normative latency bounds for policy evaluation are NOT defined for baseline
-conformance.
+Policy evaluation latency is the elapsed monotonic-clock time, in microseconds,
+from admission of a complete validated `PolicyInput` to availability of its
+`PolicyDecision`. Attenuation enforcement overhead is the elapsed
+monotonic-clock time, in microseconds, spent validating and applying all
+populated `AttenuationConfig` restrictions before capability execution; it
+excludes the capability's own execution time.
+Clock implementation, sampling, and aggregation are internal mechanisms. They
+MUST preserve these start and end boundaries, MUST NOT alter policy outcomes or
+execution order, and MUST report clock resolution with the measurements.
+Attenuation evidence MUST also report the number of populated restrictions, but
+MUST NOT divide the elapsed duration into an invented per-restriction latency.
+The conformance profile MUST publish latency ceilings for both metrics.
 
 > **Normative definition.**
 
@@ -735,16 +743,22 @@ boundary without exposing secrets.
 ### Bounded diagnostics
 
 > **Normative definition.**
-The host MUST emit bounded diagnostics for each failure outcome.
-The diagnostics MUST include:
+The host MUST emit bounded diagnostics for each failure outcome using exactly
+the Chapter 04 `Diagnostic` top-level structure. The domain error is `code`,
+`severity` is `error`, and `details` contains `phase`, `contract`, `profile`,
+`failed_boundary`, `context`, `entity_identifiers`, `timestamp`, and
+`retryable`.
 
-1. **Error code**: The specific error code from the table above.
-2. **Context**: The operation that failed (e.g., signal admission, action
-   resolution, guest invocation).
-3. **Entity identifiers**: The tenant ID, agent ID, or principal ID involved
-   (without exposing sensitive data).
-4. **Timestamp**: The time the error occurred.
-5. **Retryable**: Whether the operation can be retried.
+| Family | Domain codes |
+|--------|--------------|
+| `identity.validation.capability_policy` | `policy.malformed_input`, `policy.attenuation_violation`, `policy.credential_scope_mismatch`, `policy.credential_export_forbidden` |
+| `identity.compatibility.capability_policy` | `policy.incompatible_version`, `policy.policy_version_mismatch`, `policy.capability_disabled` |
+| `identity.authorization.capability_policy` | `policy.unauthorized`, `policy.grant_absent`, `policy.grant_expired`, `policy.grant_revoked`, `policy.grant_scoped`, `policy.tenant_mismatch`, `policy.trust_class_insufficient`, `policy.artifact_untrusted`, `policy.plugin_untrusted` |
+| `identity.conflict.capability_policy` | `policy.conflicting_rules`, `policy.resource_locked`, `policy.credential_replay` |
+| `identity.limit.capability_policy` | `policy.exhausted`, `policy.approval_deadline_exceeded`, `policy.rate_limit_exceeded`, `policy.quota_exhausted`, `policy.byte_count_exceeded`, `policy.duration_exceeded`, `policy.budget_exceeded` |
+| `identity.resource.capability_policy` | `policy.unavailable`, `policy.capability_unavailable`, `policy.credential_custodian_unavailable` |
+
+No additional top-level diagnostic member is permitted.
 
 > **Normative definition.**
 The host MUST NOT expose internal implementation details, secrets, or
@@ -755,6 +769,10 @@ sensitive data in diagnostics.
 > **Normative implementation-defined choice.**
 The following choices are implementation-defined and MUST be documented in the
 conformance profile:
+Each selection is one of the alternatives or bounded domains stated below.
+Observable approval-notification channels, policy-limit rejections, and
+retained audit-history availability may differ according to the recorded
+selections; policy decisions for the same inputs MUST NOT differ.
 
 1. **Policy engine**: The policy engine implementation (e.g., OPA, custom).
 
@@ -832,7 +850,10 @@ Each report MUST include:
 - Actual output
 - Pass/fail status
 - Timestamp
-- Performance metrics (latency, overhead) where applicable
+- Policy-evaluation latency and total attenuation-enforcement overhead where
+  applicable
+- Monotonic-clock resolution and populated-restriction count for each
+  attenuation measurement
 
 ### Test execution
 
@@ -847,17 +868,13 @@ which require sequential execution.
 > **Normative definition.**
 The conformance profile MUST define normative latency bounds for:
 - Policy evaluation latency (microseconds per evaluation).
-- Attenuation enforcement overhead (microseconds per restriction).
-- Grant validation latency (microseconds per validation).
+- Total attenuation enforcement overhead (microseconds per evaluation across
+  all populated restrictions).
 
 Tests MUST verify that implementations meet these bounds under representative
-workloads.
-2. **Failure handling**: The host handles malformed, incompatible, stale,
-   duplicate, and boundary-limit inputs correctly.
-3. **Security enforcement**: The host enforces policy decisions, attenuation
-   restrictions, and limits without leaving unauthorized state.
-4. **Cross-milestone compatibility**: The phase does not introduce regressions
-   in earlier milestones.
+workloads and MUST verify the exact start and end boundaries, reported clock
+resolution, and populated-restriction count defined in
+[Attenuation Overhead Measurement](#attenuation-overhead-measurement).
 
 > **Normative definition.**
 Each integration test MUST exercise observable contracts rather than private
@@ -923,8 +940,8 @@ The following tests MUST verify failure handling:
     `policy.credential_replay`.
 
 > **Normative definition.**
-Each test MUST verify that the error code and diagnostic message match the
-expected values.
+Each test MUST verify the exact Chapter 04 diagnostic shape, assigned family,
+domain `code`, `severity: "error"`, message, and required bounded details.
 
 ### Security enforcement tests
 
@@ -992,15 +1009,21 @@ gates.
 
 ## Variability register
 
+The register below indexes profile selections and other variability governed by
+the linked clauses. It does not independently license variation.
+
+> **Non-normative note.**
+
 | Item | Permission | Recommendation | Constraint |
 |------|------------|----------------|------------|
-| Policy engine | Implementation-defined | Document in conformance profile | Must support policy input, decisions, and attenuation |
-| Grant storage | Implementation-defined | Document in conformance profile | Must support grant dimensions and revocation |
-| Policy caching | Implementation-defined | Document in conformance profile | Must invalidate on policy version change or revocation |
-| Audit log retention | Implementation-defined | Document in conformance profile | Must preserve audit trail |
-| Approval notification | Implementation-defined | Document in conformance profile | Must notify all approvers and respect deadlines |
-| Attenuation enforcement | Implementation-defined | Document in conformance profile | Must enforce all restrictions at runtime |
-| Tenant isolation | Implementation-defined | Document in conformance profile | Must prevent cross-tenant access |
-| Policy versioning | Implementation-defined | Document in conformance profile | Must invalidate cached decisions on version change |
-| Credential-use attenuation | Required | Enforce custodian, handle fingerprint, operation, resource, binding, nonce, and budget restrictions | Must deny on mismatch and must not expose credentials or handles |
-| Domain and credential authorization | Required | Evaluate as independent policy decisions | `ModelAccess` or `Effects` must not imply `CredentialUse` |
+| [Policy engine](#implementation-defined-choices) | Implementation-defined | Document in conformance profile | Must support policy input, decisions, and attenuation |
+| [Grant storage](#implementation-defined-choices) | Implementation-defined | Document in conformance profile | Must support grant dimensions and revocation |
+| [Policy caching](#implementation-defined-choices) | Implementation-defined | Document in conformance profile | Must invalidate on policy version change or revocation |
+| [Audit log retention](#implementation-defined-choices) | Implementation-defined | Document in conformance profile | Must preserve audit trail |
+| [Approval notification](#implementation-defined-choices) | Implementation-defined | Document in conformance profile | Must notify all approvers and respect deadlines |
+| [Attenuation enforcement](#implementation-defined-choices) | Implementation-defined | Document in conformance profile | Must enforce all restrictions at runtime |
+| [Latency and overhead measurement](#attenuation-overhead-measurement) | Required | Monotonic microseconds over fixed boundaries | Publish clock resolution and latency ceilings |
+| [Tenant isolation](#policy-evaluation-flow) | Required | Preserve tenant-qualified policy evaluation | Must prevent cross-tenant access |
+| [Policy versioning](#revocation-and-policy-versioning) | Required | Track and validate the active policy version | Must invalidate cached decisions on version change |
+| [Credential-use attenuation](#attenuation) | Required | Enforce custodian, handle fingerprint, operation, resource, binding, nonce, and budget restrictions | Must deny on mismatch and must not expose credentials or handles |
+| [Domain and credential authorization](#policy-evaluation-flow) | Required | Evaluate as independent policy decisions | `ModelAccess` or `Effects` must not imply `CredentialUse` |

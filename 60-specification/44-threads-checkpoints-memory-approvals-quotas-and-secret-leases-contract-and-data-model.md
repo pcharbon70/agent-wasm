@@ -2,7 +2,7 @@
 title: "Threads Checkpoints Memory Approvals Quotas And Secret Leases Contract And Data Model"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.2.0"
 tags:
   - milestone-07
@@ -24,7 +24,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 4](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/phase-04-threads-checkpoints-memory-approvals-quotas-and-secret-leases.md)
 of
 [Milestone 7](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/README.md)
@@ -494,8 +494,11 @@ change, or delivery of the new credential to the host.
 
 ### 44.1.5 Custodian transport and receipt verification
 
-- **Permission**: The authenticated transport and receipt signature mechanism
-  are implementation-defined.
+> **Non-normative note.**
+
+- **Internal mechanism**: The authenticated transport and receipt-verification
+  mechanism may vary only when it authenticates the sender, prevents replay,
+  and verifies the same request, scope, outcome, usage, and binding data.
 - **Recommendation**: The host SHOULD use sender-constrained workload identity
   and independently verifiable receipts.
 - **Permitted presentation**: The host MAY present non-authority-bearing

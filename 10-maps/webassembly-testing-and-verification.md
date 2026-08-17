@@ -82,6 +82,10 @@ plug-in testing, and the assurance problem for a host-owned Jido-like runtime.
 
 ### Embedding-specific tests
 
+- [Guest Protocol Port Conformance](../50-journal/2026-08-11-guest-protocol-port-conformance.md)
+  — first local executable evidence for the compiled four-export no-WASI guest
+  ABI and one-shot runner timeout mechanism through the private Elixir-to-Extism Port,
+  with narrower claims than the lifecycle, invocation, and assurance contracts.
 - [Testing Extism Plug-ins with XTP](../30-sources/dylibso-2026-extism-plugin-testing.md)
   — compiled plug-in calls, assertions, persistent state, input fixtures, and
   Wasm mock hosts.

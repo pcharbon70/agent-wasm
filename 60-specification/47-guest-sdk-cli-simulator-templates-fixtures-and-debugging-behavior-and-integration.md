@@ -2,7 +2,7 @@
 title: "Guest SDK CLI Simulator Templates Fixtures And Debugging Behavior And Integration"
 kind: specification
 created: "2026-08-10"
-status: draft
+status: normative
 spec_version: "0.2.0"
 tags:
   - milestone-09
@@ -23,7 +23,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 2](../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/phase-02-guest-sdk-cli-simulator-templates-fixtures-and-debugging.md)
 of
 [Milestone 9](../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/README.md)
@@ -270,7 +270,7 @@ See [Variability register](#variability-register).
 | Debugging view redaction | Section 47.2.6 | Required | Must redact all data listed in the redaction rules table. |
 | Compatibility negotiation points | Section 47.2.7 | Required | Must negotiate at all points listed in the negotiation points list. |
 | Deprecation stage behavior | Section 47.2.8 | Required | Must include all behaviors listed in the deprecation stage behavior table. |
-| Offline mode activation triggers | Section 47.2.9 | Implementation-defined | Must document the triggers for offline mode activation. |
+| Offline mode activation triggers | [Offline Behavior](#4729-offline-behavior) | Required | Activate when the host is unreachable, the network is unavailable, or `--offline` is set. |
 | Reproducible build verification steps | Section 47.2.10 | Required | Must include all verification steps listed in the build verification list. |
 | Actionable failure classification | Section 47.2.11 | Required | Must classify failures into stable diagnostic families. |
 

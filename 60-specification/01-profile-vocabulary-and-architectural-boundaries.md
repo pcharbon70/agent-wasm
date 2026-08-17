@@ -2,8 +2,8 @@
 title: "Profile Vocabulary And Architectural Boundaries"
 kind: specification
 created: "2026-08-08"
-status: draft
-spec_version: "0.2.0"
+status: normative
+spec_version: "1.0.0"
 tags:
   - milestone-01
   - phase-01
@@ -20,7 +20,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 1](../.spec/planning/agentic-system/milestone-01-contracts-profiles-and-artifacts/phase-01-profile-vocabulary-and-architectural-boundaries.md)
 of
 [Milestone 1](../.spec/planning/agentic-system/milestone-01-contracts-profiles-and-artifacts/README.md)
@@ -31,11 +31,9 @@ Jido-inspired agent system built on WebAssembly and Extism.
 It applies to all later milestones within Milestone 1 and provides the
 foundation for milestones 2 through 9.
 
-Version `0.2.0` clarifies two later-milestone ownership boundaries: concrete
-model selection belongs to the installing user or tenant operator, and raw
-provider or external-service credentials may remain in a user-controlled
-custodian outside the host while the host retains effect authorization and
-orchestration.
+Version `1.0.0` replaces `0.2.0`. It retains the model-selection and
+credential-custody ownership boundaries and aligns the host--guest export
+signatures with protocol version `1.0.0`.
 
 This chapter is normative by default within its stated scope.
 Material visibly marked non-normative does not create conformance
@@ -183,7 +181,7 @@ of this profile.
 | Concern | Owner | Rationale |
 | --- | --- | --- |
 | Authoritative agent state | Host | State must survive guest trap, reset, and instance eviction. |
-| State schemas and initial-state functions | Host | Schema enforcement and initial values are policy decisions. |
+| State schemas and initial-state admission | Host | Schema enforcement and acceptance of initial values are policy decisions. |
 | State revision and snapshot storage | Host | Revisions provide optimistic concurrency and replay. |
 | Policy and authorization | Host | Untrusted guests must not supply the only check that authorizes their own actions. |
 | Turn scheduling and serialization | Host | One committed turn advances one revision at a time per agent. |
@@ -196,6 +194,7 @@ of this profile.
 | Audit and provenance evidence | Host | Guest diagnostics may enrich but cannot replace host-owned records. |
 | Tenant isolation boundaries | Host | Namespacing alone is not isolation. |
 | Deterministic decision behavior | Guest | The reducer computes the next state and requested effects from stable input. |
+| Initial-state and migration candidate calculation | Guest | Pure exports calculate candidates; the host authorizes, validates, and commits them. |
 | Disposable scratch state within a turn | Guest | Per-call scratch, caches, and temporary buffers are safe in guest memory. |
 | Strategy snapshot within a turn | Guest | Strategy-local state lives in a reserved namespace and is returned to the host. |
 
@@ -206,24 +205,30 @@ decision logic as its sole authorization check.
 ## Host--Guest Interface
 
 > **Normative definition.**
-The host invokes a plug-in through the reducer export.
-The reducer is the only mandatory plug-in export for this bootstrap profile.
+The host invokes a plug-in through four required protocol exports.
+The `reduce` export is the primary decision boundary, but `describe`,
+`initialize`, and `migrate` are also mandatory for this bootstrap profile.
 
-- **`describe(protocol_version) -> AgentManifest`:** Returns schemas, routes,
+- **`describe(DescribeRequest) -> DescribeResponse`:** Returns schemas, routes,
   actions, strategy metadata, logical model requirements, required
   capabilities, state versions, and protocol versions.
   Results MAY be cached by the host.
 
-- **`initialize(init_request) -> TurnResult`:** Calculates initial state and
-  startup requests without acquiring external resources.
+- **`initialize(InitializeRequest) -> InitializeResponse`:** Calculates initial
+  state and startup requests without acquiring external resources.
 
-- **`reduce(turn_request) -> TurnResult`:** Handles signals or explicit
+- **`reduce(TurnRequest) -> TurnResult`:** Handles signals or explicit
   instructions.
   The reducer receives a value snapshot, not a handle to authoritative
   mutable state.
 
-- **`migrate(migration_request) -> MigrationResult`:** Transforms durable
+- **`migrate(MigrationRequest) -> MigrationResult`:** Transforms durable
   snapshots under a separately authorized maintenance path.
+
+These are logical signatures. At the core-Wasm boundary all four exports use
+the no-argument Extism calling convention and exchange the named values as
+canonical JSON byte buffers under
+[Turn Lifecycle Protocols And Canonical Encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md#exports).
 
 The host MUST validate every reducer input against the manifest-declared
 schemas before invocation.
@@ -264,37 +269,47 @@ ownership conflicts, and capability conflicts before execution.
 
 The host executes one turn as follows:
 
-1. Accept a signal and authenticate its transport identity.
-2. Resolve tenant, agent identity, artifact digest, and policy.
-3. Validate and canonicalize the signal; preserve correlation and causation.
-4. Acquire a per-agent turn lease so only one revision is advanced at a time.
-5. Load the snapshot and associated journal revision.
-6. Resolve the route and authorize the target action in trusted host policy.
-7. Acquire a clean Extism execution instance for the pinned artifact.
-8. Invoke `reduce` with deadline, fuel or equivalent budget, memory limit,
+1. Receive a `SignalSubmission`, authenticate its transport context, and
+   record its immutable `received_at` timestamp.
+2. Validate canonical structure, size, future-time rejection, and the fixed
+   signal TTL.
+3. Compute logical signal identity and reject a previously accepted duplicate.
+4. Resolve one route, authorize its source, take the fixed candidate snapshot,
+   and select one target instance.
+5. Atomically persist `AcceptedSignalEnvelope`, including the selected target
+   and any round-robin cursor advance.
+6. Acquire the selected agent's turn lease so only one revision advances at a
+   time.
+7. Load the snapshot and associated journal revision.
+8. Project and validate the accepted record as one canonical `TurnRequest`.
+9. Acquire a clean Extism execution instance for the pinned artifact.
+10. Invoke `reduce` with deadline, fuel or equivalent budget, memory limit,
    and the minimum host-function set.
-9. Treat trap, timeout, invalid encoding, oversize output, or schema failure
+11. Treat trap, timeout, invalid encoding, oversize output, or schema failure
    as a failed turn; do not commit state or effects.
-10. Validate the expected revision, patch, strategy snapshot, directive types,
+12. Validate the expected revision, patch, strategy snapshot, directive types,
     destinations, and capability grants.
-11. Atomically commit the next state, journal facts, and directive outbox.
-12. Release the turn lease and acknowledge the input according to its
-    delivery contract.
-13. Drain outbox entries through idempotent effect handlers.
-14. Convert result-bearing effects, timer fires, child lifecycle events,
+13. Atomically commit the next state, journal facts, and directive outbox.
+14. Release the turn lease and mark the one delivery attempt successful or
+    failed; do not redeliver it automatically.
+15. Drain outbox entries through idempotent effect handlers.
+16. Convert result-bearing effects, timer fires, child lifecycle events,
     and sensor events into new signals.
 
 ### State and pooling
 
 Authoritative agent state MUST NOT live in Wasm linear memory, Extism
 variables, or a long-lived plugin instance.
+Guests MAY use Extism variables only as disposable within-turn scratch that is
+cleared before another turn or tenant uses the instance.
 Compiled artifacts and verified metadata MAY be shared widely.
 Mutable instances SHOULD be fresh per turn or provably reset.
 
 ### Effects
 
 Asynchronous or durable effect requests are the preferred pattern.
-Synchronous host functions are an explicitly granted exception for
+Synchronous host functions SHOULD NOT be used unless their result is required
+in the current turn. They are an explicitly granted exception only for
 operations whose result is required in the current turn and that can be
 bounded, cancelled, and safely retried.
 
@@ -306,7 +321,6 @@ See [Failure modes](#failure-modes).
 
 ### Pinned Core WebAssembly feature set
 
-> **Normative implementation-defined choice.**
 This profile pins Core Wasm 3.0 as the minimum feature set.
 The host MUST reject any module that requires features not included in this
 pin unless an explicit, versioned extension is declared in the artifact
@@ -463,8 +477,9 @@ granted capability scope.
 A resource limit is reached: memory pages, heap allocations, call depth,
 output size, string length, collection size, or configuration bytes.
 The host MUST reject the operation and MUST return a
-`profile.vocabulary.exhausted` diagnostic identifying the limit and the
-invocation context.
+`identity.limit.<limit_identifier>` diagnostic identifying the named limit and
+the invocation context. Failures independent of a named limit use the
+`identity.resource` family instead.
 
 ### Unavailable
 
@@ -490,23 +505,24 @@ Diagnostics MUST NOT contain: secrets, raw guest memory contents, host
 process identifiers, internal stack traces, or unredacted configuration
 values.
 
-## Implementation-defined choices and deferred work
+## Fixed semantics, internal mechanisms, and deferred work
 
-### Implementation-defined choices
+### Internal mechanisms
 
-The following choices are permitted but MUST be documented in the
-implementation's conformance profile:
+The host MAY use compilation caches, instance pools, zero-copy buffer paths,
+or any durable outbox backend only when the mechanism preserves the same
+artifact identity, limits, timeout classification, tenant isolation, output
+bytes, commit behavior, and diagnostics required by this profile. These are
+internal mechanisms, not profile-selected observable semantics.
 
-| Choice | Domain | Required documentation |
-| --- | --- | --- |
-| Compilation cache strategy | Engine | Cache key, invalidation, and hit-rate policy |
-| Instance pool size and eviction | Engine | Maximum instances, eviction trigger, reset semantics |
-| Fuel unit definition | Engine | Mapping from fuel to wall-clock time and determinism guarantees |
-| Timeout enforcement mechanism | Engine | Epoch, wall-clock, or hybrid; latency characteristics |
-| Output buffer copy strategy | Host | Zero-copy where possible; bounds enforcement point |
-| Directive outbox storage backend | Host | Database, log format, and retention policy |
-| Artifact admission policy | Host | Hash verification, signature verification, revocation |
-| Diagnostic redaction rules | Host | Exact redaction list and override mechanism |
+Pooled instances MUST satisfy the reset and tenant-erasure requirements in
+[State and pooling](#state-and-pooling). Timeout enforcement MUST produce the
+fixed limit outcome defined by
+[Limit enforcement](02-stable-identities-versions-errors-and-limits.md#limit-enforcement).
+Artifact admission is governed by
+[Validation order](03-agent-manifests-artifacts-schemas-and-registries.md#validation-order),
+and diagnostic recording is governed by
+[Diagnostic recording policy](05-guest-sdk-contracts-fixtures-and-milestone-acceptance.md#diagnostic-recording-policy).
 
 ### Deferred work
 
@@ -565,15 +581,17 @@ for promoting this chapter to `status: normative`.
 
 ### Successful flow
 
-The host MUST accept a well-formed signal, resolve the agent, invoke the
-plug-in reducer, validate the output, commit the state+journal+outbox
-atomically, release the turn lease, and acknowledge the input.
+The host MUST validate a well-formed submission, persist its accepted-ingress
+record and fixed target, invoke the plug-in reducer with the exact projection,
+validate the output, commit the state+journal+outbox atomically, release the
+turn lease, and record the one delivery outcome.
 The test MUST record and retain:
 
-1. The input signal envelope and its causal identifiers.
+1. The submission, accepted-ingress record, `received_at`, delivery identity,
+   and causal identifiers.
 2. The artifact digest and manifest version used.
 3. The protocol version and schema versions validated.
-4. The resolved route and action.
+4. The route identity, selector mode and state, selected target, and action.
 5. The capability grants supplied to the guest.
 6. The resource limits and measured usage.
 7. The prior and committed state revisions.
@@ -633,11 +651,13 @@ The host MUST enforce size, depth, and collection limits.
 The test MUST verify that:
 
 1. Input exceeding declared size limits is rejected with a
-   `profile.vocabulary.exhausted` diagnostic.
-2. Output exceeding declared size limits is rejected with the same
-   diagnostic.
-3. Nested structures exceeding depth limits are rejected.
-4. Collections exceeding size limits are rejected.
+   `identity.limit.input.max_bytes` diagnostic.
+2. Output exceeding declared size limits is rejected with
+   `identity.limit.output.max_bytes`.
+3. Nested structures exceeding depth limits are rejected with
+   `identity.limit.state.max_depth`.
+4. Collections exceeding size limits are rejected with
+   `identity.limit.collection.max_items`.
 
 ### Timeout behavior
 
@@ -647,7 +667,7 @@ The test MUST verify that:
 1. A reducer that exceeds its deadline is interrupted.
 2. No state, journal, or outbox entries are created for the timed-out turn.
 3. The turn lease is released.
-4. The diagnostic identifies the timeout event.
+4. The diagnostic is `identity.limit.time.turn_ms`.
 
 ### Cancellation behavior
 
@@ -671,7 +691,10 @@ The test MUST verify that:
 
 ### Retry behavior
 
-The host MUST retry failed effects according to their idempotency contract.
+The host MUST retry failed post-commit effect attempts according to their
+idempotency contract. This rule does not permit retry or redelivery of the
+input signal; signal delivery is governed by
+[Redelivery criteria](10-signals-causality-routing-and-delivery.md#redelivery-criteria).
 The test MUST verify that:
 
 1. Effects with at-least-once semantics are retried until success or
@@ -687,6 +710,11 @@ Any regression MUST be recorded with its approval status.
 
 ## Variability register
 
+This register summarizes the governing clauses linked below; it does not
+define or redeclare permitted variation.
+
+> **Non-normative note.**
+
 | Clause | Type | Selection |
 | --- | --- | --- |
 | Ownership assignments | Required | Fixed by this chapter. |
@@ -695,14 +723,17 @@ Any regression MUST be recorded with its approval status.
 | Required exports | Required | `describe`, `initialize`, `reduce`, `migrate`. |
 | State location | Required | Host-owned; never in guest memory. |
 | Turn serialization | Required | One committed turn per agent at a time. |
+| [Signal ingress and target selection](10-signals-causality-routing-and-delivery.md#submission-evaluation-order) | Required | Fixed TTL, route, selector, accepted-record, and guest-projection behavior. |
 | Outbox commit | Required | Atomic state+journal+outbox commit. |
 | Failure on trap/timeout | Required | Nothing committed for that turn. |
 | Initial Wasm feature set | Required | Core Wasm 3.0; exclusions listed in Section 1.2. |
 | WASI surface | Required | No WASI for bootstrap; explicit selection later (Section 1.2). |
 | Extism runtime family | Required | Wasmtime (reference) and Wazero (independent) at release. |
-| Synchronous host functions | SHOULD NOT | Preferred pattern is directive continuation. |
-| Guest state in Extism variables | SHOULD NOT | Treated as disposable cache at best. |
-| Instance pooling across tenants | SHOULD NOT | Must prove state erasure; not a default. |
+| [Internal mechanisms](#internal-mechanisms) | MAY (internal) | Caches, pools, copying, and storage may vary only under observational equivalence. |
+| [Effect retry](#retry-behavior) | Required | Post-commit effect attempts may retry; input signals are never redelivered automatically. |
+| [Synchronous host functions](#effects) | SHOULD NOT | Use only for bounded current-turn results; prefer directive continuation. |
+| [Guest scratch state](#state-and-pooling) | MAY | Extism variables are disposable within-turn scratch and must be cleared before reuse. |
+| [Mutable instances](#state-and-pooling) | SHOULD | Fresh per turn or provably reset with tenant state erasure. |
 
 ## Rationale and evidence (non-normative)
 

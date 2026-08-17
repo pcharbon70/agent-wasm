@@ -2,7 +2,7 @@
 title: "Embedded And Server Host APIs Configuration And Packaging Failure Evidence And Operational Notes"
 kind: specification
 created: "2026-08-10"
-status: draft
+status: normative
 spec_version: "0.2.0"
 tags:
   - milestone-09
@@ -20,7 +20,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 1](../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/phase-01-embedded-and-server-host-apis-configuration-and-packaging.md)
 of
 [Milestone 9](../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/README.md)
@@ -63,7 +63,7 @@ behavior.
 | Diagnostic | Cause | Host behavior |
 | --- | --- | --- |
 | `config.validation.failed` | Configuration does not match schema, required fields are missing, or types are invalid. | Reject initialization. Emit diagnostic with validation errors. |
-| `config.secret.resolve.failed` | Secret reference cannot be resolved (missing key, invalid path, access denied). | Reject initialization. Emit diagnostic with secret path. Do NOT expose secret value. |
+| `config.secret.resolve.failed` | Secret reference cannot be resolved (missing key, invalid path, access denied). | Reject initialization. Identify only the containing configuration field location and optional store type; do not emit the reference path, key, version, resolved-store metadata, or secret value. |
 | `config.profile.unknown` | Referenced profile does not exist. | Reject initialization. Emit diagnostic with profile name. Fall back to default profile if available. |
 | `config.load.failed` | Configuration source is unreachable or unreadable. | Reject initialization. Emit diagnostic with source name. Retry if remote source. |
 
@@ -80,7 +80,7 @@ behavior.
 
 | Diagnostic | Cause | Host behavior |
 | --- | --- | --- |
-| `request.idempotent_duplicate` | Duplicate idempotency key for a completed request. | Reject request. Emit diagnostic with original request ID. Do NOT re-execute side effects. |
+| `request.idempotent_duplicate` | A non-equivalent request reuses an idempotency key retained for an in-flight or completed request. | Reject request. Emit diagnostic with original request ID. Do NOT re-execute side effects. |
 | `request.pagination.invalid` | Pagination cursor is invalid or expired. | Reject request. Emit diagnostic with cursor. Return first page if cursor is missing. |
 | `request.operation.unknown` | Operation name is not recognized. | Reject request. Emit diagnostic with operation name. Return list of valid operations if `capabilities.discover` is supported. |
 | `request.envelope.malformed` | Request envelope is missing required fields or has invalid structure. | Reject request. Emit diagnostic with missing field names. |
@@ -120,7 +120,8 @@ Each diagnostic includes the following fields:
 
 > **Non-normative note.**
 Diagnostics MUST NOT include:
-- Raw credential values or secret references.
+- Raw credential values or secret references, including secret-reference
+  paths, keys, versions, and resolved-store metadata.
 - Internal stack traces or implementation details.
 - User data that is not relevant to the failure.
 - Sensitive configuration values (e.g., database connection strings with passwords).
@@ -129,17 +130,22 @@ Evidence is retained for operational debugging and compliance auditing.
 Evidence is retrievable via the `diagnostic.get` operation with appropriate
 access controls.
 
-### 46.3.3 Implementation-Defined Choices
+The Chapter 46 failure code applies only to host-configuration resolution.
+When a failure is governed by Chapter 44 credential custody, its exact Chapter
+44 diagnostic takes precedence and MUST survive host API and transport
+wrapping unchanged.
+
+### 46.3.3 Conformance Summary
 
 > **Non-normative note.**
-The following choices are implementation-defined and must be documented
-in the conformance profile.
+The following table summarizes fixed protocol values and existing operational
+defaults. Defaults do not override the governing contract.
 
 | Choice | Description | Default |
 | --- | --- | --- |
-| Pagination default limit | Default number of results per page. | 100 |
-| Pagination maximum limit | Maximum number of results per page. | 1000 |
-| Idempotency key retention duration | Duration for which idempotency keys are retained. | 24 hours |
+| Pagination default limit | Default number of results per page. | Fixed at 100. |
+| Pagination maximum limit | Maximum number of results per page. | Fixed at 1000. |
+| Idempotency key retention duration | Duration for which idempotency keys are retained. | Fixed at 24 hours. |
 | Configuration validation strictness | Whether to reject configuration with warnings or errors. | Reject with errors. |
 | Secret store retry count | Number of retries for secret resolution. | 3 |
 | Secret store retry backoff | Backoff strategy for secret resolution retries. | Exponential with jitter. |
@@ -199,7 +205,8 @@ See [Variability register](#variability-register).
 | Failure outcome diagnostics | Section 46.3.1 | Required | Must include all diagnostics listed in the failure outcomes tables. |
 | Diagnostic field set | Section 46.3.2 | Required | Must include all fields listed in the bounded diagnostics table. |
 | Diagnostic redaction | Section 46.3.2 | Required | Must redact secrets, stack traces, and irrelevant user data. |
-| Implementation-defined choices documentation | Section 46.3.3 | Required | Must document all implementation-defined choices in the conformance profile. |
+| Secret-reference diagnostic detail | Sections 46.3.1 and 46.3.2 | Required | Must omit paths, keys, versions, resolved-store metadata, and values; may identify only the containing configuration field location and store type. |
+| Conformance summary | Section 46.3.3 | Required | Must match the governing fixed values. |
 | Deferred work enforcement | Section 46.3.4 | MUST | Must NOT implement deferred work without evidence from the corresponding future phase. |
 
 ## Rationale and evidence (non-normative)
@@ -212,7 +219,6 @@ without parsing human-readable messages.
 Bounded diagnostics prevent information leakage while retaining sufficient
 context for operational debugging.
 
-Implementation-defined choices are documented to enable conformance
-verification and interoperability.
+Fixed protocol values enable conformance verification and interoperability.
 Deferred work is explicitly identified to prevent scope creep and ensure
 that future phases build on the verified foundation of Phase 1.

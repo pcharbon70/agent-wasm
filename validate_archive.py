@@ -40,6 +40,7 @@ ARCHIVE_DIRECTORIES = {
     "assets",
     "templates",
 }
+NON_ARCHIVE_ROOTS = {"src"}
 IGNORED_NAMES = {
     ".DS_Store",
     ".git",
@@ -63,19 +64,100 @@ PLACEHOLDER = re.compile(
     r"MAJOR\.MINOR\.PATCH)\}"
 )
 MARKDOWN_LINK = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
+MARKDOWN_CITATION = re.compile(r"(?<![!\\])\[[^\]\n]+\]\(([^)\n]+)\)")
 FENCE_START = re.compile(r"^(`{3,}|~{3,})")
 SPECIFICATION_CONTENT_LABEL = re.compile(
     r"^> \*\*(?:Normative definition|Normative conformance example|"
-    r"Non-normative (?:example|rationale|note|diagram|evidence))\.\*\*(?:\s+.*)?$"
+    r"Non-normative (?:example|rationale|note|diagram|evidence))\.\*\*$"
 )
 IMPLEMENTATION_DEFINED_CALLOUT = "> **Normative implementation-defined choice.**"
 UNSPECIFIED_PRESENTATION_CALLOUT = "> **Normative unspecified presentation.**"
+NORMATIVE_CALLOUTS = {
+    "> **Normative definition.**",
+    "> **Normative conformance example.**",
+    "> **Normative conformance criterion.**",
+    "> **Normative test scenario.**",
+    IMPLEMENTATION_DEFINED_CALLOUT,
+    UNSPECIFIED_PRESENTATION_CALLOUT,
+}
+NON_NORMATIVE_CALLOUTS = {
+    "> **Non-normative example.**",
+    "> **Non-normative rationale.**",
+    "> **Non-normative note.**",
+    "> **Non-normative diagram.**",
+    "> **Non-normative evidence.**",
+}
+AUTHORITY_CALLOUTS = NORMATIVE_CALLOUTS | NON_NORMATIVE_CALLOUTS
+AUTHORITY_STYLE_BLOCKQUOTE = re.compile(
+    r"^>\s*(?:\*{2,3}|_{2,3})\s*"
+    r"(?:normative|non[^A-Za-z0-9]*normative)\b",
+    re.IGNORECASE,
+)
 UPPERCASE_REQUIREMENT_ALIAS = re.compile(
     r"\b(?:REQUIRED|SHALL(?: NOT)?|RECOMMENDED|NOT RECOMMENDED|OPTIONAL)\b"
 )
 UNDEFINED_BEHAVIOR = re.compile(r"\bundefined behavior\b", re.IGNORECASE)
 IMPLEMENTATION_DEFINED_TERM = re.compile(
     r"\bimplementation[- ]defined\b", re.IGNORECASE
+)
+IMPLEMENTATION_DEFINED_DECLARATION = re.compile(
+    r"\b(?:implementation[- ]defined|(?:the )?(?:host|implementation) defines)\b",
+    re.IGNORECASE,
+)
+NEGATED_IMPLEMENTATION_DEFINED = re.compile(
+    r"(?:\b(?:(?:(?:is|are|was|were|be|being)\s+(?:explicitly\s+)?)?"
+    r"(?:not|never|no longer)|(?:MUST|SHOULD|MAY)\s+NOT|cannot|no)\s+"
+    r"(?:(?:be\s+)?(?:(?:treated|classified|regarded|considered|described)\s+"
+    r"as\s+)?)?(?:an?\s+)?implementation[- ]defined\b|"
+    r"\b(?:does|do)\s+not\s+(?:constitute|create)\s+(?:an?\s+)?"
+    r"implementation[- ]defined\b)",
+    re.IGNORECASE,
+)
+NEGATED_HOST_DEFINITION = re.compile(
+    r"\b(?:no\s+(?:host|implementation)|(?:the\s+)?(?:host|implementation)\s+"
+    r"(?:does\s+not|never))\s+defines\b",
+    re.IGNORECASE,
+)
+IMPLEMENTATION_DEFINED_ALTERNATIVES = re.compile(
+    r"(?:\beither\b.{0,160}\bor\b|\bone of\b|\bwhether\b|"
+    r"\bbetween\b.{0,160}\band\b|\b(?:bounded|finite)\s+"
+    r"(?:set|range|domain)\b|\b(?:set|range|domain)\s+(?:of|from)\b|"
+    r"\([^()\n]*(?:,|\bor\b)[^()\n]*\))",
+    re.IGNORECASE,
+)
+DIFFERING_OBSERVATIONS = re.compile(
+    r"(?:\bobservations?\s+(?:that\s+)?(?:may|can)\s+"
+    r"(?:differ|vary|change)\b|\b(?:observable|observed)\b.{0,160}"
+    r"\b(?:may|can)\s+(?:differ|vary|change)\b|\b(?:may|can)\s+"
+    r"(?:differ|vary|change)\b.{0,160}\b(?:observable|observations?)\b)",
+    re.IGNORECASE,
+)
+PROFILE_ACTION = (
+    r"(?:record(?:ed|ing|s)?|document(?:ed|ing|s)?|publish(?:ed|ing|es)?|"
+    r"select(?:ed|ing|s)?|specif(?:ied|ies|ying)|declar(?:ed|es|ing)|"
+    r"include(?:d|s|ing)?|contain(?:ed|s|ing)?)"
+)
+CONFORMANCE_PROFILE_OBLIGATION = re.compile(
+    rf"(?:\b{PROFILE_ACTION}\b.{{0,160}}\bconformance profile\b|"
+    rf"\bconformance profile\b.{{0,160}}\b{PROFILE_ACTION}\b)",
+    re.IGNORECASE,
+)
+PROFILE_NEGATION = (
+    r"(?:(?:MUST|SHOULD|MAY)\s+NOT|(?:does|do|is|are|was|were|need)\s+not|"
+    r"not|never)"
+)
+NEGATED_CONFORMANCE_PROFILE_OBLIGATION = re.compile(
+    rf"(?:\b{PROFILE_NEGATION}\s+(?:(?:be|required\s+to)\s+)?"
+    rf"{PROFILE_ACTION}\b.{{0,160}}\bconformance profile\b|"
+    rf"\bconformance profile\b.{{0,160}}\b{PROFILE_NEGATION}\s+"
+    rf"(?:(?:be|required\s+to)\s+)?{PROFILE_ACTION}\b)",
+    re.IGNORECASE,
+)
+PROFILE_RECORDED_REFERENCE = re.compile(
+    r"\bprofile-(?:selected|recorded)\b", re.IGNORECASE
+)
+NEGATED_PROFILE_RECORDED_REFERENCE = re.compile(
+    r"\b(?:not|never|no longer)\s+profile-(?:selected|recorded)\b", re.IGNORECASE
 )
 UNSPECIFIED_TERM = re.compile(r"\bunspecified\b", re.IGNORECASE)
 BOUNDED_UNSPECIFIED = re.compile(
@@ -86,6 +168,12 @@ NON_NORMATIVE_HEADING_ROLE = re.compile(
     r"(?:\brationale\b|^connections$|^proof(?: outline| status)?$|"
     r"^evidence(?: route| status)?$)",
     re.IGNORECASE,
+)
+LIST_ITEM_START = re.compile(r"^\s{0,3}(?:[-+*]|\d+[.)])\s+")
+PARAGRAPH_INTERRUPTING_LIST = re.compile(r"^\s{0,3}(?:[-+*]|1[.)])\s+")
+TABLE_DELIMITER_CELL = re.compile(r"^:?-{3,}:?$")
+THEMATIC_BREAK = re.compile(
+    r"^\s{0,3}(?:(?:\*\s*){3,}|(?:-\s*){3,}|(?:_\s*){3,})$"
 )
 
 
@@ -115,23 +203,31 @@ def relative(path: Path) -> str:
 
 
 def is_ignored(path: Path) -> bool:
-    """Return whether a path is repository machinery rather than archive data."""
+    """Return whether a path is excluded from archive traversal."""
 
     try:
         parts = path.resolve().relative_to(ROOT).parts
     except ValueError:
         parts = path.parts
-    return any(part in IGNORED_NAMES or part.startswith(".") for part in parts)
+    return (
+        bool(parts and parts[0] in NON_ARCHIVE_ROOTS)
+        or any(part in IGNORED_NAMES or part.startswith(".") for part in parts)
+    )
 
 
 def visible_children(directory: Path) -> list[Path]:
-    """Return direct archive children, excluding repository machinery."""
+    """Return direct children that the directory README must inventory."""
 
+    is_root = directory.resolve() == ROOT
     return sorted(
         (
             child
             for child in directory.iterdir()
-            if not is_ignored(child) and child.name != "README.md"
+            if child.name != "README.md"
+            and (
+                not is_ignored(child)
+                or (is_root and child.name in NON_ARCHIVE_ROOTS)
+            )
         ),
         key=lambda child: child.name,
     )
@@ -195,6 +291,72 @@ def link_destination(raw: str) -> str:
         close = value.find(">")
         return value[1:close] if close >= 0 else value[1:]
     return value.split(maxsplit=1)[0]
+
+
+def authority_callout_error(stripped: str) -> str | None:
+    """Return an error for a malformed or unsupported authority-style quote."""
+
+    if (
+        AUTHORITY_STYLE_BLOCKQUOTE.match(stripped)
+        and stripped not in AUTHORITY_CALLOUTS
+    ):
+        return "malformed or unsupported specification authority label"
+    return None
+
+
+def strip_inline_code(text: str) -> str:
+    """Blank inline code spans while preserving offsets and line breaks."""
+
+    characters = list(text)
+    index = 0
+    while index < len(text):
+        if text[index] != "`" or (index > 0 and text[index - 1] == "\\"):
+            index += 1
+            continue
+        marker_end = index
+        while marker_end < len(text) and text[marker_end] == "`":
+            marker_end += 1
+        marker = text[index:marker_end]
+        close = text.find(marker, marker_end)
+        if close < 0:
+            index = marker_end
+            continue
+        for position in range(index, close + len(marker)):
+            if characters[position] != "\n":
+                characters[position] = " "
+        index = close + len(marker)
+    return "".join(characters)
+
+
+def without_matches(pattern: re.Pattern[str], text: str) -> str:
+    """Blank regex matches while preserving offsets and line breaks."""
+
+    characters = list(text)
+    for match in pattern.finditer(text):
+        for position in range(match.start(), match.end()):
+            if characters[position] != "\n":
+                characters[position] = " "
+    return "".join(characters)
+
+
+def is_table_delimiter(line: str) -> bool:
+    """Return whether a line is a valid GFM-style table delimiter row."""
+
+    stripped = line.strip()
+    if "|" not in stripped:
+        return False
+    if stripped.startswith("|"):
+        stripped = stripped[1:]
+    if stripped.endswith("|"):
+        stripped = stripped[:-1]
+    cells = [cell.strip() for cell in stripped.split("|")]
+    return bool(cells) and all(TABLE_DELIMITER_CELL.fullmatch(cell) for cell in cells)
+
+
+def is_table_row(line: str) -> bool:
+    """Return whether a line can continue a recognized Markdown table."""
+
+    return re.search(r"(?<!\\)\|", line) is not None
 
 
 def local_link_target(source: Path, raw: str) -> tuple[Path, str] | None:
@@ -271,6 +433,10 @@ def specification_structure_errors(
             previous_nonempty = stripped
             continue
 
+        authority_error = authority_callout_error(stripped)
+        if authority_error is not None:
+            errors.append(f"{display_path}:{line_number}: {authority_error}")
+
         fence = FENCE_START.match(stripped)
         if fence:
             fenced_blocks += 1
@@ -301,14 +467,270 @@ def specification_vocabulary_errors(
     active_non_normative_level: int | None = None
     fence_marker = ""
     fence_is_non_normative = False
-    pending_variability = ""
+    pending_variability: tuple[str, int] | None = None
+    pending_non_normative = False
+    block_lines: list[tuple[int, str]] = []
+    block_kind = ""
+    block_variability = ""
+    block_is_non_normative = False
     previous_nonempty = ""
+
+    def line_block_kind(line: str) -> str:
+        if LIST_ITEM_START.match(line):
+            return "list"
+        if line.startswith("    ") or line.startswith("\t"):
+            return "other"
+        return "paragraph"
+
+    def uncited_profile_reference_lines() -> list[int]:
+        raw_text = "\n".join(line for _line_number, line in block_lines)
+        text = strip_inline_code(raw_text)
+        text = without_matches(NEGATED_PROFILE_RECORDED_REFERENCE, text)
+        if block_kind == "table":
+            units: list[tuple[int, int]] = []
+            start = 0
+            for line in text.splitlines(keepends=True):
+                units.append((start, start + len(line)))
+                start += len(line)
+            if start < len(text) or not units:
+                units.append((start, len(text)))
+        else:
+            units = []
+            start = 0
+            for boundary in re.finditer(r"(?<=[.!?])(?:[ \t]+|\n+)", text):
+                units.append((start, boundary.start()))
+                start = boundary.end()
+            units.append((start, len(text)))
+
+        missing: list[int] = []
+        for unit_start, unit_end in units:
+            unit = text[unit_start:unit_end]
+            references = list(PROFILE_RECORDED_REFERENCE.finditer(unit))
+            citations = [
+                match
+                for match in MARKDOWN_CITATION.finditer(unit)
+                if urlsplit(link_destination(match.group(1))).fragment
+            ]
+            used_citations: set[int] = set()
+            for reference_index, reference in enumerate(references):
+                next_reference = (
+                    references[reference_index + 1].start()
+                    if reference_index + 1 < len(references)
+                    else len(unit)
+                )
+                citation_index = next(
+                    (
+                        index
+                        for index, citation in enumerate(citations)
+                        if index not in used_citations
+                        and citation.start() <= reference.start() < citation.end()
+                    ),
+                    None,
+                )
+                if citation_index is None:
+                    citation_index = next(
+                        (
+                            index
+                            for index, citation in enumerate(citations)
+                            if index not in used_citations
+                            and reference.end() <= citation.start() < next_reference
+                            and ";" not in unit[reference.end() : citation.start()]
+                        ),
+                        None,
+                    )
+                if citation_index is not None:
+                    used_citations.add(citation_index)
+                    continue
+                position = unit_start + reference.start()
+                line_index = raw_text.count("\n", 0, position)
+                missing.append(block_lines[min(line_index, len(block_lines) - 1)][0])
+        return missing
+
+    def finish_block() -> None:
+        nonlocal block_lines, block_kind, block_variability, block_is_non_normative
+        if not block_lines:
+            return
+
+        if not block_is_non_normative:
+            text = " ".join(line for _line_number, line in block_lines)
+            for line_number, line in block_lines:
+                if UPPERCASE_REQUIREMENT_ALIAS.search(line):
+                    errors.append(
+                        f"{display_path}:{line_number}: prohibited uppercase "
+                        "requirement alias"
+                    )
+                if UNDEFINED_BEHAVIOR.search(line):
+                    errors.append(
+                        f"{display_path}:{line_number}: normative text must not "
+                        "define undefined behavior"
+                    )
+
+            if block_variability == "implementation-defined":
+                positive_text = without_matches(NEGATED_IMPLEMENTATION_DEFINED, text)
+                positive_text = without_matches(NEGATED_HOST_DEFINITION, positive_text)
+                choice_text = without_matches(
+                    CONFORMANCE_PROFILE_OBLIGATION, positive_text
+                )
+                enumerated_table = block_kind == "table" and len(block_lines) >= 4
+                if not IMPLEMENTATION_DEFINED_DECLARATION.search(choice_text):
+                    errors.append(
+                        f"{display_path}:{block_lines[0][0]}: "
+                        "implementation-defined callout must positively declare "
+                        "an implementation-defined choice"
+                    )
+                if not (
+                    IMPLEMENTATION_DEFINED_ALTERNATIVES.search(choice_text)
+                    or enumerated_table
+                ):
+                    errors.append(
+                        f"{display_path}:{block_lines[0][0]}: "
+                        "implementation-defined choice must enumerate at least two "
+                        "alternatives or an explicitly bounded domain"
+                    )
+                if not DIFFERING_OBSERVATIONS.search(choice_text):
+                    errors.append(
+                        f"{display_path}:{block_lines[0][0]}: "
+                        "implementation-defined choice must state which observations "
+                        "may differ"
+                    )
+                if (
+                    NEGATED_CONFORMANCE_PROFILE_OBLIGATION.search(text)
+                    or not CONFORMANCE_PROFILE_OBLIGATION.search(text)
+                ):
+                    errors.append(
+                        f"{display_path}:{block_lines[0][0]}: "
+                        "implementation-defined choice must require its selection "
+                        "in the conformance profile"
+                    )
+            elif block_variability == "unspecified-presentation":
+                if not BOUNDED_UNSPECIFIED.search(text):
+                    errors.append(
+                        f"{display_path}:{block_lines[0][0]}: "
+                        "unspecified-presentation callout must label bounded "
+                        "unspecified presentation"
+                    )
+            else:
+                implementation_defined_line = next(
+                    (
+                        line_number
+                        for line_number, line in block_lines
+                        if IMPLEMENTATION_DEFINED_TERM.search(
+                            without_matches(NEGATED_IMPLEMENTATION_DEFINED, line)
+                        )
+                    ),
+                    None,
+                )
+                if implementation_defined_line is not None:
+                    errors.append(
+                        f"{display_path}:{implementation_defined_line}: "
+                        "implementation-defined choice requires a visible callout"
+                    )
+                unspecified_line = next(
+                    (
+                        line_number
+                        for line_number, line in block_lines
+                        if UNSPECIFIED_TERM.search(line)
+                    ),
+                    None,
+                )
+                if unspecified_line is not None:
+                    errors.append(
+                        f"{display_path}:{unspecified_line}: unspecified presentation "
+                        "requires a visible callout"
+                    )
+
+            for profile_reference_line in uncited_profile_reference_lines():
+                errors.append(
+                    f"{display_path}:{profile_reference_line}: profile-selected or "
+                    "profile-recorded reference requires an anchored Markdown citation"
+                )
+
+        block_lines = []
+        block_kind = ""
+        block_variability = ""
+        block_is_non_normative = False
+
+    def start_or_extend_block(
+        line_number: int, line: str, kind_override: str | None = None
+    ) -> None:
+        nonlocal pending_variability, pending_non_normative
+        nonlocal block_kind, block_variability, block_is_non_normative
+        kind = kind_override or line_block_kind(line)
+
+        if block_lines:
+            if (
+                block_kind == "paragraph"
+                and is_table_delimiter(line)
+                and len(block_lines) == 1
+                and is_table_row(block_lines[0][1])
+            ):
+                block_kind = "table"
+            elif block_kind == "paragraph" and PARAGRAPH_INTERRUPTING_LIST.match(line):
+                finish_block()
+            elif block_kind == "paragraph" and kind == "quote":
+                finish_block()
+            elif block_kind == "table" and (
+                kind in {"list", "other"} or not is_table_row(line)
+            ):
+                finish_block()
+            elif block_kind == "quote" and kind != "quote":
+                finish_block()
+
+        if not block_lines:
+            block_kind = kind
+            if pending_variability is not None:
+                if block_kind in {"paragraph", "table"}:
+                    block_variability = pending_variability[0]
+                    pending_variability = None
+                else:
+                    reject_pending_variability(
+                        "must govern an immediately following paragraph or table"
+                    )
+            block_is_non_normative = pending_non_normative
+            pending_non_normative = False
+        block_lines.append((line_number, line))
+
+    def reject_pending_variability(reason: str | None = None) -> None:
+        nonlocal pending_variability
+        if pending_variability is None:
+            return
+        kind, callout_line = pending_variability
+        if reason is not None:
+            errors.append(f"{display_path}:{callout_line}: variability callout {reason}")
+            pending_variability = None
+            return
+        if kind == "implementation-defined":
+            errors.append(
+                f"{display_path}:{callout_line}: implementation-defined callout "
+                "must label an implementation-defined choice"
+            )
+        else:
+            errors.append(
+                f"{display_path}:{callout_line}: unspecified-presentation callout "
+                "must label bounded unspecified presentation"
+            )
+        pending_variability = None
 
     for body_line, line in enumerate(body.splitlines(), start=1):
         line_number = body_line + line_offset
         stripped = line.strip()
+        if fence_marker:
+            if stripped.startswith(fence_marker):
+                finish_block()
+                fence_marker = ""
+                fence_is_non_normative = False
+            elif not fence_is_non_normative:
+                if stripped:
+                    start_or_extend_block(line_number, line)
+                else:
+                    finish_block()
+            continue
+
         heading = re.match(r"^(#{1,6})\s+(.+?)\s*#*\s*$", line)
-        if not fence_marker and heading:
+        if heading:
+            finish_block()
+            reject_pending_variability()
+            pending_non_normative = False
             level = len(heading.group(1))
             text = heading.group(2).strip()
             if active_non_normative_level is not None and level <= active_non_normative_level:
@@ -320,71 +742,88 @@ def specification_vocabulary_errors(
 
         fence = FENCE_START.match(stripped)
         if fence:
-            if fence_marker:
-                fence_marker = ""
-                fence_is_non_normative = False
-            else:
-                fence_marker = fence.group(1)
-                fence_is_non_normative = (
-                    active_non_normative_level is not None
-                    or previous_nonempty.startswith("> **Non-normative ")
-                )
+            finish_block()
+            reject_pending_variability(
+                "must govern an immediately following paragraph or table"
+            )
+            fence_marker = fence.group(1)
+            fence_is_non_normative = (
+                active_non_normative_level is not None
+                or pending_non_normative
+                or previous_nonempty in NON_NORMATIVE_CALLOUTS
+            )
+            pending_non_normative = False
             continue
 
-        if active_non_normative_level is not None or fence_is_non_normative:
+        if active_non_normative_level is not None:
             if stripped:
                 previous_nonempty = stripped
             continue
-        if stripped.startswith(">") and not stripped.startswith("> **Normative"):
+
+        if THEMATIC_BREAK.fullmatch(line):
+            finish_block()
+            reject_pending_variability(
+                "must govern an immediately following paragraph or table"
+            )
+            pending_non_normative = False
             previous_nonempty = stripped
             continue
+
         if stripped == IMPLEMENTATION_DEFINED_CALLOUT:
-            pending_variability = "implementation-defined"
+            finish_block()
+            reject_pending_variability()
+            pending_non_normative = False
+            pending_variability = ("implementation-defined", line_number)
             previous_nonempty = stripped
             continue
         if stripped == UNSPECIFIED_PRESENTATION_CALLOUT:
-            pending_variability = "unspecified-presentation"
+            finish_block()
+            reject_pending_variability()
+            pending_non_normative = False
+            pending_variability = ("unspecified-presentation", line_number)
+            previous_nonempty = stripped
+            continue
+        if stripped in NORMATIVE_CALLOUTS:
+            finish_block()
+            reject_pending_variability()
+            pending_non_normative = False
+            previous_nonempty = stripped
+            continue
+        if stripped in NON_NORMATIVE_CALLOUTS:
+            finish_block()
+            reject_pending_variability()
+            pending_non_normative = True
+            previous_nonempty = stripped
+            continue
+        authority_error = authority_callout_error(stripped)
+        if authority_error is not None:
+            finish_block()
+            reject_pending_variability()
+            pending_non_normative = False
+            errors.append(f"{display_path}:{line_number}: {authority_error}")
             previous_nonempty = stripped
             continue
         if not stripped:
+            finish_block()
+            continue
+        if stripped.startswith(">"):
+            quote_line = re.sub(r"^\s{0,3}>\s?", "", line)
+            if not quote_line.strip():
+                finish_block()
+                reject_pending_variability(
+                    "must govern an immediately following paragraph or table"
+                )
+                pending_non_normative = False
+            else:
+                start_or_extend_block(line_number, quote_line, "quote")
+            previous_nonempty = stripped
             continue
 
-        if UPPERCASE_REQUIREMENT_ALIAS.search(line):
-            errors.append(
-                f"{display_path}:{line_number}: prohibited uppercase requirement alias"
-            )
-        if UNDEFINED_BEHAVIOR.search(line):
-            errors.append(
-                f"{display_path}:{line_number}: normative text must not define "
-                "undefined behavior"
-            )
-
-        if pending_variability == "implementation-defined":
-            if not IMPLEMENTATION_DEFINED_TERM.search(line):
-                errors.append(
-                    f"{display_path}:{line_number}: implementation-defined callout "
-                    "must label an implementation-defined choice"
-                )
-            pending_variability = ""
-        elif pending_variability == "unspecified-presentation":
-            if not BOUNDED_UNSPECIFIED.search(line):
-                errors.append(
-                    f"{display_path}:{line_number}: unspecified-presentation callout "
-                    "must label bounded unspecified presentation"
-                )
-            pending_variability = ""
-        else:
-            if IMPLEMENTATION_DEFINED_TERM.search(line):
-                errors.append(
-                    f"{display_path}:{line_number}: implementation-defined choice "
-                    "requires a visible callout"
-                )
-            if UNSPECIFIED_TERM.search(line):
-                errors.append(
-                    f"{display_path}:{line_number}: unspecified presentation "
-                    "requires a visible callout"
-                )
+        start_or_extend_block(line_number, line)
         previous_nonempty = stripped
+
+    finish_block()
+    reject_pending_variability()
     return errors
 
 

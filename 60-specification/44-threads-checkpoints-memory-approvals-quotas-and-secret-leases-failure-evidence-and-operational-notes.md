@@ -2,7 +2,7 @@
 title: "Threads Checkpoints Memory Approvals Quotas And Secret Leases Failure Evidence And Operational Notes"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.2.0"
 tags:
   - milestone-07
@@ -15,7 +15,6 @@ tags:
   - secret-leases
   - failure-evidence
   - diagnostics
-  - implementation-defined-choices
   - credential-custody
 aliases:
   - "M7-P4 Failure Evidence And Operational Notes"
@@ -25,7 +24,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 4](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/phase-04-threads-checkpoints-memory-approvals-quotas-and-secret-leases.md)
 of
 [Milestone 7](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/README.md)
@@ -33,8 +32,8 @@ of
 AI, Tools, Memory, And Human Control.
 It establishes the failure evidence and operational notes for threads,
 checkpoints, memory, approvals, quotas, and secret leases, including failure
-outcomes, bounded diagnostics, evidence emission, implementation-defined
-choices, deferred work, and results that would invalidate earlier milestone
+outcomes, bounded diagnostics, evidence emission, profiled configuration,
+deferred work, and results that would invalidate earlier milestone
 assumptions.
 
 Version `0.2.0` replaces host-held secret-access failures with credential
@@ -185,6 +184,10 @@ approvals, quotas, and secret leases into the following categories:
 | `credential.mode.host_local_unapproved` | Host-local custody is selected without explicit approval and warning. | Refuse activation. |
 | `credential.egress.bypass` | Host or Port attempts authenticated provider or external-service egress outside the custodian. | Deny network operation and emit critical evidence. |
 
+The underscore codes `approval_expired` and `quota_exhausted` are diagnostics.
+The dotted names `approval.expired` and `quota.exhausted` are evidence types.
+The host MUST preserve that distinction in APIs, logs, tests, and wrappers.
+
 ### Bounded diagnostics
 
 > **Normative definition.**
@@ -300,10 +303,11 @@ Evidence MUST be bounded. It MUST NOT expose:
 - Internal host implementation details.
 - Other agents' data or state.
 
-### Implementation-defined choices
+### Configuration requirements
 
 > **Normative definition.**
-The following implementation-defined choices MUST be documented by the host:
+The following required defaults and deployment selections MUST be documented
+in the conformance profile:
 
 | Choice | Default | Documentation requirement |
 |--------|---------|---------------------------|
@@ -313,10 +317,16 @@ The following implementation-defined choices MUST be documented by the host:
 | Approval routing strategy | `any` | MUST be documented in host configuration. |
 | Quota reconciliation interval | 1 hour | MUST be documented in host configuration. |
 | Credential custody mode | `external-broker` for end-user distribution | MUST document custody mode and conformance claim. |
-| Custodian transport identity | Implementation-defined | MUST document sender constraint and private-material boundary. |
-| Receipt verification | Implementation-defined | MUST document correlation, digest, and signature or transport proof. |
 | Approval expiry default | 24 hours | MUST be documented in host configuration. |
 | Memory retention default | `permanent` | MUST be documented in host configuration. |
+
+### Internal custodian mechanisms (non-normative)
+
+Custodian transport identity, receipt proof, retry scheduling, and evidence
+storage are internal mechanisms. They may vary only when they preserve sender
+constraints, private-material boundaries, correlation, digest and scope
+verification, replay rejection, tenant isolation, and every diagnostic and
+terminal outcome specified by this chapter.
 
 ### Deferred work
 
@@ -365,13 +375,24 @@ maintainer.
 
 ### 44.3.3 Custodian and receipt detail
 
+> **Non-normative note.**
+
 - **Permission**: The host MAY present custodian identity, custody mode,
   binding revision, outcome, usage, and non-authority-bearing receipt
   fingerprints to the authorized user.
 - **Recommendation**: The host SHOULD expose enough receipt detail for the user
   to reconcile external-service use independently.
-- **Permitted presentation**: Diagnostic and evidence formatting is
-  implementation-defined.
+- **Internal presentation**: Diagnostic and evidence field ordering, encoding,
+  and layout may vary only when authorized users observe the same bounded
+  fields, values, redactions, and receipt correlations.
 - **Limit**: Presentation MUST NOT include credentials, opaque handles,
   authentication headers, external request bodies, or custodian transport
   internals.
+
+### 44.3.4 Diagnostic and evidence namespaces
+
+- **Requirement**: Use canonical underscore diagnostics and dotted lifecycle
+  evidence exactly as defined above.
+- **Permitted presentation**: A diagnostic MAY link to its resulting evidence
+  entry by identity.
+- **Limit**: Linking MUST NOT change either stable code.

@@ -2,7 +2,7 @@
 title: "Multi-Agent Recovery Clustering Seams And Milestone Acceptance Failure Evidence And Operational Notes"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.1.0"
 tags:
   - milestone-06
@@ -20,7 +20,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 5](../.spec/planning/agentic-system/milestone-06-multi-agent-coordination-and-topology/phase-05-multi-agent-recovery-clustering-seams-and-milestone-acceptance.md)
 of
 [Milestone 6](../.spec/planning/agentic-system/milestone-06-multi-agent-coordination-and-topology/README.md)
@@ -28,8 +28,7 @@ of
 Multi-Agent Coordination And Topology.
 It establishes the failure evidence and operational notes for multi-agent
 recovery clustering seams and milestone acceptance, including failure
-outcomes, bounded diagnostics, evidence emission, and implementation-defined
-choices.
+outcomes, bounded diagnostics, evidence emission, and profiled configuration.
 
 This chapter is normative by default within its stated scope.
 Material visibly marked non-normative does not create conformance
@@ -97,7 +96,6 @@ host behavior.
 | `topology.directive.malformed-role` | Topology directive with unknown `role` value. | Reject directive; do NOT create partial topology state. |
 | `topology.directive.malformed-activation-mode` | Topology directive with unknown `activation_mode` value. | Reject directive; do NOT create partial topology state. |
 | `topology.directive.malformed-lifecycle-policy` | Topology directive with unknown `lifecycle_policy` value. | Reject directive; do NOT create partial topology state. |
-| `topology.directive.timeout` | Topology directive that exceeded the implementation-defined timeout. | Reject directive; do NOT create partial topology state. |
 | `topology.node.malformed` | Topology node with missing required fields. | Reject node; do NOT create partial node state. |
 | `topology.node.malformed-dependencies` | Topology node with invalid `dependencies` list. | Reject node; do NOT create partial node state. |
 | `topology.lease.malformed` | Activation lease with missing required fields. | Reject lease; do NOT apply lease. |
@@ -117,6 +115,7 @@ which is consistent with the atomic commit protocol defined in
 | `topology.node.incompatible-agent` | Topology node whose `agent_address` does not resolve to an active agent in the durable registry. | Mark node as `incompatible`; do NOT create live agent instance. |
 | `topology.node.incompatible-dependency` | Topology node whose `dependencies` reference non-existent `node_id` values. | Reject node; do NOT create partial node state. |
 | `topology.node.incompatible-circular-dependency` | Topology directive whose `nodes` list contains a circular dependency. | Reject directive; do NOT create partial topology state. |
+| `topology.lease.transfer-unsupported` | A request attempts to transfer a lease between hosts in version `0.1.0`. | Reject transfer; preserve the current lease unchanged. |
 
 > **Non-normative note.**
 Incompatible outcomes are caused by input data that is structurally valid
@@ -143,7 +142,6 @@ configuration errors (agent never registered) and runtime failures
 | `topology.directive.duplicate-version` | Topology directive with `topology_version` that matches an already-admitted version. | Reject directive; do NOT create partial topology state. |
 | `topology.node.duplicate-node-id` | Two topology directives with the same `node_id` submitted concurrently (possible only due to hash collision, since `node_id` is deterministically derived from `topology_version`, role, `agent_address`, and position index; same `topology_version` is caught by `duplicate-version`). | Reject second directive; do NOT create partial node state. |
 | `topology.lease.expired-fence` | Activation lease with `fence_token` less than the current fence token for the same `node_id`. | Reject lease; do NOT apply lease. |
-| `topology.lease.expired-timeout` | Activation lease that has exceeded its `expires_at` timestamp. | Reject lease; do NOT apply lease. |
 | `topology.reconciliation.conflict` | Two reconciliation passes attempt to modify the same `node_id` concurrently. | Reject second reconciliation pass; do NOT apply updates. |
 
 > **Non-normative note.**
@@ -175,11 +173,16 @@ state, which is consistent with the capability policy defined in
 
 | Diagnostic | Cause | Host behavior |
 |------------|-------|---------------|
-| `topology.directive.exhausted-nodes` | Topology directive would exceed the implementation-defined maximum number of nodes per topology. | Reject directive; do NOT create partial topology state. |
-| `topology.node.exhausted-concurrency` | Topology node would exceed the implementation-defined maximum concurrency per topology. | Reject node; do NOT create partial node state. |
-| `topology.lease.exhausted-concurrency` | Host would exceed the implementation-defined maximum number of concurrent leases. | Reject lease; do NOT apply lease. |
-| `topology.mailbox.exhausted-queue` | Live agent mailbox queue exceeds the implementation-defined maximum. | Reject signal; do NOT queue signal. |
-| `topology.retry.exhausted` | Topology node exceeds the implementation-defined maximum retries. | Mark node as `failed`; do NOT retry. |
+| `topology.directive.exhausted-nodes` | Topology directive would exceed the disclosed maximum-nodes implementation limit under [Resource bounding under coordination load](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-behavior-and-integration.md#resource-bounding-under-coordination-load). | Reject directive; do NOT create partial topology state. |
+| `topology.node.exhausted-concurrency` | Topology node would exceed the disclosed concurrent-agents implementation limit under [Resource bounding under coordination load](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-behavior-and-integration.md#resource-bounding-under-coordination-load). | Reject node; do NOT create partial node state. |
+| `topology.lease.exhausted-concurrency` | Host would exceed the disclosed concurrent-leases implementation limit under [Resource bounding under coordination load](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-behavior-and-integration.md#resource-bounding-under-coordination-load). | Reject lease; do NOT apply lease. |
+| `topology.mailbox.exhausted-queue` | Live agent mailbox queue exceeds the disclosed mailbox-queue implementation limit under [Resource bounding under coordination load](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-behavior-and-integration.md#resource-bounding-under-coordination-load). | Reject signal; do NOT queue signal. |
+| `topology.retry.exhausted` | Topology node exceeds the disclosed retries-per-node implementation limit under [Resource bounding under coordination load](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-behavior-and-integration.md#resource-bounding-under-coordination-load). | Mark node as `failed`; do NOT retry. |
+| `topology.cancellation.exhausted-outstanding` | Topology node exceeds the disclosed outstanding-cancellations implementation limit. | Reject cancellation; preserve the existing cancellation state. |
+| `topology.result.exhausted-retention` | Topology node exceeds the disclosed retained-results implementation limit. | Reject additional retained result; preserve existing results. |
+| `topology.directive.timeout` | Topology directive processing exceeded the fixed 30-second timeout under [Durable topology validation behavior](39-multi-agent-recovery-clustering-seams-and-milestone-acceptance-behavior-and-integration.md#durable-topology-validation-behavior). | Reject directive; do NOT create partial topology state. |
+| `topology.lease.expired-timeout` | An admitted activation lease reached its `expires_at` timestamp. | Reject use of the expired lease; do NOT apply it. |
+| `topology.recovery.timeout` | Reconciliation after host restart exceeded the fixed 60-second recovery timeout. | Mark topology as `stale`; retry on the next reconciliation pass. |
 
 > **Non-normative note.**
 Exhausted outcomes are caused by resource limits.
@@ -191,7 +194,7 @@ which is consistent with the resource limits defined in
 
 | Diagnostic | Cause | Host behavior |
 |------------|-------|---------------|
-| `topology.directive.unavailable` | Topology directive whose `topology_owner` is not active in the durable registry. | Reject directive; do NOT create partial topology state. |
+| `topology.directive.unavailable` | Topology directive whose `topology_owner` does not resolve as active in the agent or principal registry selected by its address discriminant. | Reject directive; do NOT create partial topology state. |
 | `topology.node.unavailable-agent` | Topology node whose `agent_address` is not active in the durable registry. | Mark node as `unavailable`; do NOT create live agent instance. |
 | `topology.lease.unavailable-host` | Activation lease whose `host_id` is not active in the host registry. | Reject lease; do NOT apply lease. |
 
@@ -206,7 +209,6 @@ state, which is consistent with the agent registry contract defined in
 | Diagnostic | Cause | Host behavior |
 |------------|-------|---------------|
 | `topology.recovery.failed` | Reconciliation after host restart fails to reconstruct live placement. | Mark topology as `failed`; do NOT create partial live placement. |
-| `topology.recovery.timeout` | Reconciliation after host restart exceeds the implementation-defined timeout. | Mark topology as `stale`; retry on next reconciliation pass. |
 
 > **Non-normative note.**
 Recovery outcomes are caused by failures during host restart recovery.
@@ -225,18 +227,24 @@ Evidence is recorded in the durable audit log as defined in
 [Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md).
 
 > **Normative definition.**
-Every diagnostic MUST include the following fields:
+Every diagnostic MUST use exactly the Chapter 04 `Diagnostic` top-level
+structure. The listed topology diagnostic is `code`, `severity` is `error`,
+and `details` contains `phase`, `section`, `contract`, `profile`,
+`failed_boundary`, `timestamp`, `retryable`, `topology_identity`, `node_id`,
+and `lease_id`; inapplicable identifiers are JSON `null`.
 
-| Field | Content | Source |
-|-------|---------|--------|
-| `diagnostic` | The failure diagnostic code (e.g., `topology.directive.malformed`). | Host runtime. |
-| `phase` | The phase that produced the diagnostic (`Phase 5`). | Host runtime. |
-| `section` | The section that produced the diagnostic (e.g., `39.3`). | Host runtime. |
-| `contract` | The contract that produced the diagnostic (e.g., `Multi-Agent Recovery Clustering Seams And Milestone Acceptance`). | Host runtime. |
-| `profile` | The conformance profile that produced the diagnostic. | Host runtime. |
-| `failed_boundary` | The failed boundary (e.g., `topology.directive.create`, `topology.node.create`, `topology.lease.acquire`). | Host runtime. |
-| `timestamp` | The ISO 8601 timestamp of diagnostic emission. | Host clock. |
-| `message` | A human-readable description of the failure. | Host runtime. |
+| Failure category | Family |
+|------------------|--------|
+| Malformed | `identity.validation.topology` |
+| Incompatible | `identity.compatibility.topology` |
+| Conflicting | `identity.conflict.topology` |
+| Unauthorized | `identity.authorization.topology` |
+| Exhausted | `identity.limit.topology` |
+| Unavailable | `identity.resource.topology` |
+| Recovery failure other than timeout | `identity.resource.topology` |
+
+The code has the family of the failure-outcome table containing it. No
+additional top-level diagnostic member is permitted.
 
 > **Non-normative note.**
 The bounded diagnostic format ensures that diagnostics are consistent,
@@ -267,29 +275,31 @@ the evidence record has not been tampered with after creation.
 This is consistent with the provenance and audit contract defined in
 [Provenance Signing Audit Security And Milestone Acceptance](34-provenance-signing-audit-security-and-milestone-acceptance.md).
 
-### Implementation-defined choices
+### Implementation limits and fixed timeouts
 
 > **Normative definition.**
-The following implementation-defined choices are documented by this section.
-Host implementations MUST document these choices in the conformance
-profile.
+The resource ceilings below are implementation limits. A conforming host MUST
+publish each positive limit in its conformance profile and use the named
+diagnostic on exhaustion. Timeout behavior is fixed and MUST NOT vary by
+deployment.
 
-| Choice | Description | Constraint |
-|--------|-------------|------------|
-| Maximum nodes per topology | The maximum number of nodes that may be included in a single topology version. | Must be at least 1 and at most the implementation-defined maximum. Must be documented in the conformance profile. |
-| Maximum concurrency per topology | The maximum number of live agent instances that may execute concurrently for a single topology. | Must be at least 1 and at most the implementation-defined maximum. Must be documented in the conformance profile. |
-| Maximum concurrent leases | The maximum number of activation leases that may be active concurrently. | Must be at least 1 and at most the implementation-defined maximum. Must be documented in the conformance profile. |
-| Lease timeout | The maximum duration of an activation lease before expiration. | Must be longer than the maximum expected reconciliation pass duration. Must be documented in the conformance profile. |
-| Stale timeout | The maximum duration of inactivity before a live agent instance is marked as `stale`. | Must be longer than the maximum expected node refresh interval. Must be documented in the conformance profile. |
-| Retry timeout | The maximum duration between retry attempts for a failed topology node. | Must be longer than the maximum expected node startup duration. Must be documented in the conformance profile. |
-| Recovery timeout | The maximum duration of a full reconciliation after host restart. | Must be longer than the maximum expected reconciliation pass duration. Must be documented in the conformance profile. |
+| Item | Value or constraint | Diagnostic |
+|------|---------------------|------------|
+| Maximum nodes per topology | Positive implementation limit disclosed in the conformance profile. | `topology.directive.exhausted-nodes` |
+| Maximum concurrent agents | Positive implementation limit disclosed in the conformance profile. | `topology.node.exhausted-concurrency` |
+| Maximum concurrent leases | Positive implementation limit disclosed in the conformance profile. | `topology.lease.exhausted-concurrency` |
+| Maximum mailbox queue size | Positive implementation limit disclosed in the conformance profile. | `topology.mailbox.exhausted-queue` |
+| Maximum retries per node | Non-negative implementation limit disclosed in the conformance profile. | `topology.retry.exhausted` |
+| Maximum outstanding cancellations | Positive implementation limit disclosed in the conformance profile. | `topology.cancellation.exhausted-outstanding` |
+| Maximum retained results | Positive implementation limit disclosed in the conformance profile. | `topology.result.exhausted-retention` |
+| Lease timeout | 30 seconds after `issued_at`. | `topology.lease.expired-timeout` |
+| Stale timeout | 60 seconds without refresh. | `topology.node.stale` event |
+| Retry interval | 30 seconds between attempts. | `topology.retry.exhausted` after the retry-count limit |
+| Recovery timeout | 60 seconds after recovery starts. | `topology.recovery.timeout` |
 
 > **Non-normative note.**
-The implementation-defined choices above provide flexibility for
-different deployment scenarios while ensuring that constraints are
-documented and auditable.
-Host implementations MUST document these choices in the conformance
-profile so that operators can understand the system's behavior.
+Implementation limits bound resource admission without changing lifecycle or
+timeout semantics.
 
 ### Deferred work
 

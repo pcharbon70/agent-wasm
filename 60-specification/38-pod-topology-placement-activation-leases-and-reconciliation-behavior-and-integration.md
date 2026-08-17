@@ -2,7 +2,7 @@
 title: "Pod Topology Placement Activation Leases And Reconciliation Behavior And Integration"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.1.0"
 tags:
   - milestone-06
@@ -20,7 +20,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 4](../.spec/planning/agentic-system/milestone-06-multi-agent-coordination-and-topology/phase-04-pod-topology-placement-activation-leases-and-reconciliation.md)
 of
 [Milestone 6](../.spec/planning/agentic-system/milestone-06-multi-agent-coordination-and-topology/README.md)
@@ -89,18 +89,44 @@ Every activation lease MUST include the following fields:
 
 | Field | Content | Source |
 |-------|---------|--------|
-| `lease_id` | A deterministic lease identity derived from the topology identity, `node_id`, and a monotonic per-host sequence counter. | Host runtime. |
+| `lease_id` | The fixed lease identity derived from topology identity, `node_id`, `host_id`, and a monotonic per-host sequence counter. | Host runtime. |
+| `lease_sequence` | The monotonic `u64` sequence reserved by the host service for this lease issuance. | Host runtime. |
 | `topology_identity` | The deterministic topology identity. | Host runtime. |
 | `node_id` | The `node_id` of the topology node that this lease authorizes placement for. | Host runtime. |
-| `host_id` | The implementation-defined identifier of the host that holds this lease. | Host runtime. |
+| `host_id` | The `PrincipalAddress` with `kind: "service"` of the host that holds this lease. | Host runtime. |
 | `issued_at` | The ISO 8601 timestamp of lease issuance. | Host clock. |
 | `expires_at` | The ISO 8601 timestamp of lease expiration. | Host clock. |
 | `lease_type` | The lease type: `create`, `update`, `terminate`, or `reconcile`. | Host runtime. |
 | `fence_token` | A deterministic fence token that increases monotonically for each lease issued for the same `node_id`; older leases are rejected with this token. | Host runtime. |
 
 > **Normative definition.**
-Activation leases are time-bounded: a lease MUST expire after a maximum
-duration defined in the implementation-defined lease timeout.
+Using `frame` and `u64be` from the Chapter 38 contract, and the Canonical JSON
+bytes of `host_id`, the lease identity is:
+
+> **Normative definition.**
+
+```
+"topology-lease:sha256:" + lowercase_hex(SHA-256(
+  frame(utf8("agent-wasm/topology-lease/v1")) ||
+  frame(utf8(topology_identity)) ||
+  frame(utf8(node_id)) ||
+  frame(canonical_json(host_id)) ||
+  frame(u64be(lease_sequence))
+))
+```
+
+`lease_sequence` starts at 1 per host service and MUST NOT be reused. Renewal
+reuses `lease_id` and `lease_sequence`. A distinct lease issuance reserves a
+new sequence. No alternate identity construction is conforming.
+The per-host sequence allocator and mapping from reserved sequence to
+`lease_id` MUST be durable and reserved atomically with lease issuance.
+A supplied `lease_id` that does not equal this construction, or a distinct
+issuance that reuses a sequence, MUST be rejected with
+`topology.lease.malformed` without applying the lease.
+
+> **Normative definition.**
+Activation leases are time-bounded: a lease MUST expire 30 seconds after
+`issued_at` unless renewed.
 If a reconciliation pass does not complete before the lease expires, the
 lease is automatically revoked and the host MUST NOT use the expired lease
 to modify live placement.
@@ -110,6 +136,8 @@ Activation leases are fenced: a reconciliation pass MUST NOT apply a lease
 whose `fence_token` is less than the current `fence_token` recorded in
 observed status for the same `node_id`.
 Fenced leases are rejected with the diagnostic `topology.lease.expired-fence`.
+The first lease issued for a `node_id` has `fence_token: 1`; every distinct
+later issuance increments the last token by exactly one.
 
 > **Non-normative note.**
 Fencing prevents split-brain placement: if two reconciliation passes issue
@@ -120,24 +148,25 @@ node at any time.
 
 > **Normative definition.**
 Activation leases are renewable: a reconciliation pass MAY renew an
-active lease before expiration by issuing a new lease with the same
-`lease_id` and an incremented `fence_token`.
-Renewed leases extend the lease's `expires_at` timestamp.
+active lease before expiration. Renewal reuses the same `lease_id`,
+`lease_sequence`, and `fence_token` and extends only `expires_at`. A distinct
+lease issued for the same `node_id` after the previous lease expires or is
+revoked MUST reserve a new `lease_sequence` and increment `fence_token` by one.
+The renewed `expires_at` MUST be exactly 30 seconds after the host accepts the
+renewal.
 
 > **Normative definition.**
-Activation leases are transferable: a reconciliation pass MAY transfer
-an active lease to another host by revoking the current lease and issuing
-a new lease on the target host.
-Transfer is used for host failover: if the host holding a lease crashes,
-the target host MUST issue a new lease with an incremented `fence_token`
-to take over placement authority.
+Activation leases MUST NOT be transferred between hosts in version `0.1.0`.
+A transfer request MUST be rejected with
+`topology.lease.transfer-unsupported` without revoking, renewing, or replacing
+the current lease. After host failure, the lease expires or is revoked and the
+single-host recovery flow issues a distinct new lease using a new
+`lease_sequence`; that operation is not a transfer.
 
 > **Non-normative note.**
-Lease transfer is essential for fault tolerance: if a host crashes while
-holding an active lease, the lease is automatically revoked on the crashed
-host; the target host MUST issue a new lease to take over placement
-authority.
-This ensures that placement is never lost due to host crashes.
+Cross-host lease transfer requires the distributed coordination deferred to a
+later milestone. Single-host recovery reconstructs placement from durable
+topology after the old lease is no longer authoritative.
 
 ### Reconciliation of missing, extra, failed, stale, moved, incompatible, and dependency-blocked agents
 
@@ -169,7 +198,7 @@ into live placement by applying the following rules in order:
      executing; do NOT include its results in aggregated results.
 
 4. **Stale nodes**: For each node in live placement whose live state has
-   not been refreshed within the implementation-defined stale timeout,
+   not been refreshed for 60 seconds,
    mark the node as `stale` and apply the node's `lifecycle_policy` to
    determine whether to restart, wait, or allow partial results.
 
@@ -239,8 +268,8 @@ Topology validation ensures that topology directives are structurally
 valid and semantically consistent before admission.
 The host MUST validate the following rules for every topology directive:
 
-1. The `topology_owner` address MUST resolve to an active agent in the
-   durable registry.
+1. The `topology_owner` MUST resolve to an active addressable principal in the
+   agent registry or principal registry, according to its discriminant.
 2. The `nodes` list MUST contain at least one node.
 3. Each node's `agent_address` MUST resolve to an active agent in the
    durable registry.
@@ -252,9 +281,21 @@ The host MUST validate the following rules for every topology directive:
 6. Each node's `lifecycle_policy` MUST name a defined lifecycle policy
    (`terminate-on-topology-revoke`, `wait-completion-on-topology-revoke`,
    or `allow-partial-on-topology-revoke`).
-7. A topology directive whose `topology_version` matches an already-
+7. Each node's `resource_class` MUST be `default`; another value MUST be
+   rejected with `topology.node.incompatible-resource-class`.
+8. `topology_identity` MUST equal the fixed construction from
+   `topology_version`, `topology_owner`, and `topology_sequence`; a mismatch
+   MUST be rejected with `topology.directive.malformed`.
+9. Every `node_id` MUST equal the fixed construction from topology version,
+   role, agent address, and position index; a mismatch MUST be rejected with
+   `topology.directive.malformed-node-id`.
+10. A topology directive whose `topology_version` matches an already-
    admitted version (recorded in the durable state journal) MUST be
    rejected with the diagnostic `topology.directive.duplicate-version`.
+
+The host MUST complete topology directive validation within 30 seconds of
+receipt. Exceeding 30 seconds MUST reject the directive with
+`topology.directive.timeout` and MUST NOT create partial topology state.
 
 > **Non-normative note.**
 Topology validation ensures that topology directives are valid before

@@ -2,7 +2,7 @@
 title: "Tool Catalogs Retrieval Code Execution And Connectors Behavior And Integration"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.2.0"
 tags:
   - milestone-07
@@ -25,7 +25,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 2](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/phase-02-tool-catalogs-retrieval-code-execution-and-connectors.md)
 of
 [Milestone 7](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/README.md)
@@ -152,20 +152,24 @@ When the host receives a tool execution request, it MUST:
 3. **Check the catalog**: The host MUST verify that the tool is active
    and available in the filtered catalog. Stale or unavailable tools MUST
    be rejected with `tool.execution.unknown_tool` or `tool.execution.stale_catalog`.
-4. **Create the effect attempt**: The host MUST create a durable effect
+4. **Materialize network authority**: For code network access, the host MUST
+   resolve the selected network-class descriptor and persist the exact
+   descriptor-and-policy destination intersection. It MUST reject an empty
+   intersection before sandbox execution.
+5. **Create the effect attempt**: The host MUST create a durable effect
    attempt for the tool execution. The attempt captures the request,
    the tool descriptor, and the execution context.
-5. **Prepare and execute the tool**: The host MUST invoke an approved tool
+6. **Prepare and execute the tool**: The host MUST invoke an approved tool
    handler or ask the connector to prepare a typed operation. An authenticated
    connector operation MUST be executed by its bound credential custodian as
    defined below. Execution is bounded by the `timeout_ms` and
    `resource_budget` fields.
-6. **Normalize the result**: The host MUST normalize the tool result
+7. **Normalize the result**: The host MUST normalize the tool result
    into the common format defined in section 42.1. Normalization includes
    schema validation, content filtering, and provenance capture.
-7. **Emit the result signal**: The host MUST emit a `tool.execution.result`
+8. **Emit the result signal**: The host MUST emit a `tool.execution.result`
    signal with the normalized result.
-8. **Record the attempt**: The host MUST record the effect attempt in
+9. **Record the attempt**: The host MUST record the effect attempt in
    the durable journal with the result.
 
 > **Non-normative note.**
@@ -241,6 +245,12 @@ execution, and connectors.
 Each outcome describes a specific failure condition and the expected
 host behavior.
 
+#### Malformed network destination
+
+| Diagnostic | Cause | Host behavior |
+|------------|-------|---------------|
+| `tool.descriptor.malformed-destination` | A descriptor destination violates the exact `NetworkDestination` host, port, or side-effect-class rules. | Reject the descriptor before catalog admission; do not create executable tool state. |
+
 #### Unknown tool
 
 | Diagnostic | Cause | Host behavior |
@@ -299,7 +309,7 @@ The host MUST reject the result and emit a warning in diagnostics.
 
 | Diagnostic | Cause | Host behavior |
 |------------|-------|---------------|
-| `tool.execution.sandbox_failure` | Code execution failed due to sandbox restrictions (e.g., memory limit, network restriction). | Cancel execution; emit `tool.execution.failed` signal. |
+| `tool.execution.sandbox_failure` | An admitted code execution attempts a canonical destination outside `authorized_network_destinations` or exceeds its network budget. | Deny the network operation before contact, cancel execution, and emit `tool.execution.failed`. |
 
 > **Non-normative note.**
 Sandbox failure is caused by the code violating sandbox restrictions.
@@ -382,17 +392,18 @@ earlier chapters:
 
 ## Variability register
 
-The following table lists every implementation-defined choice,
-non-normative disposition, and permitted presentation documented in this
-chapter.
+The following table summarizes the variability documented in this chapter.
+
+> **Non-normative note.**
 
 | Item | Location | Nature | Constraint |
 |------|----------|--------|------------|
 | Framework plugin query order | Section 42.2 | MAY | Must query all approved framework plugins. Order is informational. |
 | Catalog filtering order | Section 42.2 | MAY | Must apply all filters: status, capability, tenant scope. Order is informational. |
 | Tool resolution caching | Section 42.2 | MAY | May cache filtered catalog. Must invalidate on descriptor change. Documented in conformance profile. |
-| Tool execution timeout | Section 42.2 | MAY | Must be at least the minimum execution duration. Documented in conformance profile. |
-| Resource budget limits | Section 42.2 | MAY | Must respect implementation-defined maximums. Documented in conformance profile. |
+| Tool execution timeout | [Implementation limits and closed deployment modes](42-tool-catalogs-retrieval-code-execution-and-connectors-failure-evidence-and-operational-notes.md#implementation-limits-and-closed-deployment-modes) | Implementation limit | Descriptor and request values must be positive and no greater than the published maximum; retrieval remains fixed at 60 seconds. |
+| Resource budget limits | [Implementation limits and closed deployment modes](42-tool-catalogs-retrieval-code-execution-and-connectors-failure-evidence-and-operational-notes.md#implementation-limits-and-closed-deployment-modes) | Implementation limit | Must use the named exhaustion diagnostics and publish each limit in the conformance profile. |
+| Network destination admission | [Code-execution request and result schema](42-tool-catalogs-retrieval-code-execution-and-connectors-contract-and-data-model.md#code-execution-request-and-result-schema) | Fixed | Persist the exact descriptor-and-policy intersection and contact only members. |
 | Result normalization order | Section 42.2 | MAY | Must validate schema, filter content, capture provenance. Order is informational. |
 | Diagnostic message format | Section 42.2 | MAY | Must include all required fields. Free-text portion is informational. |
 | Evidence record field order | Section 42.2 | SHOULD | Must include all required fields. Order is informational. |

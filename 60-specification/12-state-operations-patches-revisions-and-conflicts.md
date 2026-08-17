@@ -2,8 +2,8 @@
 title: "State Operations Patches Revisions And Conflicts"
 kind: specification
 created: "2026-08-08"
-status: draft
-spec_version: "0.1.0"
+status: normative
+spec_version: "1.0.0"
 tags:
   - milestone-02
   - phase-03
@@ -20,7 +20,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 3](../.spec/planning/agentic-system/milestone-02-signals-actions-state-and-strategies/phase-03-state-operations-patches-revisions-and-conflicts.md)
 of
 [Milestone 2](../.spec/planning/agentic-system/milestone-02-signals-actions-state-and-strategies/README.md)
@@ -60,8 +60,9 @@ before application.
 ### StateOperation
 
 > **Normative definition.**
-A state operation is a deterministic, idempotent mutation or observation
-of agent state within a turn.
+A state operation is a deterministic mutation or observation of agent state
+within a turn. The containing patch identity supplies duplicate suppression;
+individual operations such as `append` and `increment` are not idempotent.
 Each operation acts on a canonical path and carries an optional precondition
 for optimistic concurrency control.
 
@@ -69,6 +70,7 @@ for optimistic concurrency control.
 Only the following operation kinds are specified; their deterministic semantics
 MUST be explicit.
 
+- **replace**: Replace the complete state object. Valid only at the root path.
 - **set**: Write a value at a path. Overwrites any existing value.
 - **delete**: Remove a value at a path. No-op if path does not exist.
 - **merge**: Merge a partial object into an existing object at a path.
@@ -80,7 +82,7 @@ MUST be explicit.
 
 ```
 StateOperation {
-  type: "set" | "delete" | "merge" | "append" | "increment" | "test",
+  type: "replace" | "set" | "delete" | "merge" | "append" | "increment" | "test",
   path: CanonicalPath,
   value: JsonValue?,
   delta: number?,
@@ -88,13 +90,10 @@ StateOperation {
   schema_version: string?
 }
 
-CanonicalPath {
-  segments: string[],
-  namespace: string
-}
+CanonicalPath = string
 
 Precondition {
-  type: "exists" | "not_exists" | "version_matches" | "custom",
+  type: "exists" | "not_exists" | "version_matches",
   expected: JsonValue?,
   message: string?
 }
@@ -103,8 +102,8 @@ Precondition {
 | Field | Type | Required | Purpose |
 |-------|------|----------|---------|
 | `type` | string | Yes | Operation kind |
-| `path` | CanonicalPath | Yes | Target path with namespace |
-| `value` | JsonValue? | Conditional | Value to set/merge/append |
+| `path` | CanonicalPath | Yes | Target canonical JSON Pointer |
+| `value` | JsonValue? | Conditional | Value to replace/set/merge/append |
 | `delta` | number? | Conditional | Numeric delta for increment |
 | `precondition` | Precondition? | No | Optimistic concurrency check |
 | `schema_version` | string? | No | Expected state schema version |
@@ -122,58 +121,107 @@ to enable optimistic concurrency control.
 ```
 Patch {
   id: string,
-  base_revision: string,
+  base_revision: int,
   state_schema_version: string?,
   operations: StateOperation[],
   created_at: UnixTimestamp,
-  created_by: string
+  producer_id: string,
+  authorized_principal: string?
 }
 ```
 
 | Field | Type | Required | Purpose |
 |-------|------|----------|---------|
 | `id` | string | Yes | Patch identifier |
-| `base_revision` | string | Yes | Expected state revision before patch |
+| `base_revision` | int | Yes | Expected revision sequence number before patch |
 | `state_schema_version` | string? | No | Expected state schema version |
 | `operations` | StateOperation[] | Yes | Ordered sequence of operations |
 | `created_at` | timestamp | Yes | Patch creation timestamp |
-| `created_by` | string | Yes | Originator identifier (turn ID or caller principal) |
+| `producer_id` | string | Yes | Producing invocation or maintenance-request identity |
+| `authorized_principal` | string? | Yes | Accepted-ingress principal; null only for host-generated work |
+
+When converting a reducer-produced wire `StatePatch` to this internal `Patch`,
+the host MUST set `base_revision` to the integer
+`TurnRequest.agent.expected_state_revision`, set `state_schema_version` from
+the admitted reducer descriptor, set `created_at` from the input signal's
+canonical timestamp, set `producer_id` to the producing invocation id, and set
+`authorized_principal` from the persisted accepted-ingress principal.
+
+The wire fields convert to operations in the Chapter 04 application order:
+
+1. A non-null `replace` produces one `replace` operation at root path `""` and
+   no other operation.
+2. Otherwise, each `delete` JSON Pointer produces one `delete` operation in
+   array order.
+3. A non-null `merge` produces one `merge` operation at root path `""`.
+4. Each `set` entry produces one `set` operation in array order.
+
+`append`, `increment`, and `test` are available only to separately authorized
+host maintenance requests in protocol `1.0.0`; no reducer wire field silently
+maps to them. The canonical patch id is:
+
+> **Normative definition.**
+
+```
+patch_id = "patch:sha256:" + lowercase_hex(SHA-256(canonical_json([
+  base_revision,
+  state_schema_version,
+  operations,
+  created_at,
+  producer_id,
+  authorized_principal
+])))
+```
+
+The patch's `id` MUST equal `patch_id`. The id is excluded from its own
+preimage. Host-originated maintenance patches use the maintenance-request
+identity for `producer_id`, the authenticated caller for
+`authorized_principal`, and the admitted maintenance-request timestamp for
+`created_at`, then use the same id construction.
 
 ### Path constraints
 
 > **Normative definition.**
-Canonical paths MUST conform to the following constraints:
-
-- Paths MUST use dot-separated segments (e.g., `agent.state.counter`).
-- Segments MUST be non-empty strings.
-- Segments MUST match `^[a-zA-Z_][a-zA-Z0-9_]*$`.
-- Paths MUST not exceed 1000 characters.
-- Paths MUST include a namespace prefix (e.g., `agent.`, `user.`).
+Canonical paths are JSON Pointers. The root path is the empty string. A
+non-root path MUST begin with `/`; `~` and `/` within a segment MUST use the
+RFC 6901 escapes `~0` and `~1`, and every other `~` escape is invalid. Paths
+MUST NOT exceed 1000 Unicode scalar values or 50 decoded segments. The root is
+valid only for `replace` and `merge`.
 
 | Constraint | Limit | Purpose |
 |------------|-------|---------|
 | Maximum path length | 1000 characters | Prevent path explosion |
-| Segment regex | `^[a-zA-Z_][a-zA-Z0-9_]*$` | Enforce canonical naming |
-| Minimum segments | 1 (namespace) | Ensure namespace ownership |
+| Escape syntax | RFC 6901 `~0` and `~1` only | Ensure one canonical path spelling |
+| Minimum segments | 0 (root) | Root is restricted to replace and merge |
 | Maximum segments | 50 | Prevent deep nesting |
 
 ### Namespace ownership
 
 > **Normative definition.**
-Each namespace prefix (e.g., `agent.`, `user.`, `config.`) identifies the principal authorized to write to paths under that namespace.
-The `created_by` field on a Patch identifies the caller principal, and the host MUST enforce namespace write permissions against this identifier.
+The first decoded JSON Pointer segment selects a namespace only when it is
+`user` or `config`; every other path, including `/counter`, belongs to the
+default `agent` namespace. The host MUST authorize the namespace against the
+accepted `authorized_principal`, the producing action's `state_access`, and
+the turn grants before commit. `producer_id` is provenance and MUST NOT be used
+as the caller principal.
 
 The following namespace ownership rules apply by default:
 
 | Namespace | Authorized principal | Description |
 |-----------|---------------------|-------------|
-| `agent.` | Host | Agent-owned internal state |
-| `user.` | User | User-owned data |
-| `config.` | Host | Agent configuration |
+| `agent` (default) | Host commit pipeline after action/grant validation | Agent-owned internal state |
+| `user` | Authenticated user principal | User-owned data |
+| `config` | Separately authorized host maintenance principal | Agent configuration |
 
 > **Normative definition.**
 Implementations MAY define additional namespaces.
-The `Unauthorized` diagnostic family applies when a patch targets a namespace not owned by the caller.
+Every additional namespace MUST have one documented authorized principal class
+and MUST use the same precommit ownership enforcement as the default
+namespaces.
+The `Unauthorized` diagnostic family applies when a patch targets a namespace
+not authorized for the accepted principal, action, and grants. A null
+`authorized_principal` is valid only for host-generated work and never
+authorizes the `user` namespace.
 
 ### Patch-size limits
 
@@ -208,7 +256,7 @@ Revision {
   sequence_number: int,
   state_hash: string,
   timestamp: UnixTimestamp,
-  previous_revision: string
+  previous_revision: string?
 }
 ```
 
@@ -218,7 +266,7 @@ Revision {
 | `sequence_number` | int | Yes | Monotonic sequence number |
 | `state_hash` | string | Yes | Cryptographic hash of state |
 | `timestamp` | UnixTimestamp | Yes | Revision creation timestamp |
-| `previous_revision` | string | Yes | Parent revision ID |
+| `previous_revision` | string? | Yes | Parent revision ID; null for initialization |
 
 ## 3.2 Behavior And Integration
 
@@ -230,7 +278,8 @@ The host MUST validate patches in the following order before application:
 1. **Size check**: Verify patch size does not exceed limits.
 2. **Structure validation**: Verify patch structure conforms to the Patch schema.
 3. **Schema check**: Verify `state_schema_version` matches if provided.
-4. **Revision check**: Verify the patch's `base_revision` matches the current state revision.
+4. **Revision check**: Verify the patch's `base_revision` matches the current
+   revision sequence number.
 5. **Operation validation**: Verify each operation's type, path, and value.
 6. **Precondition check**: Verify each operation's precondition against current state.
 
@@ -260,10 +309,14 @@ If an operation fails mid-application, the host MUST rollback to before-state.
 The host MUST calculate the next revision as follows:
 
 - `sequence_number` = current_sequence_number + 1
-- `state_hash` = hash(current_state)
+- `state_hash` = SHA-256(canonical_json(current_state))
 - `timestamp` = current_timestamp
 - `previous_revision` = current_revision_id
-- `id` = hash(sequence_number || state_hash || previous_revision)
+- `id` = SHA-256(canonical_json([sequence_number, state_hash, previous_revision]))
+
+`canonical_json` is defined by
+[Canonical JSON encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md#canonical-json-encoding).
+SHA-256 digest bytes MUST be represented as lowercase hexadecimal.
 
 ### State initialization
 
@@ -272,8 +325,11 @@ The host MUST support full-snapshot initialization for new agents:
 
 1. Accept a complete state object as initial value.
 2. Compute initial state hash.
-3. Create initial revision with `sequence_number = 0`.
-4. Set initial revision as current state revision.
+3. Create initial revision with `sequence_number = 1` and
+   `previous_revision = null`.
+4. Compute `id` as
+   `SHA-256(canonical_json([1, state_hash, null]))` and set the initial
+   revision as current.
 
 > **Normative definition.**
 Migration from legacy state formats MUST produce a full-snapshot initialization
@@ -282,19 +338,29 @@ followed by patch-based ordinary turns.
 ### Conflict detection
 
 > **Normative definition.**
-The host MUST detect conflicts when two patches target the same `base_revision` concurrently.
-This is the only true conflict condition; other failure modes (stale revision, precondition failure) are caught during validation steps 4 and 6.
+Ordinary reducer patches are serialized by the mailbox and current turn lease.
+The host loads the current revision only after lease acquisition, so a later
+ordinary turn observes the prior turn's commit rather than producing a patch
+against its old base. Only the patch produced by the turn holding the current
+fencing token is eligible for validation and commit. Prebuilt maintenance
+patches MUST acquire the same lease and enter one FIFO single-writer queue.
 
 > **Normative definition.**
-Upon conflict detection, the host MUST reject one of the conflicting patches and emit a `state.patch.conflict` diagnostic.
-The selection of which patch to reject is implementation-defined (e.g., last-writer-wins, first-come-first-served).
+If multiple prebuilt maintenance patches name the same base revision, their
+FIFO queue order determines the first eligible patch. After it commits, every
+later patch naming the old revision is rejected with `state.revision.stale`.
+An ordinary turn or maintenance request that lacks the current lease is
+rejected by the turn-lease contract; patch-id ordering MUST NOT choose a
+winner. Equal patch ids are duplicate input and are rejected with
+`state.revision.duplicate`.
 
 ### Deterministic behavior
 
 > **Normative definition.**
 All state operations MUST be deterministic:
 
-- Operations MUST produce identical results given identical inputs.
+- Operations MUST produce identical results given identical inputs and one
+  application.
 - Operation order MUST be deterministic (sequential within a patch).
 - State hash computation MUST be deterministic.
 - Revision sequence numbers MUST be monotonically increasing.
@@ -315,7 +381,7 @@ without exposing secrets or implementation internal state.
 
 | Family | Purpose | Example codes |
 |--------|---------|---------------|
-| `state.patch` | Patch validation failures | `malformed`, `incompatible`, `conflict` |
+| `state.patch` | Patch validation failures | `malformed`, `incompatible` |
 | `state.operation` | Operation validation failures | `unknown_type`, `invalid_path`, `precondition_failed` |
 | `state.revision` | Revision-related failures | `stale`, `duplicate`, `sequence_error` |
 | `state.schema` | Schema validation failures | `version_mismatch`, `type_error` |
@@ -328,27 +394,34 @@ without exposing secrets or implementation internal state.
 |------|-------------|------------|
 | Malformed | Invalid patch or operation structure | Failed JSON parsing or schema validation |
 | Incompatible | State schema version incompatible | Schema version mismatch |
-| Conflicting | Concurrent patch application | Same base_revision targeted |
+| Conflicting | Concurrent turn ownership | Request does not hold the current turn lease |
 | Unauthorized | Missing write permissions | Path namespace ownership violated |
 | Exhausted | Size limits exceeded | Patch, value, or path too large |
 | Unavailable | State initialization required | Agent has no initial state |
 | Stale | Patch targets outdated revision | base_revision does not match current |
 | Precondition failed | Operation precondition not met | test operation or conditional check fails |
 
-### Implementation-defined choices
+### Fixed revision storage policy and governing references
 
-> **Normative implementation-defined choice.**
-The following choices are implementation-defined and do not create
-conformance obligations.
-The Variability register below catalogs all such choices.
+1. **Hash algorithm**: State and revision identifiers use the fixed SHA-256
+   calculations in [Next-revision calculation](#next-revision-calculation).
 
-1. **Hash algorithm**: The host MAY choose the hash algorithm for state and revision computation (e.g., SHA-256, SHA-3). The algorithm MUST be documented in the conformance profile.
+2. **Concurrent request serialization**: Mailbox FIFO and the current turn
+   lease provide the fixed single-writer order under
+   [Conflict detection](#conflict-detection). Patch ids never select a winner.
 
-2. **Conflict resolution**: The host MAY implement conflict resolution strategies (e.g., last-writer-wins, custom merge functions). The strategy is implementation-defined.
+3. **Snapshot frequency**: The host MUST materialize one canonical full-state
+   snapshot for every committed revision before making that revision current.
+   Snapshot persistence is part of the atomic patch commit. A snapshot write
+   failure MUST emit `identity.storage.write_failed`, publish no revision, and
+   leave the prior state current.
 
-3. **Snapshot frequency**: The host MAY choose how frequently to emit full-state snapshots (e.g., every N revisions, on-demand). The frequency is implementation-defined.
-
-4. **State compression**: The host MAY compress state snapshots for storage efficiency. The compression algorithm is implementation-defined.
+4. **State compression**: The host MAY compress only the internal storage
+   representation of a snapshot. Decompression MUST produce bytes identical
+   to the canonical uncompressed snapshot; hashes MUST be computed from the
+   uncompressed bytes. Compression MUST NOT change snapshot availability,
+   commit behavior, diagnostics, or protocol output, and its format is not a
+   profile selection.
 
 ### Deferred work
 
@@ -399,7 +472,8 @@ initialized with a full state snapshot.
 Expected behavior:
 
 - Input: full state snapshot for new agent.
-- Expected output: initial revision with sequence_number = 0.
+- Expected output: initial revision with `sequence_number = 1` and
+  `previous_revision = null`.
 - Expected error: null.
 
 ### Stale revision rejection
@@ -414,17 +488,19 @@ Expected behavior:
 - Expected output: null.
 - Expected error: `state.revision.stale`.
 
-### Conflicting patch rejection
+### Same-base request serialization
 
 > **Normative definition.**
-The conflicting patch rejection integration test validates that two concurrent
-patches targeting the same revision result in one being rejected.
+The same-base request test validates that two prebuilt maintenance patches
+naming one revision are serialized before patch application.
 
 Expected behavior:
 
-- Input: two patches with same base_revision submitted concurrently.
-- Expected output: one patch succeeds, other is rejected.
-- Expected error: `state.patch.conflict` for rejected patch.
+- Input: two authorized prebuilt maintenance patches with the same
+  `base_revision`, submitted to the FIFO maintenance queue.
+- Expected output: the FIFO-earlier patch acquires the lease and commits; the
+  later patch is rejected before application.
+- Expected error: `state.revision.stale` for the later request.
 
 ### Precondition failure
 
@@ -458,7 +534,8 @@ paths are rejected.
 
 Expected behavior:
 
-- Input: operation with invalid path (e.g., empty segment, invalid characters).
+- Input: operation with an invalid JSON Pointer escape, a non-root path without
+  a leading slash, or a root path used by a non-root operation.
 - Expected output: null.
 - Expected error: `state.operation.invalid_path`.
 
@@ -493,19 +570,27 @@ Any approved variability MUST be documented in the Milestone 2 exit report.
 
 ## Variability register
 
+This register summarizes the governing clauses linked below; it does not
+define or redeclare permitted variation.
+
+> **Non-normative note.**
+
 | Clause | Type | Selection |
 |--------|------|-----------|
-| State operations | Required | Six kinds fixed by this chapter |
+| State operations | Required | Seven kinds fixed by this chapter; reducer wire patches map only to replace, delete, merge, and set |
 | Patch structure | Required | Fields fixed by this chapter |
-| Path constraints | Required | Canonical path format fixed by this chapter |
+| [Patch identity](#patch) | Required | SHA-256 over the canonical non-self-referential patch fields |
+| [Wire-to-internal bridge](#patch) | Required | Expected revision, schema version, JSON Pointer operations, producer id, and accepted principal map exactly |
+| Path constraints | Required | Canonical JSON Pointer format fixed by this chapter |
 | Namespace ownership | Required | Default namespaces fixed by this chapter |
+| [Additional namespaces](#namespace-ownership) | MAY | Additional namespaces require explicit ownership and the same authorization checks |
 | Patch-size limits | Required | Limits fixed by this chapter |
 | Revision structure | Required | Fields fixed by this chapter |
 | Validation order | Required | 6-step order fixed by this chapter |
-| Hash algorithm | Implementation-defined | Documented in conformance profile |
-| Conflict resolution | Implementation-defined | Documented in conformance profile |
-| Snapshot frequency | Implementation-defined | Documented in conformance profile |
-| State compression | Implementation-defined | Documented in conformance profile |
+| [Hash algorithm](#next-revision-calculation) | Required | SHA-256 over canonical JSON |
+| [Concurrent request serialization](#conflict-detection) | Required | Ordinary turns load after lease acquisition; FIFO and lease order serialize prebuilt maintenance patches and later same-base patches are stale |
+| [Snapshot frequency](#fixed-revision-storage-policy-and-governing-references) | Required | One canonical full-state snapshot per committed revision |
+| [State compression](#fixed-revision-storage-policy-and-governing-references) | MAY (internal) | Permitted only under byte-identical and failure-equivalent behavior |
 
 ## Rationale and evidence (non-normative)
 
@@ -515,7 +600,7 @@ and the operational needs of a multi-tenant, multi-agent system.
 
 The state operation model provides:
 
-- Deterministic, idempotent mutations that enable predictable state transitions.
+- Deterministic mutations with patch-level duplicate suppression.
 - Canonical paths with namespace ownership for clear state boundaries.
 - Optional preconditions for optimistic concurrency control.
 

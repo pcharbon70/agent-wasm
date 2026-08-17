@@ -2,7 +2,7 @@
 title: "Direct FSM Tool-Loop And Planning Strategies Behavior And Integration"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.1.0"
 tags:
   - milestone-07
@@ -20,7 +20,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 3](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/phase-03-direct-fsm-tool-loop-and-planning-strategies.md)
 of
 [Milestone 7](../.spec/planning/agentic-system/milestone-07-ai-tools-memory-and-human-control/README.md)
@@ -160,11 +160,22 @@ The host MUST follow this budget enforcement flow:
 
 2. **Budget tracking**: The host tracks the remaining budgets for the strategy execution.
 
-3. **Budget checking**: Before each strategy transition, the host checks if the budgets are exhausted.
+3. **Budget calculation**: Before each strategy transition, the host calculates
+   the exact deduction that transition requires from each budget.
 
-4. **Budget deduction**: After each strategy transition, the host deducts the cost from the budgets.
+4. **Budget checking**: If any required deduction exceeds its remaining
+   budget, the host emits that budget's diagnostic and terminates without the
+   transition or its effect.
 
-5. **Budget exhaustion**: If any budget is exhausted, the host terminates the strategy execution.
+5. **Budget deduction**: Otherwise the host atomically deducts the calculated
+   amounts with the transition.
+
+A `tool_requested` transition deducts exactly one tool unit. A zero remaining
+tool balance permits processing and termination transitions that require no
+new tool unit, but the next `tool_requested` is rejected with
+`tool_budget_exhausted`. The same insufficient-before-effect rule applies to
+every count or quantity budget; reaching zero does not retroactively reject
+the transition that consumed the last authorized unit.
 
 > **Normative definition.**
 The host MUST enforce the following budget types:
@@ -173,6 +184,7 @@ The host MUST enforce the following budget types:
 |-------------|------|------------|------------|
 | `turns` | Number of turns | Host runtime | Host policy |
 | `tokens` | Number of tokens | Host runtime | Host policy |
+| `tools` | Number of durably committed tool requests | Host runtime | Host policy |
 | `iterations` | Number of strategy iterations | Host runtime | Host policy |
 | `cost` | Monetary cost (e.g., USD) | Host runtime | Host policy |
 | `time` | Elapsed time (e.g., seconds) | Host runtime | Host policy |
@@ -194,13 +206,14 @@ The host MUST enforce budgets at the following points:
 6. **Plan adaptation**: The host checks if the plan adaptation is within the budgets.
 
 > **Normative definition.**
-When a budget is exhausted, the host MUST terminate the strategy execution
-and emit the corresponding diagnostic:
+When a transition requires more than a remaining budget, the host MUST
+terminate the strategy execution and emit the corresponding diagnostic:
 
 | Budget type | Diagnostic |
 |-------------|------------|
 | `turns` | `turn_budget_exhausted` |
 | `tokens` | `token_budget_exhausted` |
+| `tools` | `tool_budget_exhausted` |
 | `iterations` | `iteration_budget_exhausted` |
 | `cost` | `cost_budget_exhausted` |
 | `time` | `time_budget_exhausted` |
@@ -232,20 +245,23 @@ When the FSM detects a non-progress loop, the FSM MUST transition to
 `terminated` and emit a `nonprogress_loop_detected` diagnostic.
 
 > **Normative definition.**
-A non-progress loop is detected when the same state is entered N times
-without progress.
-The threshold N is implementation-defined but MUST be documented.
+A non-progress loop is detected by the snapshot counter algorithm in Section
+43.1. A state entry is counted against the previous entry only when both the
+state and `progress_revision` are unchanged. The threshold is exactly 5.
 
 > **Normative definition.**
 The host MUST enforce the following non-progress loop behavior:
 
 1. **Detection**: The FSM detects a non-progress loop by monitoring state transitions.
 
-2. **Threshold**: A non-progress loop is detected when the same state is entered N times without progress.
+2. **Counter update**: Apply the exact state-entry reset and increment rules
+   from Section 43.1; timestamps, retries, diagnostics, evidence, and budget
+   deductions do not reset the counter.
 
 3. **Termination**: The FSM transitions to `terminated` and emits a `nonprogress_loop_detected` diagnostic.
 
-4. **Evidence emission**: The host emits evidence with the loop details (states, transitions, duration).
+4. **Evidence emission**: The host emits evidence with the state,
+   `progress_revision`, count of 5, transitions, and duration.
 
 5. **History preservation**: The loop details are preserved in history for debugging.
 
@@ -258,20 +274,25 @@ When the FSM detects a repeated tool request, the FSM MUST transition to
 `terminated` and emit a `repeated_tool_request_detected` diagnostic.
 
 > **Normative definition.**
-A repeated tool request is detected when the same tool is requested N times
-without a different result.
-The threshold N is implementation-defined but MUST be documented.
+A repeated tool request is detected by the snapshot counter algorithm in
+Section 43.1. Tool equality is exact `tool_id` equality and result equality is
+equality of canonical normalized-result digests, with no result represented by
+null. The threshold is exactly 5.
 
 > **Normative definition.**
 The host MUST enforce the following repeated tool request behavior:
 
 1. **Detection**: The FSM detects a repeated tool request by monitoring tool requests.
 
-2. **Threshold**: A repeated tool request is detected when the same tool is requested N times without a different result.
+2. **Counter update**: Reset to 1 when `tool_id` changes or a different result
+   digest has been admitted; otherwise increment on each durable
+   `tool_requested` event.
 
 3. **Termination**: The FSM transitions to `terminated` and emits a `repeated_tool_request_detected` diagnostic.
 
-4. **Evidence emission**: The host emits evidence with the repeated tool details (tool ID, request count, duration).
+4. **Evidence emission**: The host emits evidence with tool ID,
+   non-authority-bearing result digest or null, request count of 5, and
+   duration.
 
 5. **History preservation**: The repeated tool details are preserved in history for debugging.
 
@@ -379,17 +400,18 @@ The host MUST enforce the following forced termination behavior:
 
 ### 43.2.1 Non-progress loop threshold
 
-- **Permission**: The host MAY configure the non-progress loop threshold (N) different from the default.
-- **Recommendation**: The host SHOULD use a threshold between 3 and 10.
-- **Permitted presentation**: The host MAY present the configured threshold to the operator.
-- **Limit**: The host MUST document the configured threshold.
+- **Requirement**: The non-progress loop threshold is exactly 5 under the
+  fixed `progress_revision` counter algorithm in Section 43.1.
+- **Permitted presentation**: The host MAY present the fixed threshold to the operator.
+- **Limit**: Configuration MUST NOT change the threshold.
 
 ### 43.2.2 Repeated tool request threshold
 
-- **Permission**: The host MAY configure the repeated tool request threshold (N) different from the default.
-- **Recommendation**: The host SHOULD use a threshold between 3 and 10.
-- **Permitted presentation**: The host MAY present the configured threshold to the operator.
-- **Limit**: The host MUST document the configured threshold.
+- **Requirement**: The repeated tool request threshold is exactly 5 under the
+  fixed `tool_id` and canonical result-digest counter algorithm in Section
+  43.1.
+- **Permitted presentation**: The host MAY present the fixed threshold to the operator.
+- **Limit**: Configuration MUST NOT change the threshold.
 
 ### 43.2.3 Missing result timeout
 

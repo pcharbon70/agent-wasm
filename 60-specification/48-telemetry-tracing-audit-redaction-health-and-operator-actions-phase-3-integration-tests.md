@@ -2,7 +2,7 @@
 title: "Telemetry Tracing Audit Redaction Health And Operator Actions Phase 3 Integration Tests"
 kind: specification
 created: "2026-08-10"
-status: draft
+status: normative
 spec_version: "0.2.0"
 tags:
   - milestone-09
@@ -23,7 +23,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 3](../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/phase-03-telemetry-tracing-audit-redaction-health-and-operator-actions.md)
 of
 [Milestone 9](../.spec/planning/agentic-system/milestone-09-production-platform-and-developer-experience/README.md)
@@ -77,13 +77,17 @@ The test MUST verify that:
    policy, signal, instruction, approval, operator actions).
 5. Redaction policies redact all required data types (credentials, secrets,
    sensitive PII, internal IDs, user data, configuration).
-6. Sampling policies apply correctly (always-on, always-off, rate-limit,
-   probabilistic, header-based).
-7. Cardinality limits are enforced (drop or bucket when exceeded).
-8. Retention policies are enforced (delete data past retention limit).
+6. Required `rate-limit` sampling applies independently to traces and logs;
+   each optional sampling method declared supported by the implementation is
+   also verified.
+7. Cardinality limits are enforced by dropping excess metric points and
+   emitting `metrics.cardinality.exceeded`.
+8. Metrics remain available for 30 days, traces for 7 days, logs for 14 days,
+   and audit events indefinitely; each finite class becomes unavailable at its
+   boundary unless an authorized earlier deletion is permitted.
 9. Access control is enforced (authorize access based on role).
-10. Export policies export data to configured targets (OTLP, Prometheus,
-    StatsD, CloudWatch).
+10. Export policies export data to required OTLP and to each optional target
+    that the implementation declares supported and configures.
 11. Deletion policies delete data correctly (time-based, manual).
 12. Health checks report correct status (healthy, degraded, unhealthy).
 13. Operator actions execute correctly (drain, pause, resume, retry, cancel,
@@ -109,30 +113,46 @@ Telemetry, tracing, audit, redaction, health, and operator actions MUST
 reject malformed and incompatible inputs with stable diagnostics.
 The test MUST verify that:
 
-1. Invalid metric label combinations produce `metrics.cardinality.exceeded` diagnostic.
+1. Invalid metric label names, values, or combinations produce
+   `metrics.emit.failed`; they do not produce a cardinality diagnostic.
 2. Invalid trace context produces `trace.propagation.failed` diagnostic.
-3. Invalid sampling policy produces `trace.sample.failed` diagnostic.
+3. Invalid trace and log sampling policies produce `trace.sample.failed` and
+   `log.sample.failed` respectively, retain the last valid family policy, and
+   do not enable `always-on`; if no valid policy exists, the affected family
+   is disabled.
 4. Invalid log data (e.g., missing required fields) produces `log.emit.failed` diagnostic.
 5. Invalid audit event parameters produce `audit.event.record.failed` diagnostic.
-6. Invalid redaction policy produces `redaction.policy.invalid` diagnostic.
+6. Invalid redaction policy produces `redaction.policy.invalid`, admits none
+   of the candidate record, and retains the last valid policy or disables the
+   family when none exists.
 7. Invalid health check configuration produces `health.check.timeout` diagnostic.
 8. Invalid operator action parameters produce `operator.action.invalid` diagnostic.
-9. No metrics, traces, logs, or audit events are created for the failed operations.
+9. Invalid telemetry candidates create no candidate metrics, traces, or logs.
+   A denied operator action creates no action effect and retains its required
+   redacted attempted and failure audit events when audit storage is healthy.
 10. The diagnostic identifies the specific field, type, or boundary that failed.
 11. The diagnostic does not expose secrets or implementation internals.
 
 ### 48.4.3 Stale and duplicate input
 
-Telemetry, tracing, audit, redaction, health, and operator actions MUST
-detect and reject stale or duplicate inputs.
+Telemetry, tracing, audit, redaction, health, and operator actions MUST handle
+stale or duplicate inputs without treating repeated metric samples as new
+label combinations.
 The test MUST verify that:
 
-1. Duplicate metric points with same labels produce `metrics.cardinality.exceeded` diagnostic.
-2. Duplicate trace contexts with same trace ID produce stable diagnostic.
-3. Duplicate audit events with same timestamp and action produce stable diagnostic.
+1. Repeated metric points with the same valid labels are admitted as samples,
+   do not increase the unique-label-combination count, and do not emit
+   `metrics.cardinality.exceeded`.
+2. Reuse of a valid trace context continues the same trace and does not emit a
+   duplicate-input diagnostic.
+3. Distinct audit event identities with the same timestamp and action are
+   recorded as distinct attempts and do not emit a duplicate-input diagnostic.
 4. Stale operator actions (e.g., resume when not paused) produce `operator.action.invalid` diagnostic.
-5. No metrics, traces, logs, or audit events are created for the rejected operations.
-6. The diagnostic identifies the stale or duplicate input.
+5. A rejected operator action creates no action effect but retains its required
+   redacted audit attempt; other rejected telemetry candidates create no
+   candidate trace or log record.
+6. A diagnostic for a genuinely rejected stale input identifies the stable
+   failed boundary without exposing candidate data.
 
 ### 48.4.4 Boundary and limit inputs
 
@@ -140,14 +160,20 @@ Telemetry, tracing, audit, redaction, health, and operator actions MUST
 enforce configured boundaries and limits.
 The test MUST verify that:
 
-1. Metric cardinality limits are enforced (drop or bucket when exceeded).
-2. Trace sampling rate limits are enforced (drop excess traces).
-3. Log emission rate limits are enforced (drop excess logs).
-4. Audit event buffer limits are enforced (drop excess events or reject).
+1. The fixed metric cardinality limits are enforced by dropping the first
+   excess point with `metrics.cardinality.exceeded`.
+2. Trace sampling admits the first 100 traces in each UTC-aligned second and
+   drops later traces in that bucket.
+3. Log sampling admits the first 100 logs in each UTC-aligned second and drops
+   later logs in that bucket.
+4. An audit event buffer or store limit rejects the audited action before its
+   effect with `audit.event.record.failed`; audit events are never silently
+   dropped.
 5. Health check timeouts are enforced (mark as unhealthy on timeout).
 6. Operator action timeouts are enforced (cancel action on timeout).
 7. Operator action rate limits are enforced (reject action when rate limited).
-8. No metrics, traces, logs, or audit events are created for the rejected operations.
+8. Rejected telemetry candidates create no candidate metric, trace, or log;
+   an audited action retains only a successfully committed redacted attempt.
 9. The diagnostic identifies the boundary or limit that was exceeded.
 
 ### 48.4.5 Timeout, cancellation, and unavailable dependency
@@ -170,7 +196,9 @@ The test MUST verify that:
 11. Unavailable health check dependency produces `health.check.dependency.failed` diagnostic.
 12. Retry behavior is correct for transient failures (e.g., exponential backoff).
 13. The system transitions to a safe state (e.g., degraded, unhealthy) after repeated failures.
-14. No metrics, traces, logs, or audit events are created for the failed operations.
+14. Failed export operations create no duplicate exported records; required
+    local audit evidence remains durable and candidate data is never used in a
+    safe failure diagnostic.
 
 ### 48.4.6 Cross-milestone fixture regression
 
@@ -210,6 +238,11 @@ The test MUST verify that:
 5. User data not relevant to the operation is redacted from logs, metrics, traces, and audit events.
 6. Sensitive configuration values are redacted from logs, metrics, traces, and audit events.
 7. Redaction is applied at the configured levels (source, destination, display).
+8. Injected policy-validation and application failures reject the entire
+   candidate before buffering, persistence, export, or display.
+9. The resulting safe failure diagnostic contains exactly `diagnostic`,
+   `telemetry_family`, `failed_boundary`, and `timestamp`, with no value or
+   byte derived from the candidate.
 
 ### 48.4.8 Audit event immutability
 
@@ -220,6 +253,12 @@ The test MUST verify that:
 2. Audit events cannot be deleted (except by authorized deletion of non-audit data).
 3. Audit events are tamper-evident (e.g., cryptographic hashing detects modifications).
 4. Audit event recording failures produce `audit.event.record.failed` diagnostic.
+5. Failure to append the redacted `attempted` audit event prevents the
+   operator or administrative action effect.
+6. Failure to append a terminal event after a durable attempt marks audit
+   health unhealthy, blocks new audited actions, and requires reconciliation.
+7. Failure to source-redact an attempted audit event emits only the safe
+   redaction diagnostic and prevents the action effect before append.
 
 ### 48.4.9 Operator action authorization
 
@@ -230,6 +269,13 @@ The test MUST verify that:
 2. Authorized operators can execute actions successfully.
 3. Operator action execution is logged as an audit event.
 4. Operator action failures produce appropriate diagnostics.
+5. An action still running at 30 seconds is cancelled with
+   `operator.action.timeout`.
+6. The eleventh action by one actor in a rolling 60-second interval is
+   rejected with `operator.action.rate-limited` and `retry_after_seconds`.
+7. Unauthorized and invalid actions retain their original canonical diagnostic
+   and a correlated redacted audit attempt and failure outcome; audit failure
+   is additional unless it prevented an otherwise allowed action.
 
 ### 48.4.10 Health check accuracy
 
@@ -252,7 +298,8 @@ The test MUST verify that:
 Data export MUST be reliable with retry and backoff.
 The test MUST verify that:
 
-1. Exports to configured targets succeed under normal conditions.
+1. Exports to OTLP and to every configured optional target declared supported
+   by the implementation succeed under normal conditions.
 2. Exports retry on transient failures (e.g., network errors).
 3. Exports use exponential backoff for retries.
 4. Exports drop data if retry limit is exceeded (with diagnostic).
@@ -271,7 +318,7 @@ See [Variability register](#variability-register).
 | Log field verification | Section 48.4.1 | MUST | Must verify all required fields are present. |
 | Audit event operation coverage | Section 48.4.1 | MUST | Must verify all operations are captured. |
 | Redaction data type coverage | Section 48.4.1 | MUST | Must verify all data types are redacted. |
-| Sampling policy verification | Section 48.4.1 | MUST | Must verify all sampling policies are applied correctly. |
+| Sampling policy verification | Section 48.4.1 | MUST | Must verify required `rate-limit` behavior and each optional method the implementation declares supported. |
 | Cardinality limit verification | Section 48.4.1 | MUST | Must verify cardinality limits are enforced. |
 | Retention enforcement verification | Section 48.4.1 | MUST | Must verify retention policies are enforced. |
 | Access control verification | Section 48.4.1 | MUST | Must verify access control is enforced. |
@@ -283,6 +330,9 @@ See [Variability register](#variability-register).
 | Regression approval | Section 48.4.6 | Required | Must record and approve or reject any regression. |
 | Redaction verification | Section 48.4.7 | MUST | Must verify all data types are redacted correctly. |
 | Audit event immutability verification | Section 48.4.8 | MUST | Must verify audit events are immutable and tamper-evident. |
+| Sampling failure verification | Sections 48.4.2 and 48.4.4 | MUST | Must verify family-specific diagnostics, exact UTC buckets, last-valid retention or family disablement, and no `always-on` fallback. |
+| Redaction failure verification | Section 48.4.7 | MUST | Must verify complete candidate rejection and the exact reduced safe diagnostic. |
+| Audit fail-closed verification | Sections 48.4.4 and 48.4.8 | MUST | Must verify an audit append failure prevents the action effect and no audit event is silently dropped. |
 | Operator action authorization verification | Section 48.4.9 | MUST | Must verify authorization is enforced for all operator actions. |
 | Health check accuracy verification | Section 48.4.10 | MUST | Must verify all health checks report accurate status. |
 | Export reliability verification | Section 48.4.11 | MUST | Must verify export reliability with retry and backoff. |

@@ -3,7 +3,7 @@ title: "Single-Agent Host Flow And Milestone Acceptance"
 kind: specification
 created: "2026-08-08"
 status: normative
-spec_version: "0.1.0"
+spec_version: "1.0.0"
 tags:
   - milestone-03
   - phase-05
@@ -18,7 +18,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 5](../.spec/planning/agentic-system/milestone-03-host-actor-runtime-and-lifecycle/phase-05-single-agent-host-flow-and-milestone-acceptance.md)
 of
 [Milestone 3](../.spec/planning/agentic-system/milestone-03-host-actor-runtime-and-lifecycle/README.md)
@@ -53,23 +53,37 @@ Related chapters:
 
 > **Normative definition.**
 The host MUST implement the following reference flow from authenticated
-signal through routing, lease, snapshot load, reducer call, result validation,
-and in-memory commit:
+submission through accepted-record routing, lease, snapshot load, reducer
+call, result validation, atomic commit, and asynchronous effect scheduling:
 
-1. **Signal admission**: Authenticate the signal source, resolve tenant/agent, validate schema, deduplicate, and admit to mailbox.
-2. **Mailbox dequeue**: Dequeue the signal from the mailbox in priority order.
-3. **Lease acquisition**: Acquire a turn lease for the agent.
-4. **Snapshot load**: Load the state snapshot for the agent.
-5. **Reducer invocation**: Invoke the reducer with the signal, state snapshot, and grants.
-6. **Result validation**: Validate the reducer result (state patch, directives, diagnostics).
-7. **State commit**: Commit the state patch to the agent's state.
-8. **Directive execution**: Execute the directives (emit, timer, effect, etc.).
-9. **Lease release**: Release the turn lease.
+1. **Signal admission**: Run Chapter 10's complete submission evaluation,
+   atomically persist `AcceptedSignalEnvelope` and selector state, and enqueue
+   a mailbox reference for the recorded target.
+2. **Mailbox dequeue**: Dequeue the accepted-record reference under Chapter
+   21's fixed priority schedule.
+3. **Lease acquisition**: Acquire the recorded target agent's turn lease.
+4. **Snapshot and request load**: Load the current state and strategy snapshot,
+   then project and validate the accepted record as one `TurnRequest`.
+5. **Reducer invocation**: Invoke `reduce` exactly once with the projected
+   signal, snapshots, grants, and effective limits.
+6. **Result validation**: Validate canonical output, expected revision, patch,
+   strategy snapshot, every directive, and diagnostics.
+7. **Atomic commit**: Commit the next state revision, journal facts, strategy
+   snapshot, and all validated directive outbox entries as one unit.
+8. **Turn completion**: Release the turn lease, record the delivery outcome,
+   and publish the successful `TurnResult` to the caller.
+9. **Asynchronous directive drain**: Schedule and execute committed outbox
+   entries after turn completion. The turn caller MUST NOT wait for this step.
 
 > **Normative definition.**
-If any step fails, the host MUST roll back the state change and release the
-lease.
-The host MUST NOT commit partial state changes.
+Failure before or during step 7 MUST publish no state revision, journal fact,
+strategy snapshot, or outbox entry; if a lease was acquired, the host MUST
+release it. Atomic-commit failure leaves the prior revision current. Failure
+to release a lease after commit MUST be recorded and fenced, but MUST NOT undo
+the commit or suppress the committed `TurnResult`; its lease diagnostic is
+host-owned evidence rather than a mutation of deterministic reducer output. A
+step 9 effect failure follows the directive retry and completion contract and
+MUST NOT alter the committed turn or `TurnResult`.
 
 ### Host flow invariants
 
@@ -135,7 +149,14 @@ The host MUST record the following evidence for each turn:
 
 > **Normative definition.**
 The host MUST retain turn evidence for debugging and auditing purposes.
-The retention period MUST be documented in the conformance profile.
+Ordinary turn evidence MUST remain available for exactly 90 days after the turn
+completes and MUST then become unavailable. Evidence classified by another
+applicable normative chapter as security evidence or an audit event MUST
+instead follow the longer retention and authorized-deletion rules in
+[Host-owned evidence recording](34-provenance-signing-audit-security-and-milestone-acceptance.md#host-owned-evidence-recording)
+and
+[Retention Policies](48-telemetry-tracing-audit-redaction-health-and-operator-actions-contract-and-data-model.md#4818-retention-policies),
+as applicable.
 
 ### Milestone 3 exit report
 
@@ -185,7 +206,7 @@ milestone acceptance:
 | Exhausted | Resource limits exceeded | Maximum agents per tenant reached | `host.flow.capacity.exhausted` |
 | Unavailable | Registry or artifact unavailable | Registry not found or artifact not cached | `host.flow.registry.unavailable`, `host.flow.artifact.unavailable` |
 | Trap | Reducer trapped | Guest instance trapped | `host.flow.reducer.trap` |
-| Timeout | Reducer timeout | Execution timeout exceeded | `host.flow.reducer.timeout` |
+| Timeout | Reducer duration limit | Effective turn-duration ceiling exceeded | `identity.limit.time.turn_ms` |
 | Cancelled | Reducer cancelled | Cancellation requested | `host.flow.reducer.cancelled` |
 | InvalidOutput | Invalid reducer output | Output validation failed | `host.flow.reducer.invalid_output` |
 | StaleRevision | Stale revision | Input revision does not match current | `host.flow.state.stale_revision` |
@@ -215,24 +236,24 @@ without exposing secrets or implementation internal state.
 | `host.flow.capacity` | Capacity failures | `exhausted` |
 | `host.flow.registry` | Registry failures | `unavailable` |
 | `host.flow.artifact` | Artifact failures | `unavailable` |
-| `host.flow.reducer` | Reducer failures | `trap`, `timeout`, `cancelled`, `invalid_output` |
+| `host.flow.reducer` | Reducer failures independent of named limits | `trap`, `cancelled`, `invalid_output` |
+| `identity.limit` | Named host-flow limit exhaustion | `time.turn_ms`, `memory.max_pages`, `input.max_bytes`, `output.max_bytes` |
 | `host.flow.state` | State failures | `stale_revision` |
 | `host.flow.policy` | Policy failures | `rejected` |
 
-### Implementation-defined choices
+### Internal mechanisms and fixed behavior
 
-> **Normative implementation-defined choice.**
-The following choices are implementation-defined and do not create
-conformance obligations.
-The Variability register below catalogs all such choices.
-
-1. **Turn evidence retention**: The host MAY choose how long to retain turn evidence. The retention period MUST be documented in the conformance profile.
-
-2. **Host flow optimization**: The host MAY optimize the host flow for performance. The optimization MUST be documented in the conformance profile.
-
-3. **Failure recovery**: The host MAY implement failure recovery strategies. The strategy MUST be documented in the conformance profile.
-
-4. **Observability**: The host MAY choose the observability mechanisms (metrics, logging, tracing). The mechanisms MUST be documented in the conformance profile.
+> **Normative definition.**
+Execution optimization, evidence storage, metrics collection, structured
+logging, and tracing backends are internal mechanisms. Every mechanism MUST be
+observationally equivalent with respect to the nine host-flow steps, operation
+order, acceptance, diagnostics, committed state, directives, lifecycle state,
+usage, and required turn evidence. A failed precommit host-flow step MUST NOT
+be retried transparently: the host publishes no commit, releases any acquired
+lease, and returns the specified diagnostic. Postcommit lease-release or
+directive failures are recorded and fenced or retried under their governing
+contracts without rolling back the committed turn. A later signal submission
+is a new flow with a newly acquired lease.
 
 ### Deferred work
 
@@ -315,7 +336,7 @@ Expected behavior:
 
 - Input: reducer that exceeds the execution timeout.
 - Expected output: null.
-- Expected error: `host.flow.reducer.timeout`.
+- Expected error: `identity.limit.time.turn_ms`.
 
 ### Negative: reducer cancelled
 
@@ -444,6 +465,24 @@ Expected behavior:
 - Expected output: TurnResult with terminal completion diagnostic.
 - Expected error: null.
 
+### Fixed evidence, optimization, and failure behavior
+
+> **Normative conformance criterion.**
+The Phase 5 integration tests MUST additionally verify:
+
+1. Every completed or failed turn records all eight required evidence groups,
+   and ordinary turn evidence remains available before the 90-day boundary and
+   becomes unavailable at that boundary.
+2. Evidence subject to a longer security or audit retention rule remains
+   available for that longer period.
+3. An optimized execution path and the unoptimized reference path produce the
+   same acceptance, diagnostics, state, directives, lifecycle state, usage
+   fields, and turn evidence for the same input.
+4. Failure at each precommit boundary through atomic commit publishes no
+   partial state and releases any acquired lease without transparent retry.
+   Simulated postcommit lease-release and directive failures preserve the
+   committed turn and follow their fencing or retry contracts.
+
 ### Cross-milestone fixture regression
 
 > **Normative conformance criterion.**
@@ -468,14 +507,18 @@ Any approved variability MUST be documented in the Milestone 3 exit report.
 
 ## Variability register
 
-| Clause | Type | Selection |
-|--------|------|-----------|
-| Host flow reference flow | Required | 9 steps fixed by this chapter |
-| Host flow invariants | Required | 6 invariants fixed by this chapter |
-| Representative flows | Required | 6 flows fixed by this chapter |
-| Turn evidence recording | Required | 8 evidence fields fixed by this chapter |
+The register summarizes fixed behavior and internal mechanisms. It does not
+independently license variation.
 
-Other variability choices are documented in the section on host-defined selections.
+| Clause | Type | Selection | Constraint |
+|--------|------|-----------|------------|
+| Host flow reference flow | Required | Nine steps fixed by this chapter | Preserve accepted-record admission, atomic commit, turn completion, and asynchronous directive drain order |
+| Host flow invariants | Required | Six invariants fixed by this chapter | Never commit partial state |
+| Representative flows | Required | Six flows fixed by this chapter | Verify each flow in Phase 5 |
+| [Turn evidence recording](#host-owned-turn-evidence) | Required | Eight evidence groups | Record every completed or failed turn |
+| [Ordinary turn-evidence retention](#host-owned-turn-evidence) | Required | Exactly 90 days | Apply longer security or audit rules when applicable |
+| [Failure recovery](#internal-mechanisms-and-fixed-behavior) | Required | No transparent turn retry | Precommit failure publishes nothing; postcommit failure never rolls back the committed turn |
+| Optimization and observability backends | Internal mechanism | No profile selection | Preserve host-flow, result, state, lifecycle, usage, and evidence observations |
 
 ## Rationale and evidence (non-normative)
 

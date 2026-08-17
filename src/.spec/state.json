@@ -1,0 +1,2783 @@
+{
+  "decisions": {
+    "items": [
+      {
+        "affects": [
+          "repo.governance"
+        ],
+        "date": "2026-08-11",
+        "file": ".spec/decisions/agent_wasm.decision.atomic_durable_effects.md",
+        "id": "agent_wasm.decision.atomic_durable_effects",
+        "status": "accepted",
+        "title": "Atomic Durable Effects"
+      },
+      {
+        "affects": [
+          "repo.governance"
+        ],
+        "date": "2026-08-11",
+        "file": ".spec/decisions/agent_wasm.decision.elixir_otp_product_host.md",
+        "id": "agent_wasm.decision.elixir_otp_product_host",
+        "status": "accepted",
+        "title": "Elixir OTP Product Host"
+      },
+      {
+        "affects": [
+          "repo.governance"
+        ],
+        "date": "2026-08-11",
+        "file": ".spec/decisions/agent_wasm.decision.evidence_gated_conformance.md",
+        "id": "agent_wasm.decision.evidence_gated_conformance",
+        "status": "accepted",
+        "title": "Evidence-Gated Conformance"
+      },
+      {
+        "affects": [
+          "repo.governance"
+        ],
+        "date": "2026-08-11",
+        "file": ".spec/decisions/agent_wasm.decision.host_owned_authority.md",
+        "id": "agent_wasm.decision.host_owned_authority",
+        "status": "accepted",
+        "title": "Host-Owned Authority"
+      },
+      {
+        "affects": [
+          "repo.governance"
+        ],
+        "date": "2026-08-11",
+        "file": ".spec/decisions/agent_wasm.decision.least_authority_credential_custody.md",
+        "id": "agent_wasm.decision.least_authority_credential_custody",
+        "status": "accepted",
+        "title": "Least Authority and Credential Custody"
+      },
+      {
+        "affects": [
+          "repo.governance"
+        ],
+        "date": "2026-08-11",
+        "file": ".spec/decisions/agent_wasm.decision.logical_identity_disposable_placement.md",
+        "id": "agent_wasm.decision.logical_identity_disposable_placement",
+        "status": "accepted",
+        "title": "Logical Identity and Disposable Placement"
+      },
+      {
+        "affects": [
+          "repo.governance"
+        ],
+        "date": "2026-08-11",
+        "file": ".spec/decisions/agent_wasm.decision.portable_guest_protocol.md",
+        "id": "agent_wasm.decision.portable_guest_protocol",
+        "status": "accepted",
+        "title": "Portable Guest Protocol"
+      },
+      {
+        "affects": [
+          "repo.governance"
+        ],
+        "date": "2026-08-11",
+        "file": ".spec/decisions/agent_wasm.decision.specification_authority.md",
+        "id": "agent_wasm.decision.specification_authority",
+        "status": "accepted",
+        "title": "Specification Authority"
+      },
+      {
+        "affects": [
+          "repo.governance"
+        ],
+        "date": "2026-08-11",
+        "file": ".spec/decisions/agent_wasm.decision.user_owned_external_bindings.md",
+        "id": "agent_wasm.decision.user_owned_external_bindings",
+        "status": "accepted",
+        "title": "User-Owned External Bindings"
+      }
+    ]
+  },
+  "findings": [],
+  "index": {
+    "exceptions": [
+      {
+        "covers": [
+          "agent_wasm.actions.declaration",
+          "agent_wasm.actions.execution_plan",
+          "agent_wasm.actions.result"
+        ],
+        "file": ".spec/specs/actions.spec.md",
+        "id": "agent_wasm.actions.implementation_frontier",
+        "reason": "Action registries, validation, planning, and result handling are not implemented.",
+        "subject_id": "agent_wasm.actions"
+      },
+      {
+        "covers": [
+          "agent_wasm.agent_graph.addresses",
+          "agent_wasm.agent_graph.relationships",
+          "agent_wasm.agent_graph.provenance"
+        ],
+        "file": ".spec/specs/agent_graph.spec.md",
+        "id": "agent_wasm.agent_graph.implementation_frontier",
+        "reason": "Agent address resolution, relationship storage, visibility, and provenance validation are not implemented.",
+        "subject_id": "agent_wasm.agent_graph"
+      },
+      {
+        "covers": [
+          "agent_wasm.agent_registry.logical_record",
+          "agent_wasm.agent_registry.lifecycle",
+          "agent_wasm.agent_registry.disposable_projection"
+        ],
+        "file": ".spec/specs/agent_registry.spec.md",
+        "id": "agent_wasm.agent_registry.implementation_frontier",
+        "reason": "Registry records, lifecycle transitions, and activation supervision are not implemented.",
+        "subject_id": "agent_wasm.agent_registry"
+      },
+      {
+        "covers": [
+          "agent_wasm.artifacts.immutable_bundle",
+          "agent_wasm.artifacts.portable_requirements",
+          "agent_wasm.artifacts.admission"
+        ],
+        "file": ".spec/specs/artifacts.spec.md",
+        "id": "agent_wasm.artifacts.implementation_frontier",
+        "reason": "Artifact storage, admission, registry, and cache behavior are not implemented.",
+        "subject_id": "agent_wasm.artifacts"
+      },
+      {
+        "covers": [
+          "agent_wasm.atomic_commit.unit",
+          "agent_wasm.atomic_commit.outbox",
+          "agent_wasm.atomic_commit.ambiguity"
+        ],
+        "file": ".spec/specs/atomic_commit.spec.md",
+        "id": "agent_wasm.atomic_commit.implementation_frontier",
+        "reason": "Atomic commit and outbox storage are not implemented.",
+        "subject_id": "agent_wasm.atomic_commit"
+      },
+      {
+        "covers": [
+          "agent_wasm.capability_policy.decisions",
+          "agent_wasm.capability_policy.attenuation",
+          "agent_wasm.capability_policy.enforcement"
+        ],
+        "file": ".spec/specs/capability_policy.spec.md",
+        "id": "agent_wasm.capability_policy.implementation_frontier",
+        "reason": "Policy evaluation, attenuation, approvals, enforcement, and cache invalidation are not implemented.",
+        "subject_id": "agent_wasm.capability_policy"
+      },
+      {
+        "covers": [
+          "agent_wasm.child_lifecycle.creation",
+          "agent_wasm.child_lifecycle.monitoring",
+          "agent_wasm.child_lifecycle.cancellation_restart"
+        ],
+        "file": ".spec/specs/child_lifecycle.spec.md",
+        "id": "agent_wasm.child_lifecycle.implementation_frontier",
+        "reason": "Child directives, monitoring, cancellation, hard stop, and restart supervision are not implemented.",
+        "subject_id": "agent_wasm.child_lifecycle"
+      },
+      {
+        "covers": [
+          "agent_wasm.conformance_vocabulary.requirement_words",
+          "agent_wasm.conformance_vocabulary.behavior_classes",
+          "agent_wasm.conformance_vocabulary.profile"
+        ],
+        "file": ".spec/specs/conformance_vocabulary.spec.md",
+        "id": "agent_wasm.conformance_vocabulary.implementation_frontier",
+        "reason": "The implementation profile and diagnostic class registry are not implemented.",
+        "subject_id": "agent_wasm.conformance_vocabulary"
+      },
+      {
+        "covers": [
+          "agent_wasm.context_and_control.context",
+          "agent_wasm.context_and_control.human_resources",
+          "agent_wasm.context_and_control.credential_use"
+        ],
+        "file": ".spec/specs/context_and_control.spec.md",
+        "id": "agent_wasm.context_and_control.implementation_frontier",
+        "reason": "Threads, checkpoints, memory, approvals, quotas, custodians, leases, and receipts are not implemented.",
+        "subject_id": "agent_wasm.context_and_control"
+      },
+      {
+        "covers": [
+          "agent_wasm.crash_acceptance.commit_invariant",
+          "agent_wasm.crash_acceptance.restart",
+          "agent_wasm.crash_acceptance.matrix"
+        ],
+        "file": ".spec/specs/crash_acceptance.spec.md",
+        "id": "agent_wasm.crash_acceptance.implementation_frontier",
+        "reason": "Durable runtime and crash-injection infrastructure do not exist.",
+        "subject_id": "agent_wasm.crash_acceptance"
+      },
+      {
+        "covers": [
+          "agent_wasm.delegation.plan",
+          "agent_wasm.delegation.aggregation",
+          "agent_wasm.delegation.evidence"
+        ],
+        "file": ".spec/specs/delegation.spec.md",
+        "id": "agent_wasm.delegation.implementation_frontier",
+        "reason": "Fan-out scheduling, child work, durable aggregation, and integration fixtures are not implemented.",
+        "subject_id": "agent_wasm.delegation"
+      },
+      {
+        "covers": [
+          "agent_wasm.developer_toolchain.surfaces",
+          "agent_wasm.developer_toolchain.determinism",
+          "agent_wasm.developer_toolchain.compatibility_debug"
+        ],
+        "file": ".spec/specs/developer_toolchain.spec.md",
+        "id": "agent_wasm.developer_toolchain.implementation_frontier",
+        "reason": "Guest SDKs, CLI, simulator, templates, fixtures, debug views, and reproducible build tooling are not implemented.",
+        "subject_id": "agent_wasm.developer_toolchain"
+      },
+      {
+        "covers": [
+          "agent_wasm.directives.effect_data",
+          "agent_wasm.directives.strategy_snapshot",
+          "agent_wasm.directives.terminal"
+        ],
+        "file": ".spec/specs/directives.spec.md",
+        "id": "agent_wasm.directives.implementation_frontier",
+        "reason": "Directive validation, strategy snapshots, and terminal-state enforcement are not implemented.",
+        "subject_id": "agent_wasm.directives"
+      },
+      {
+        "covers": [
+          "agent_wasm.effects.handler_gate",
+          "agent_wasm.effects.attempts",
+          "agent_wasm.effects.result_signal"
+        ],
+        "file": ".spec/specs/effects.spec.md",
+        "id": "agent_wasm.effects.implementation_frontier",
+        "reason": "Effect handlers, attempt leases, idempotency, and result ingress are not implemented.",
+        "subject_id": "agent_wasm.effects"
+      },
+      {
+        "covers": [
+          "agent_wasm.guest_protocol.message_contracts",
+          "agent_wasm.guest_protocol.canonical_bytes",
+          "agent_wasm.guest_protocol.failure_atomicity"
+        ],
+        "file": ".spec/specs/guest_protocol.spec.md",
+        "id": "agent_wasm.guest_protocol.implementation_frontier",
+        "reason": "Complete schema and semantic validation, canonical codecs, negative fixtures, and failure-atomicity evidence are not implemented.",
+        "subject_id": "agent_wasm.guest_protocol"
+      },
+      {
+        "covers": [
+          "agent_wasm.guest_sandbox.host_functions",
+          "agent_wasm.guest_sandbox.wasi",
+          "agent_wasm.guest_sandbox.isolation"
+        ],
+        "file": ".spec/specs/guest_sandbox.spec.md",
+        "id": "agent_wasm.guest_sandbox.implementation_frontier",
+        "reason": "Host-function registration, WASI policy, optimized instances, and residue testing are not implemented.",
+        "subject_id": "agent_wasm.guest_sandbox"
+      },
+      {
+        "covers": [
+          "agent_wasm.guest_sdk.semantic_preservation",
+          "agent_wasm.guest_sdk.compiled_fixtures",
+          "agent_wasm.guest_sdk.acceptance"
+        ],
+        "file": ".spec/specs/guest_sdk.spec.md",
+        "id": "agent_wasm.guest_sdk.implementation_frontier",
+        "reason": "No guest SDK package or compiled conformance fixture corpus exists yet.",
+        "subject_id": "agent_wasm.guest_sdk"
+      },
+      {
+        "covers": [
+          "agent_wasm.host_flow.order",
+          "agent_wasm.host_flow.failure_atomicity",
+          "agent_wasm.host_flow.acceptance"
+        ],
+        "file": ".spec/specs/host_flow.spec.md",
+        "id": "agent_wasm.host_flow.implementation_frontier",
+        "reason": "End-to-end host orchestration and Milestone 3 fixtures are not implemented.",
+        "subject_id": "agent_wasm.host_flow"
+      },
+      {
+        "covers": [
+          "agent_wasm.host_platform.operations",
+          "agent_wasm.host_platform.lifecycle_config",
+          "agent_wasm.host_platform.adapters_packaging"
+        ],
+        "file": ".spec/specs/host_platform.spec.md",
+        "id": "agent_wasm.host_platform.implementation_frontier",
+        "reason": "Host operations, lifecycle, configuration, adapters, transports, and packaging are not implemented.",
+        "subject_id": "agent_wasm.host_platform"
+      },
+      {
+        "covers": [
+          "agent_wasm.identities.canonical",
+          "agent_wasm.identities.compatibility",
+          "agent_wasm.identities.limits"
+        ],
+        "file": ".spec/specs/identities.spec.md",
+        "id": "agent_wasm.identities.implementation_frontier",
+        "reason": "Canonical identity, version, diagnostic, and limit modules are not implemented.",
+        "subject_id": "agent_wasm.identities"
+      },
+      {
+        "covers": [
+          "agent_wasm.ingress.unified_boundary",
+          "agent_wasm.ingress.scheduling",
+          "agent_wasm.ingress.timer"
+        ],
+        "file": ".spec/specs/ingress.spec.md",
+        "id": "agent_wasm.ingress.implementation_frontier",
+        "reason": "Source adapters, schedule evaluation, timers, and ingress admission are not implemented.",
+        "subject_id": "agent_wasm.ingress"
+      },
+      {
+        "covers": [
+          "agent_wasm.invocation.isolation",
+          "agent_wasm.invocation.validation_order",
+          "agent_wasm.invocation.disposition"
+        ],
+        "file": ".spec/specs/invocation.spec.md",
+        "id": "agent_wasm.invocation.implementation_frontier",
+        "reason": "The bootstrap Port adapter exists, but authorization, digest verification, complete resource limits, cancellation, output validation, and disposition evidence are not implemented.",
+        "subject_id": "agent_wasm.invocation"
+      },
+      {
+        "covers": [
+          "agent_wasm.mailbox.ordering_bounds",
+          "agent_wasm.mailbox.overload",
+          "agent_wasm.mailbox.lease_fencing"
+        ],
+        "file": ".spec/specs/mailbox.spec.md",
+        "id": "agent_wasm.mailbox.implementation_frontier",
+        "reason": "Mailbox scheduling, overload policies, and turn leases are not implemented.",
+        "subject_id": "agent_wasm.mailbox"
+      },
+      {
+        "covers": [
+          "agent_wasm.model_gateway.intent_binding",
+          "agent_wasm.model_gateway.pinned_request",
+          "agent_wasm.model_gateway.streaming_custody"
+        ],
+        "file": ".spec/specs/model_gateway.spec.md",
+        "id": "agent_wasm.model_gateway.implementation_frontier",
+        "reason": "Model catalogs, bindings, request materialization, adapters, custody dispatch, streaming, and fixtures are not implemented.",
+        "subject_id": "agent_wasm.model_gateway"
+      },
+      {
+        "covers": [
+          "agent_wasm.operations.observability",
+          "agent_wasm.operations.redaction_health",
+          "agent_wasm.operations.operator_actions"
+        ],
+        "file": ".spec/specs/operations.spec.md",
+        "id": "agent_wasm.operations.implementation_frontier",
+        "reason": "Telemetry, audit, redaction, health, export, and operator-action systems are not implemented.",
+        "subject_id": "agent_wasm.operations"
+      },
+      {
+        "covers": [
+          "agent_wasm.planning.explicit_state",
+          "agent_wasm.planning.budgets_termination",
+          "agent_wasm.planning.resume_evidence"
+        ],
+        "file": ".spec/specs/planning.spec.md",
+        "id": "agent_wasm.planning.implementation_frontier",
+        "reason": "Strategy state machines, budgets, planning, loop detection, resume, and fixtures are not implemented.",
+        "subject_id": "agent_wasm.planning"
+      },
+      {
+        "covers": [
+          "agent_wasm.plugins.manifest",
+          "agent_wasm.plugins.composition",
+          "agent_wasm.plugins.lifecycle"
+        ],
+        "file": ".spec/specs/plugins.spec.md",
+        "id": "agent_wasm.plugins.implementation_frontier",
+        "reason": "Plugin registries, composition, configuration, approval, and lifecycle behavior are not implemented.",
+        "subject_id": "agent_wasm.plugins"
+      },
+      {
+        "covers": [
+          "agent_wasm.production_readiness.examples_runbooks",
+          "agent_wasm.production_readiness.slos_evidence",
+          "agent_wasm.production_readiness.release_gate"
+        ],
+        "file": ".spec/specs/production_readiness.spec.md",
+        "id": "agent_wasm.production_readiness.implementation_frontier",
+        "reason": "Production examples, runbooks, SLO measurement, evidence packages, and release acceptance do not exist.",
+        "subject_id": "agent_wasm.production_readiness"
+      },
+      {
+        "covers": [
+          "agent_wasm.profile.ownership",
+          "agent_wasm.profile.bootstrap",
+          "agent_wasm.profile.disclosure"
+        ],
+        "file": ".spec/specs/profile.spec.md",
+        "id": "agent_wasm.profile.implementation_frontier",
+        "reason": "Profile loading, enforcement, and publication are not implemented.",
+        "subject_id": "agent_wasm.profile"
+      },
+      {
+        "covers": [
+          "agent_wasm.provenance.admission",
+          "agent_wasm.provenance.evidence",
+          "agent_wasm.provenance.acceptance"
+        ],
+        "file": ".spec/specs/provenance.spec.md",
+        "id": "agent_wasm.provenance.implementation_frontier",
+        "reason": "Signing, provenance, evidence storage, redaction, and security acceptance infrastructure are not implemented.",
+        "subject_id": "agent_wasm.provenance"
+      },
+      {
+        "covers": [
+          "agent_wasm.recovery.delayed_work",
+          "agent_wasm.recovery.replay_hibernate",
+          "agent_wasm.recovery.migration"
+        ],
+        "file": ".spec/specs/recovery.spec.md",
+        "id": "agent_wasm.recovery.implementation_frontier",
+        "reason": "Durable retry, timers, replay, hibernation, and migration are not implemented.",
+        "subject_id": "agent_wasm.recovery"
+      },
+      {
+        "covers": [
+          "agent_wasm.reducer.resolution_order",
+          "agent_wasm.reducer.determinism",
+          "agent_wasm.reducer.acceptance"
+        ],
+        "file": ".spec/specs/reducer.spec.md",
+        "id": "agent_wasm.reducer.implementation_frontier",
+        "reason": "Reducer orchestration and deterministic conformance fixtures are not implemented.",
+        "subject_id": "agent_wasm.reducer"
+      },
+      {
+        "covers": [
+          "agent_wasm.signals.envelope",
+          "agent_wasm.signals.admission",
+          "agent_wasm.signals.delivery"
+        ],
+        "file": ".spec/specs/signals.spec.md",
+        "id": "agent_wasm.signals.implementation_frontier",
+        "reason": "Signal schemas, routing, deduplication, and delivery tracking are not implemented.",
+        "subject_id": "agent_wasm.signals"
+      },
+      {
+        "covers": [
+          "agent_wasm.specification_authority.normative_source",
+          "agent_wasm.specification_authority.conflict_gate",
+          "agent_wasm.specification_authority.traceability"
+        ],
+        "file": ".spec/specs/specification_authority.spec.md",
+        "id": "agent_wasm.specification_authority.implementation_frontier",
+        "reason": "Automated source-heading traceability and conflict gating are not implemented.",
+        "subject_id": "agent_wasm.specification_authority"
+      },
+      {
+        "covers": [
+          "agent_wasm.state_operations.atomic_patch",
+          "agent_wasm.state_operations.revision",
+          "agent_wasm.state_operations.conflict"
+        ],
+        "file": ".spec/specs/state_operations.spec.md",
+        "id": "agent_wasm.state_operations.implementation_frontier",
+        "reason": "State-operation validation, patch application, and revision hashing are not implemented.",
+        "subject_id": "agent_wasm.state_operations"
+      },
+      {
+        "covers": [
+          "agent_wasm.storage.snapshots",
+          "agent_wasm.storage.journals",
+          "agent_wasm.storage.guarantees"
+        ],
+        "file": ".spec/specs/storage.spec.md",
+        "id": "agent_wasm.storage.implementation_frontier",
+        "reason": "No durable storage adapter, snapshot store, or journal exists.",
+        "subject_id": "agent_wasm.storage"
+      },
+      {
+        "covers": [
+          "agent_wasm.threat_model.assets",
+          "agent_wasm.threat_model.principals_trust",
+          "agent_wasm.threat_model.grants"
+        ],
+        "file": ".spec/specs/threat_model.spec.md",
+        "id": "agent_wasm.threat_model.implementation_frontier",
+        "reason": "Principal authentication, trust assignment, grants, and threat controls are not implemented.",
+        "subject_id": "agent_wasm.threat_model"
+      },
+      {
+        "covers": [
+          "agent_wasm.tool_runtime.catalog",
+          "agent_wasm.tool_runtime.execution",
+          "agent_wasm.tool_runtime.connectors"
+        ],
+        "file": ".spec/specs/tool_runtime.spec.md",
+        "id": "agent_wasm.tool_runtime.implementation_frontier",
+        "reason": "Tool catalog, retrieval, code sandbox, connector, custody, and result behavior are not implemented.",
+        "subject_id": "agent_wasm.tool_runtime"
+      },
+      {
+        "covers": [
+          "agent_wasm.topology.desired_state",
+          "agent_wasm.topology.leases",
+          "agent_wasm.topology.reconciliation"
+        ],
+        "file": ".spec/specs/topology.spec.md",
+        "id": "agent_wasm.topology.implementation_frontier",
+        "reason": "Topology versions, placement, activation leases, reconciliation, and fixtures are not implemented.",
+        "subject_id": "agent_wasm.topology"
+      },
+      {
+        "covers": [
+          "agent_wasm.topology_recovery.clean_state",
+          "agent_wasm.topology_recovery.isolation",
+          "agent_wasm.topology_recovery.seams"
+        ],
+        "file": ".spec/specs/topology_recovery.spec.md",
+        "id": "agent_wasm.topology_recovery.implementation_frontier",
+        "reason": "Multi-agent recovery, lease seams, and Milestone 6 acceptance fixtures are not implemented.",
+        "subject_id": "agent_wasm.topology_recovery"
+      },
+      {
+        "covers": [
+          "agent_wasm.workflows.corpus",
+          "agent_wasm.workflows.safety",
+          "agent_wasm.workflows.acceptance"
+        ],
+        "file": ".spec/specs/workflows.spec.md",
+        "id": "agent_wasm.workflows.implementation_frontier",
+        "reason": "Agentic workflows and their integration acceptance corpus are not implemented.",
+        "subject_id": "agent_wasm.workflows"
+      }
+    ],
+    "requirements": [
+      {
+        "file": ".spec/specs/actions.spec.md",
+        "id": "agent_wasm.actions.declaration",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Reusable action descriptors shall declare schemas, state access, directive kinds, grants, determinism, and timeout independently of invocations.",
+        "subject_id": "agent_wasm.actions"
+      },
+      {
+        "file": ".spec/specs/actions.spec.md",
+        "id": "agent_wasm.actions.execution_plan",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Instructions and sequential or DAG plans shall validate before execution and use deterministic node ordering.",
+        "subject_id": "agent_wasm.actions"
+      },
+      {
+        "file": ".spec/specs/actions.spec.md",
+        "id": "agent_wasm.actions.result",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Results shall distinguish success, rejection, validation, infrastructure, diagnostics, patches, directives, and domain status.",
+        "subject_id": "agent_wasm.actions"
+      },
+      {
+        "file": ".spec/specs/agent_graph.spec.md",
+        "id": "agent_wasm.agent_graph.addresses",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "External agent references shall use stable tenant-qualified logical addresses independent of process, engine, worker, socket, and node identity.",
+        "subject_id": "agent_wasm.agent_graph"
+      },
+      {
+        "file": ".spec/specs/agent_graph.spec.md",
+        "id": "agent_wasm.agent_graph.provenance",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Relayed signals shall preserve validated origin, principal, correlation, causation, delegation chain, and return-address provenance within bounded depth.",
+        "subject_id": "agent_wasm.agent_graph"
+      },
+      {
+        "file": ".spec/specs/agent_graph.spec.md",
+        "id": "agent_wasm.agent_graph.relationships",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Parent, child, owner, member, dependency, observer, delegate, and result-recipient relations shall enforce direction, consent, lifecycle, cardinality, and visibility.",
+        "subject_id": "agent_wasm.agent_graph"
+      },
+      {
+        "file": ".spec/specs/agent_registry.spec.md",
+        "id": "agent_wasm.agent_registry.disposable_projection",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Processes, Wasm instances, workers, sockets, and Port handles shall remain disposable and non-authoritative.",
+        "subject_id": "agent_wasm.agent_registry"
+      },
+      {
+        "file": ".spec/specs/agent_registry.spec.md",
+        "id": "agent_wasm.agent_registry.lifecycle",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Create, resolve, activate, initialize, suspend, hibernate, thaw, cancel, complete, terminate, and inspect behavior shall enforce valid transitions.",
+        "subject_id": "agent_wasm.agent_registry"
+      },
+      {
+        "file": ".spec/specs/agent_registry.spec.md",
+        "id": "agent_wasm.agent_registry.logical_record",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "The registry shall own tenant-scoped logical identity, artifact, lifecycle policy, revision, and activation state independently of live execution.",
+        "subject_id": "agent_wasm.agent_registry"
+      },
+      {
+        "file": ".spec/specs/artifacts.spec.md",
+        "id": "agent_wasm.artifacts.admission",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Admission shall apply the specified integrity, digest, signature, feature, manifest, schema, and policy checks before availability.",
+        "subject_id": "agent_wasm.artifacts"
+      },
+      {
+        "file": ".spec/specs/artifacts.spec.md",
+        "id": "agent_wasm.artifacts.immutable_bundle",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Artifacts shall be immutable content-addressed Wasm bundles whose manifest, schemas, modules, provenance, and cache identity are verified.",
+        "subject_id": "agent_wasm.artifacts"
+      },
+      {
+        "file": ".spec/specs/artifacts.spec.md",
+        "id": "agent_wasm.artifacts.portable_requirements",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Manifests shall express logical model requirements without selecting providers, endpoints, connections, credentials, or custodians.",
+        "subject_id": "agent_wasm.artifacts"
+      },
+      {
+        "file": ".spec/specs/atomic_commit.spec.md",
+        "id": "agent_wasm.atomic_commit.ambiguity",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Ambiguous commit outcomes shall be resolved from durable revision, journal, and outbox identity without duplicate authoritative state.",
+        "subject_id": "agent_wasm.atomic_commit"
+      },
+      {
+        "file": ".spec/specs/atomic_commit.spec.md",
+        "id": "agent_wasm.atomic_commit.outbox",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "No directive shall dispatch before its transition commits, and every outbox payload shall retain stable identity, hash, target, attempt, and state.",
+        "subject_id": "agent_wasm.atomic_commit"
+      },
+      {
+        "file": ".spec/specs/atomic_commit.spec.md",
+        "id": "agent_wasm.atomic_commit.unit",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Snapshot, journal, directive outbox, and lifecycle changes shall commit as one compare-and-commit unit against the expected revision.",
+        "subject_id": "agent_wasm.atomic_commit"
+      },
+      {
+        "file": ".spec/specs/capability_policy.spec.md",
+        "id": "agent_wasm.capability_policy.attenuation",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "All populated restrictions shall combine restrictively, denials shall win, and authority shall never expand through fallback or substitution.",
+        "subject_id": "agent_wasm.capability_policy"
+      },
+      {
+        "file": ".spec/specs/capability_policy.spec.md",
+        "id": "agent_wasm.capability_policy.decisions",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Host policy shall return allow, deny, approval-required, attenuated, or unavailable decisions with stable reasons for complete versioned inputs.",
+        "subject_id": "agent_wasm.capability_policy"
+      },
+      {
+        "file": ".spec/specs/capability_policy.spec.md",
+        "id": "agent_wasm.capability_policy.enforcement",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Policy shall be enforced at admission, action resolution, invocation, directive validation, effect dispatch, and result admission with revocation-safe caches.",
+        "subject_id": "agent_wasm.capability_policy"
+      },
+      {
+        "file": ".spec/specs/child_lifecycle.spec.md",
+        "id": "agent_wasm.child_lifecycle.cancellation_restart",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Cancellation propagation, acknowledgement, hard stop, grant revocation, orphaning, and restart policy shall remain explicit and bounded.",
+        "subject_id": "agent_wasm.child_lifecycle"
+      },
+      {
+        "file": ".spec/specs/child_lifecycle.spec.md",
+        "id": "agent_wasm.child_lifecycle.creation",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Child admission shall atomically record logical identity, relationships, lifecycle policy, attenuated grants, journal intent, mailbox event, and evidence before activation.",
+        "subject_id": "agent_wasm.child_lifecycle"
+      },
+      {
+        "file": ".spec/specs/child_lifecycle.spec.md",
+        "id": "agent_wasm.child_lifecycle.monitoring",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Lifecycle events and monitor subscriptions shall be durable, ordered, replayable, bounded, and independent of live watch handles.",
+        "subject_id": "agent_wasm.child_lifecycle"
+      },
+      {
+        "file": ".spec/specs/conformance_vocabulary.spec.md",
+        "id": "agent_wasm.conformance_vocabulary.behavior_classes",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Invalid input, implementation-defined choices, presentation variation, limits, and runtime failures shall remain distinguishable observable classes.",
+        "subject_id": "agent_wasm.conformance_vocabulary"
+      },
+      {
+        "file": ".spec/specs/conformance_vocabulary.spec.md",
+        "id": "agent_wasm.conformance_vocabulary.profile",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Every claimed release shall publish supported versions, choices, options, deviations, limits, and bounded presentation variation.",
+        "subject_id": "agent_wasm.conformance_vocabulary"
+      },
+      {
+        "file": ".spec/specs/conformance_vocabulary.spec.md",
+        "id": "agent_wasm.conformance_vocabulary.requirement_words",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Normative implementation work shall preserve the five canonical requirement words and their defined force.",
+        "subject_id": "agent_wasm.conformance_vocabulary"
+      },
+      {
+        "file": ".spec/specs/context_and_control.spec.md",
+        "id": "agent_wasm.context_and_control.context",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Threads, messages, checkpoints, and working, episodic, semantic, and retrieved memory shall remain tenant-scoped projections with provenance, visibility, redaction, retention, and validation.",
+        "subject_id": "agent_wasm.context_and_control"
+      },
+      {
+        "file": ".spec/specs/context_and_control.spec.md",
+        "id": "agent_wasm.context_and_control.credential_use",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Credential leases shall authorize typed use only, keep handles and credentials non-exportable, require independent custodian checks, and verify correlated receipts before result admission.",
+        "subject_id": "agent_wasm.context_and_control"
+      },
+      {
+        "file": ".spec/specs/context_and_control.spec.md",
+        "id": "agent_wasm.context_and_control.human_resources",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Approval routing, decisions, expiry, escalation, quota reservation, consumption, release, windows, burst, and reconciliation shall be durable and policy controlled.",
+        "subject_id": "agent_wasm.context_and_control"
+      },
+      {
+        "file": ".spec/specs/crash_acceptance.spec.md",
+        "id": "agent_wasm.crash_acceptance.commit_invariant",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "No directive from an uncommitted turn shall dispatch and every eligible committed directive shall retain a recoverable outbox record.",
+        "subject_id": "agent_wasm.crash_acceptance"
+      },
+      {
+        "file": ".spec/specs/crash_acceptance.spec.md",
+        "id": "agent_wasm.crash_acceptance.matrix",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Fault tests shall retain a crash matrix for every specified commit, dispatch, acknowledgement, and result-ingress boundary.",
+        "subject_id": "agent_wasm.crash_acceptance"
+      },
+      {
+        "file": ".spec/specs/crash_acceptance.spec.md",
+        "id": "agent_wasm.crash_acceptance.restart",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Restart shall verify snapshots, replay journals, and restore outbox, timers, retries, hibernation, and migration state before normal work.",
+        "subject_id": "agent_wasm.crash_acceptance"
+      },
+      {
+        "file": ".spec/specs/delegation.spec.md",
+        "id": "agent_wasm.delegation.aggregation",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "All, quorum, first-success, best-effort, and ordered aggregation shall be host-owned, deterministic, durable, and duplicate-aware.",
+        "subject_id": "agent_wasm.delegation"
+      },
+      {
+        "file": ".spec/specs/delegation.spec.md",
+        "id": "agent_wasm.delegation.evidence",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Result conflicts, timeouts, cancellation, recovery, aggregation progress, and cross-milestone behavior shall retain bounded signed evidence.",
+        "subject_id": "agent_wasm.delegation"
+      },
+      {
+        "file": ".spec/specs/delegation.spec.md",
+        "id": "agent_wasm.delegation.plan",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Fan-out plans and work items shall use deterministic identities, bounded concurrency, deadlines, cancellation policy, attenuated grants, and result contracts.",
+        "subject_id": "agent_wasm.delegation"
+      },
+      {
+        "file": ".spec/specs/developer_toolchain.spec.md",
+        "id": "agent_wasm.developer_toolchain.compatibility_debug",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Compatibility negotiation, deprecation, actionable failures, and capability-controlled redacted debug views shall remain versioned and testable.",
+        "subject_id": "agent_wasm.developer_toolchain"
+      },
+      {
+        "file": ".spec/specs/developer_toolchain.spec.md",
+        "id": "agent_wasm.developer_toolchain.determinism",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Simulator controls, fixtures, templates, builds, and offline operation shall be isolated, reproducible, deterministic, and digest pinned.",
+        "subject_id": "agent_wasm.developer_toolchain"
+      },
+      {
+        "file": ".spec/specs/developer_toolchain.spec.md",
+        "id": "agent_wasm.developer_toolchain.surfaces",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Guest SDK and CLI surfaces shall preserve canonical host semantics for manifests, exports, codecs, artifacts, composition, fixtures, local execution, replay, reduction, and evidence inspection.",
+        "subject_id": "agent_wasm.developer_toolchain"
+      },
+      {
+        "file": ".spec/specs/directives.spec.md",
+        "id": "agent_wasm.directives.effect_data",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Emit, timer, effect, child-lifecycle, approval, and topology requests shall be represented as validated directives rather than guest-side effects.",
+        "subject_id": "agent_wasm.directives"
+      },
+      {
+        "file": ".spec/specs/directives.spec.md",
+        "id": "agent_wasm.directives.strategy_snapshot",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Direct, FSM, and bounded-loop strategies shall use explicit serializable snapshots and logical model-slot references.",
+        "subject_id": "agent_wasm.directives"
+      },
+      {
+        "file": ".spec/specs/directives.spec.md",
+        "id": "agent_wasm.directives.terminal",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Completed and cancelled states shall reject ordinary continuation and preserve bounded diagnostics and evidence.",
+        "subject_id": "agent_wasm.directives"
+      },
+      {
+        "file": ".spec/specs/effects.spec.md",
+        "id": "agent_wasm.effects.attempts",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Every external dispatch shall use a durable leased attempt with stable request hash, outcome, timestamps, and retained evidence.",
+        "subject_id": "agent_wasm.effects"
+      },
+      {
+        "file": ".spec/specs/effects.spec.md",
+        "id": "agent_wasm.effects.handler_gate",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Dispatch shall validate handler registration, trust, capability, schema, idempotency, payload, duration, and result bounds.",
+        "subject_id": "agent_wasm.effects"
+      },
+      {
+        "file": ".spec/specs/effects.spec.md",
+        "id": "agent_wasm.effects.result_signal",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Effect outcomes shall return as causally linked signals and shall not directly mutate an already committed reducer transition.",
+        "subject_id": "agent_wasm.effects"
+      },
+      {
+        "file": ".spec/specs/guest_protocol.spec.md",
+        "id": "agent_wasm.guest_protocol.canonical_bytes",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Protocol messages shall use validated canonical encoding with stable version, identity, revision, and diagnostic fields.",
+        "subject_id": "agent_wasm.guest_protocol"
+      },
+      {
+        "file": ".spec/specs/guest_protocol.spec.md",
+        "id": "agent_wasm.guest_protocol.exports",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "The bootstrap artifact shall expose describe, initialize, reduce, and migrate through the Extism no-argument bytes-in/bytes-out calling convention.",
+        "subject_id": "agent_wasm.guest_protocol"
+      },
+      {
+        "file": ".spec/specs/guest_protocol.spec.md",
+        "id": "agent_wasm.guest_protocol.failure_atomicity",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Decode, schema, semantic, revision, trap, timeout, cancellation, and limit failures shall publish no successful or partial authoritative result.",
+        "subject_id": "agent_wasm.guest_protocol"
+      },
+      {
+        "file": ".spec/specs/guest_protocol.spec.md",
+        "id": "agent_wasm.guest_protocol.message_contracts",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Each lifecycle export shall implement its specified request-response schema and semantic contract.",
+        "subject_id": "agent_wasm.guest_protocol"
+      },
+      {
+        "file": ".spec/specs/guest_sandbox.spec.md",
+        "id": "agent_wasm.guest_sandbox.host_functions",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Synchronous host functions shall be deterministic, bounded, cancellable, retry-safe, typed, capability-gated, and tenant-aware.",
+        "subject_id": "agent_wasm.guest_sandbox"
+      },
+      {
+        "file": ".spec/specs/guest_sandbox.spec.md",
+        "id": "agent_wasm.guest_sandbox.isolation",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Fresh, reset, pooled, and agent-pinned modes shall preserve memory, state, capability, resource, and residue isolation at least as strongly as fresh execution.",
+        "subject_id": "agent_wasm.guest_sandbox"
+      },
+      {
+        "file": ".spec/specs/guest_sandbox.spec.md",
+        "id": "agent_wasm.guest_sandbox.wasi",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "WASI shall be disabled by default and enabled only by an approved per-module request intersected with host policy.",
+        "subject_id": "agent_wasm.guest_sandbox"
+      },
+      {
+        "file": ".spec/specs/guest_sdk.spec.md",
+        "id": "agent_wasm.guest_sdk.acceptance",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "SDK and Milestone 1 acceptance evidence shall retain fixture status, profile, versions, and unresolved variability.",
+        "subject_id": "agent_wasm.guest_sdk"
+      },
+      {
+        "file": ".spec/specs/guest_sdk.spec.md",
+        "id": "agent_wasm.guest_sdk.compiled_fixtures",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Conformance shall be demonstrated by compiled guest artifacts and exact positive and negative fixtures rather than source-only tests.",
+        "subject_id": "agent_wasm.guest_sdk"
+      },
+      {
+        "file": ".spec/specs/guest_sdk.spec.md",
+        "id": "agent_wasm.guest_sdk.semantic_preservation",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Guest SDKs shall preserve protocol semantics while lowering language values, exports, codecs, signals, state operations, directives, strategies, and diagnostics.",
+        "subject_id": "agent_wasm.guest_sdk"
+      },
+      {
+        "file": ".spec/specs/host_flow.spec.md",
+        "id": "agent_wasm.host_flow.acceptance",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Direct, FSM, timer, sensor, cancellation, and terminal flows shall retain complete bounded turn and regression evidence.",
+        "subject_id": "agent_wasm.host_flow"
+      },
+      {
+        "file": ".spec/specs/host_flow.spec.md",
+        "id": "agent_wasm.host_flow.failure_atomicity",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Trap, timeout, cancellation, invalid output, stale revision, and policy rejection shall leave no unauthorized successful or partial state.",
+        "subject_id": "agent_wasm.host_flow"
+      },
+      {
+        "file": ".spec/specs/host_flow.spec.md",
+        "id": "agent_wasm.host_flow.order",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "A turn shall preserve the governing admission, dequeue, lease, snapshot, invocation, validation, commit, directive, and release order.",
+        "subject_id": "agent_wasm.host_flow"
+      },
+      {
+        "file": ".spec/specs/host_platform.spec.md",
+        "id": "agent_wasm.host_platform.adapters_packaging",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Transport, runtime, storage, telemetry, and secrets adapters plus packages shall preserve host semantics, compatibility, provenance, and bounded diagnostics.",
+        "subject_id": "agent_wasm.host_platform"
+      },
+      {
+        "file": ".spec/specs/host_platform.spec.md",
+        "id": "agent_wasm.host_platform.lifecycle_config",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Configure, initialize, ready, drain, shutdown, cancel, and health behavior shall validate layered configuration, profiles, secret references, and dependencies before readiness.",
+        "subject_id": "agent_wasm.host_platform"
+      },
+      {
+        "file": ".spec/specs/host_platform.spec.md",
+        "id": "agent_wasm.host_platform.operations",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Embedded and server hosts shall expose the complete stable operation set through canonical request, response, error, pagination, idempotency, and streaming boundaries.",
+        "subject_id": "agent_wasm.host_platform"
+      },
+      {
+        "file": ".spec/specs/identities.spec.md",
+        "id": "agent_wasm.identities.canonical",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Tenant, principal, agent, artifact, invocation, signal, directive, attempt, and trace identities shall use their canonical stable representations and equality rules.",
+        "subject_id": "agent_wasm.identities"
+      },
+      {
+        "file": ".spec/specs/identities.spec.md",
+        "id": "agent_wasm.identities.compatibility",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Version negotiation shall enforce compatible major, minor, and patch behavior with stable incompatibility diagnostics.",
+        "subject_id": "agent_wasm.identities"
+      },
+      {
+        "file": ".spec/specs/identities.spec.md",
+        "id": "agent_wasm.identities.limits",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Resource-limit exhaustion shall be distinct from malformed input and shall disclose the applicable configured limit safely.",
+        "subject_id": "agent_wasm.identities"
+      },
+      {
+        "file": ".spec/specs/ingress.spec.md",
+        "id": "agent_wasm.ingress.scheduling",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Schedule timezone, misfire, and jitter behavior shall be validated and deterministic for a schedule and fire time.",
+        "subject_id": "agent_wasm.ingress"
+      },
+      {
+        "file": ".spec/specs/ingress.spec.md",
+        "id": "agent_wasm.ingress.timer",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Timer identities shall be tenant scoped and timer signals shall not be admitted before their absolute due time.",
+        "subject_id": "agent_wasm.ingress"
+      },
+      {
+        "file": ".spec/specs/ingress.spec.md",
+        "id": "agent_wasm.ingress.unified_boundary",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "User, transport, sensor, schedule, and timer events shall pass authentication, resolution, schema validation, deduplication, and mailbox admission.",
+        "subject_id": "agent_wasm.ingress"
+      },
+      {
+        "file": ".spec/specs/invocation.spec.md",
+        "id": "agent_wasm.invocation.disposition",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Success, trap, timeout, cancellation, and invalid output shall dispose or quarantine the instance with bounded evidence.",
+        "subject_id": "agent_wasm.invocation"
+      },
+      {
+        "file": ".spec/specs/invocation.spec.md",
+        "id": "agent_wasm.invocation.isolation",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "The host shall verify tenant authorization and artifact digest before creating a fresh bounded guest instance for each turn.",
+        "subject_id": "agent_wasm.invocation"
+      },
+      {
+        "file": ".spec/specs/invocation.spec.md",
+        "id": "agent_wasm.invocation.validation_order",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Guest output shall pass byte, encoding, schema, patch, revision, directive-capability, and usage checks before state logic observes it.",
+        "subject_id": "agent_wasm.invocation"
+      },
+      {
+        "file": ".spec/specs/mailbox.spec.md",
+        "id": "agent_wasm.mailbox.lease_fencing",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "A valid per-agent lease and current fencing token shall be required for a turn, renewal, and authoritative completion.",
+        "subject_id": "agent_wasm.mailbox"
+      },
+      {
+        "file": ".spec/specs/mailbox.spec.md",
+        "id": "agent_wasm.mailbox.ordering_bounds",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Mailboxes shall enforce priority, FIFO tie behavior, fairness, count, byte, age, source, tenant, and delivery bounds.",
+        "subject_id": "agent_wasm.mailbox"
+      },
+      {
+        "file": ".spec/specs/mailbox.spec.md",
+        "id": "agent_wasm.mailbox.overload",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Overload shall produce the configured reject, defer, coalesce, supersede, or dead-letter outcome with stable diagnostics.",
+        "subject_id": "agent_wasm.mailbox"
+      },
+      {
+        "file": ".spec/specs/model_gateway.spec.md",
+        "id": "agent_wasm.model_gateway.intent_binding",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Agents shall emit provider-neutral model intents while users own versioned concrete connection, provider, model, and custodian bindings outside artifacts.",
+        "subject_id": "agent_wasm.model_gateway"
+      },
+      {
+        "file": ".spec/specs/model_gateway.spec.md",
+        "id": "agent_wasm.model_gateway.pinned_request",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "The host shall atomically materialize and pin request identity, binding revision, provider, model, digest, budget, quota, outbox, and idempotency across retry and replay.",
+        "subject_id": "agent_wasm.model_gateway"
+      },
+      {
+        "file": ".spec/specs/model_gateway.spec.md",
+        "id": "agent_wasm.model_gateway.streaming_custody",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Streaming, final response, usage, cancellation, credential use, and receipt admission shall remain bounded, normalized, tenant-safe, and credential-free.",
+        "subject_id": "agent_wasm.model_gateway"
+      },
+      {
+        "file": ".spec/specs/operations.spec.md",
+        "id": "agent_wasm.operations.observability",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Metrics, traces, structured logs, and audit records shall use bounded versioned schemas, causal correlation, controlled cardinality, retention, export, and tenant authorization.",
+        "subject_id": "agent_wasm.operations"
+      },
+      {
+        "file": ".spec/specs/operations.spec.md",
+        "id": "agent_wasm.operations.operator_actions",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Drain, pause, resume, retry, cancel, quarantine, reconcile, rotate, and inspect actions shall be authorized, audited, idempotent, bounded, and safely observable.",
+        "subject_id": "agent_wasm.operations"
+      },
+      {
+        "file": ".spec/specs/operations.spec.md",
+        "id": "agent_wasm.operations.redaction_health",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Sensitive data shall be redacted before exposure, and liveness, readiness, dependencies, runtime profile, queue, storage, scheduler, and coordinator health shall remain accurate and bounded.",
+        "subject_id": "agent_wasm.operations"
+      },
+      {
+        "file": ".spec/specs/package.spec.md",
+        "id": "agent_wasm.package.bootstrap_test",
+        "priority": "must",
+        "stability": "evolving",
+        "statement": "The current Elixir package shall compile and pass its ExUnit suite.",
+        "subject_id": "agent_wasm.package"
+      },
+      {
+        "file": ".spec/specs/package.spec.md",
+        "id": "agent_wasm.package.conformance_gate",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "The package shall not claim implemented conformance until applicable exceptions are replaced by linked or executed evidence and normative acceptance gates pass.",
+        "subject_id": "agent_wasm.package"
+      },
+      {
+        "file": ".spec/specs/package.spec.md",
+        "id": "agent_wasm.package.product_host",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Agent WASM shall be delivered as an Elixir/OTP product whose public programming and operations surfaces belong to the Mix application.",
+        "subject_id": "agent_wasm.package"
+      },
+      {
+        "file": ".spec/specs/package.spec.md",
+        "id": "agent_wasm.package.source_authority",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Package behavior shall follow the complete applicable normative source corpus and shall not use implementation behavior to resolve source conflicts silently.",
+        "subject_id": "agent_wasm.package"
+      },
+      {
+        "file": ".spec/specs/package.spec.md",
+        "id": "agent_wasm.package.source_coverage",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "The SpecLed workspace shall maintain one implementation subject for each of the 39 numbered technical areas and two governance specifications.",
+        "subject_id": "agent_wasm.package"
+      },
+      {
+        "file": ".spec/specs/planning.spec.md",
+        "id": "agent_wasm.planning.budgets_termination",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Turn, token, tool, cost, time, iteration, and recursion limits plus loop, repeated-request, contradiction, missing-result, and model-drift detection shall force explicit termination.",
+        "subject_id": "agent_wasm.planning"
+      },
+      {
+        "file": ".spec/specs/planning.spec.md",
+        "id": "agent_wasm.planning.explicit_state",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Direct, FSM, tool-loop, and planning strategies shall use explicit serialized state, plans, waits, iterations, budgets, and bounded history without hidden continuation.",
+        "subject_id": "agent_wasm.planning"
+      },
+      {
+        "file": ".spec/specs/planning.spec.md",
+        "id": "agent_wasm.planning.resume_evidence",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Snapshot migration, deterministic resume, plan adaptation, state transitions, and every failure class shall retain bounded evidence and integration proof.",
+        "subject_id": "agent_wasm.planning"
+      },
+      {
+        "file": ".spec/specs/plugins.spec.md",
+        "id": "agent_wasm.plugins.composition",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Composition shall use deterministic plugin ordering and reject name, route, namespace, schema, migration, capability, and lifecycle conflicts atomically.",
+        "subject_id": "agent_wasm.plugins"
+      },
+      {
+        "file": ".spec/specs/plugins.spec.md",
+        "id": "agent_wasm.plugins.lifecycle",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Install, validate, configure, approve, enable, disable, upgrade, migrate, rollback, and remove shall preserve user bindings, trust, and review gates.",
+        "subject_id": "agent_wasm.plugins"
+      },
+      {
+        "file": ".spec/specs/plugins.spec.md",
+        "id": "agent_wasm.plugins.manifest",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Plugin manifests shall declare immutable artifacts, actions, routes, namespaces, schemas, strategies, logical requirements, grants, and lifecycle ownership.",
+        "subject_id": "agent_wasm.plugins"
+      },
+      {
+        "file": ".spec/specs/production_readiness.spec.md",
+        "id": "agent_wasm.production_readiness.examples_runbooks",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Canonical examples and dependency, overload, stuck-turn, repeated-effect, divergence, revocation, tenant-incident, recovery, and rollback runbooks shall use supported surfaces and reproducible evidence.",
+        "subject_id": "agent_wasm.production_readiness"
+      },
+      {
+        "file": ".spec/specs/production_readiness.spec.md",
+        "id": "agent_wasm.production_readiness.release_gate",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Conformance, security, performance, runbook, example, support-matrix, residual-risk, ownership, deployment, and verification evidence shall gate production release.",
+        "subject_id": "agent_wasm.production_readiness"
+      },
+      {
+        "file": ".spec/specs/production_readiness.spec.md",
+        "id": "agent_wasm.production_readiness.slos_evidence",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Admission, latency, durability, effect delay, recovery, availability, isolation, and evidence completeness shall have measured objectives, budgets, alerts, immutable evidence, and retained reports.",
+        "subject_id": "agent_wasm.production_readiness"
+      },
+      {
+        "file": ".spec/specs/profile.spec.md",
+        "id": "agent_wasm.profile.bootstrap",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "The bootstrap guest profile shall expose the portable reducer boundary without ambient WASI or credential authority.",
+        "subject_id": "agent_wasm.profile"
+      },
+      {
+        "file": ".spec/specs/profile.spec.md",
+        "id": "agent_wasm.profile.disclosure",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "A release shall publish its supported profile, versions, extensions, choices, and limits.",
+        "subject_id": "agent_wasm.profile"
+      },
+      {
+        "file": ".spec/specs/profile.spec.md",
+        "id": "agent_wasm.profile.ownership",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Profiles shall preserve host authority over identity, state, scheduling, policy, effects, topology, and evidence while guests remain deterministic proposal producers.",
+        "subject_id": "agent_wasm.profile"
+      },
+      {
+        "file": ".spec/specs/provenance.spec.md",
+        "id": "agent_wasm.provenance.acceptance",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Threat-to-control, malicious-input, tenant-isolation, revocation, residue, and audit-tampering exercises shall gate security acceptance.",
+        "subject_id": "agent_wasm.provenance"
+      },
+      {
+        "file": ".spec/specs/provenance.spec.md",
+        "id": "agent_wasm.provenance.admission",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Artifact admission shall verify digest, signature, publisher, build provenance, dependencies, toolchain compatibility, and revocation before availability.",
+        "subject_id": "agent_wasm.provenance"
+      },
+      {
+        "file": ".spec/specs/provenance.spec.md",
+        "id": "agent_wasm.provenance.evidence",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Security and authority events shall produce immutable tamper-evident host-owned evidence before dependent actions proceed.",
+        "subject_id": "agent_wasm.provenance"
+      },
+      {
+        "file": ".spec/specs/recovery.spec.md",
+        "id": "agent_wasm.recovery.delayed_work",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Retry and timer records shall be durable, bounded, independently recoverable, and classified for transient, permanent, or operator intervention outcomes.",
+        "subject_id": "agent_wasm.recovery"
+      },
+      {
+        "file": ".spec/specs/recovery.spec.md",
+        "id": "agent_wasm.recovery.migration",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Migration shall require authorization, compatible path, checkpoint, rollback state, atomic audit evidence, and safe failure behavior.",
+        "subject_id": "agent_wasm.recovery"
+      },
+      {
+        "file": ".spec/specs/recovery.spec.md",
+        "id": "agent_wasm.recovery.replay_hibernate",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Replay shall reconstruct pinned history without external effects, and hibernation shall deactivate only after verified snapshot and checkpoint durability.",
+        "subject_id": "agent_wasm.recovery"
+      },
+      {
+        "file": ".spec/specs/reducer.spec.md",
+        "id": "agent_wasm.reducer.acceptance",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Replay and metamorphic fixtures shall prove field-order and canonical-reencoding equivalence and reject stale or unauthorized output.",
+        "subject_id": "agent_wasm.reducer"
+      },
+      {
+        "file": ".spec/specs/reducer.spec.md",
+        "id": "agent_wasm.reducer.determinism",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Identical canonical inputs and profile shall produce canonically equivalent outputs without ambient nondeterminism.",
+        "subject_id": "agent_wasm.reducer"
+      },
+      {
+        "file": ".spec/specs/reducer.spec.md",
+        "id": "agent_wasm.reducer.resolution_order",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Reducer resolution shall preserve the specified signal, routing, execution, patch, directive, and result-construction order.",
+        "subject_id": "agent_wasm.reducer"
+      },
+      {
+        "file": ".spec/specs/signals.spec.md",
+        "id": "agent_wasm.signals.admission",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "The host shall authenticate, authorize, validate, deduplicate, and deterministically route signals before delivery.",
+        "subject_id": "agent_wasm.signals"
+      },
+      {
+        "file": ".spec/specs/signals.spec.md",
+        "id": "agent_wasm.signals.delivery",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Accepted, rejected, deferred, delivered, redelivered, coalesced, and dead-lettered outcomes shall remain explicit and bounded.",
+        "subject_id": "agent_wasm.signals"
+      },
+      {
+        "file": ".spec/specs/signals.spec.md",
+        "id": "agent_wasm.signals.envelope",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Signals shall be immutable tenant-scoped envelopes with stable source, subject, correlation, causation, delivery, trace, and timestamp data.",
+        "subject_id": "agent_wasm.signals"
+      },
+      {
+        "file": ".spec/specs/specification_authority.spec.md",
+        "id": "agent_wasm.specification_authority.conflict_gate",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Conflicting normative rules, ambiguity, and normative silence shall block conformance for the disputed behavior.",
+        "subject_id": "agent_wasm.specification_authority"
+      },
+      {
+        "file": ".spec/specs/specification_authority.spec.md",
+        "id": "agent_wasm.specification_authority.normative_source",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Implementation behavior and conformance claims shall follow applicable normative specification chapters and visibly normative content.",
+        "subject_id": "agent_wasm.specification_authority"
+      },
+      {
+        "file": ".spec/specs/specification_authority.spec.md",
+        "id": "agent_wasm.specification_authority.traceability",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Tests, implementation, and evidence shall cite governing document headings and shall not override normative text.",
+        "subject_id": "agent_wasm.specification_authority"
+      },
+      {
+        "file": ".spec/specs/state_operations.spec.md",
+        "id": "agent_wasm.state_operations.atomic_patch",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Set, delete, merge, append, increment, and test operations shall apply in order and atomically against an expected base revision.",
+        "subject_id": "agent_wasm.state_operations"
+      },
+      {
+        "file": ".spec/specs/state_operations.spec.md",
+        "id": "agent_wasm.state_operations.conflict",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Stale revisions, failed preconditions, invalid paths, schema violations, and patch limits shall reject the patch without partial state.",
+        "subject_id": "agent_wasm.state_operations"
+      },
+      {
+        "file": ".spec/specs/state_operations.spec.md",
+        "id": "agent_wasm.state_operations.revision",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Successful state changes shall produce monotonic hash-linked revisions from canonical state.",
+        "subject_id": "agent_wasm.state_operations"
+      },
+      {
+        "file": ".spec/specs/storage.spec.md",
+        "id": "agent_wasm.storage.guarantees",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Storage adapters shall provide isolated reads, serializable compare-and-commit writes, durability, conflict rejection, backup, and recovery.",
+        "subject_id": "agent_wasm.storage"
+      },
+      {
+        "file": ".spec/specs/storage.spec.md",
+        "id": "agent_wasm.storage.journals",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Audit and reconstruction journals shall be append-only, ordered, atomic, and sufficient for reconstruction while conversation views remain filtered projections.",
+        "subject_id": "agent_wasm.storage"
+      },
+      {
+        "file": ".spec/specs/storage.spec.md",
+        "id": "agent_wasm.storage.snapshots",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Durable snapshots shall be tenant isolated, revisioned, checksummed, lifecycle consistent, and verified on every read.",
+        "subject_id": "agent_wasm.storage"
+      },
+      {
+        "file": ".spec/specs/threat_model.spec.md",
+        "id": "agent_wasm.threat_model.assets",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Security controls shall address the specified malicious guests, compromised components, confused deputies, tenants, dependencies, operators, co-tenants, and host threats.",
+        "subject_id": "agent_wasm.threat_model"
+      },
+      {
+        "file": ".spec/specs/threat_model.spec.md",
+        "id": "agent_wasm.threat_model.grants",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Grants shall independently bind principal, tenant, capability, resource, purpose, operation, constraints, expiry, and delegation without ambient authority.",
+        "subject_id": "agent_wasm.threat_model"
+      },
+      {
+        "file": ".spec/specs/threat_model.spec.md",
+        "id": "agent_wasm.threat_model.principals_trust",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Authentication shall bind the closed principal kinds and assign trust only through provenance, authorization, and tenant isolation.",
+        "subject_id": "agent_wasm.threat_model"
+      },
+      {
+        "file": ".spec/specs/tool_runtime.spec.md",
+        "id": "agent_wasm.tool_runtime.catalog",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Tool descriptors and catalog queries shall validate schemas, provenance, capability, side-effect class, tenant scope, status, timeout, and result limits.",
+        "subject_id": "agent_wasm.tool_runtime"
+      },
+      {
+        "file": ".spec/specs/tool_runtime.spec.md",
+        "id": "agent_wasm.tool_runtime.connectors",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Authenticated connector operations shall use user-owned bindings, independent credential-use authority, typed custodian dispatch, receipt verification, and direct-egress denial.",
+        "subject_id": "agent_wasm.tool_runtime"
+      },
+      {
+        "file": ".spec/specs/tool_runtime.spec.md",
+        "id": "agent_wasm.tool_runtime.execution",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Retrieval, code, and tool operations shall execute through bounded durable attempts with tenant isolation, provenance, cancellation, and normalized result signals.",
+        "subject_id": "agent_wasm.tool_runtime"
+      },
+      {
+        "file": ".spec/specs/topology.spec.md",
+        "id": "agent_wasm.topology.desired_state",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Desired topology shall be durable and immutable per version, observed status shall be durable, and live placement shall remain disposable.",
+        "subject_id": "agent_wasm.topology"
+      },
+      {
+        "file": ".spec/specs/topology.spec.md",
+        "id": "agent_wasm.topology.leases",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Placement authority shall require unexpired activation leases and monotonic fencing that rejects stale hosts.",
+        "subject_id": "agent_wasm.topology"
+      },
+      {
+        "file": ".spec/specs/topology.spec.md",
+        "id": "agent_wasm.topology.reconciliation",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Reconciliation shall process missing, extra, failed, stale, moved, incompatible, and dependency-blocked nodes in the governing order with evidence.",
+        "subject_id": "agent_wasm.topology"
+      },
+      {
+        "file": ".spec/specs/topology_recovery.spec.md",
+        "id": "agent_wasm.topology_recovery.clean_state",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Restart shall distrust pre-restart live placement and reconstruct bounded live agents from verified durable topology and observed status.",
+        "subject_id": "agent_wasm.topology_recovery"
+      },
+      {
+        "file": ".spec/specs/topology_recovery.spec.md",
+        "id": "agent_wasm.topology_recovery.isolation",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Recovery and topology shall not create cross-tenant routes, relationships, grants, results, mailboxes, leases, or placement authority.",
+        "subject_id": "agent_wasm.topology_recovery"
+      },
+      {
+        "file": ".spec/specs/topology_recovery.spec.md",
+        "id": "agent_wasm.topology_recovery.seams",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Horizontal lease transfer, topology distribution, and reconciliation coordination shall remain versioned replaceable seams with bounded evidence.",
+        "subject_id": "agent_wasm.topology_recovery"
+      },
+      {
+        "file": ".spec/specs/workflows.spec.md",
+        "id": "agent_wasm.workflows.acceptance",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Workflow, provenance, safety, cost, resume, credential non-exposure, and residual model-risk evidence shall gate Milestone 7 acceptance.",
+        "subject_id": "agent_wasm.workflows"
+      },
+      {
+        "file": ".spec/specs/workflows.spec.md",
+        "id": "agent_wasm.workflows.corpus",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Direct model, structured response, model-tool continuation, retrieval-grounded, code-execution, and multi-agent workflows shall use durable explicit state and pinned dependencies.",
+        "subject_id": "agent_wasm.workflows"
+      },
+      {
+        "file": ".spec/specs/workflows.spec.md",
+        "id": "agent_wasm.workflows.safety",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Hostile output, approvals, quotas, credential revocation, stream cancellation, provenance, and workflow budgets shall be validated before state, context, tool, or user admission.",
+        "subject_id": "agent_wasm.workflows"
+      },
+      {
+        "file": ".spec/specs/spec_system.spec.md",
+        "id": "spec.workspace.agent_prime_context",
+        "priority": "should",
+        "stability": "evolving",
+        "statement": "The repository shall include a .spec/AGENTS.md that tells agents to start a session with mix spec.prime before editing current truth.",
+        "subject_id": "spec.system"
+      },
+      {
+        "file": ".spec/specs/spec_system.spec.md",
+        "id": "spec.workspace.agents_present",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "The repository shall include a .spec/AGENTS.md that gives local operating guidance for agents working inside the .spec workspace.",
+        "subject_id": "spec.system"
+      },
+      {
+        "file": ".spec/specs/spec_system.spec.md",
+        "id": "spec.workspace.decisions_readme_present",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "The repository shall include a .spec/decisions/README.md that explains when durable ADRs belong in the workspace.",
+        "subject_id": "spec.system"
+      },
+      {
+        "file": ".spec/specs/spec_system.spec.md",
+        "id": "spec.workspace.readme_present",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "The repository shall include a .spec/README.md that explains purpose, layout, and workflow.",
+        "subject_id": "spec.system"
+      },
+      {
+        "file": ".spec/specs/spec_system.spec.md",
+        "id": "spec.workspace.state_generated",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "When indexing and validation run, the workspace shall generate .spec/state.json containing indexed subjects, indexed decisions, and verification state.",
+        "subject_id": "spec.system"
+      }
+    ],
+    "scenarios": [],
+    "subjects": [
+      {
+        "file": ".spec/specs/actions.spec.md",
+        "id": "agent_wasm.actions",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.host_owned_authority",
+            "agent_wasm.decision.portable_guest_protocol"
+          ],
+          "id": "agent_wasm.actions",
+          "kind": "contract",
+          "status": "active",
+          "summary": "Action declarations, concrete instructions, deterministic plans, validation, and result classes.",
+          "surface": [
+            "lib/agent_wasm/actions/**/*.ex",
+            "test/agent_wasm/actions/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Actions, Instructions, Plans, and Results"
+      },
+      {
+        "file": ".spec/specs/agent_graph.spec.md",
+        "id": "agent_wasm.agent_graph",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.host_owned_authority",
+            "agent_wasm.decision.logical_identity_disposable_placement",
+            "agent_wasm.decision.least_authority_credential_custody"
+          ],
+          "id": "agent_wasm.agent_graph",
+          "kind": "contract",
+          "status": "active",
+          "summary": "Tenant-qualified identity, relationships, ownership, dependency, visibility, and signal provenance.",
+          "surface": [
+            "lib/agent_wasm/agent_graph/**/*.ex",
+            "test/agent_wasm/agent_graph/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Agent Identity and Relationship Graph"
+      },
+      {
+        "file": ".spec/specs/agent_registry.spec.md",
+        "id": "agent_wasm.agent_registry",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.elixir_otp_product_host",
+            "agent_wasm.decision.host_owned_authority",
+            "agent_wasm.decision.logical_identity_disposable_placement"
+          ],
+          "id": "agent_wasm.agent_registry",
+          "kind": "module",
+          "status": "active",
+          "summary": "Logical agent records, activation, cancellation, completion, and disposable live projections.",
+          "surface": [
+            "lib/agent_wasm/agent_registry/**/*.ex",
+            "test/agent_wasm/agent_registry/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Agent Registry and Lifecycle"
+      },
+      {
+        "file": ".spec/specs/artifacts.spec.md",
+        "id": "agent_wasm.artifacts",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.portable_guest_protocol",
+            "agent_wasm.decision.user_owned_external_bindings",
+            "agent_wasm.decision.evidence_gated_conformance"
+          ],
+          "id": "agent_wasm.artifacts",
+          "kind": "contract",
+          "status": "active",
+          "summary": "Immutable artifact bundles, manifests, schemas, registry resolution, admission, and cache keys.",
+          "surface": [
+            "lib/agent_wasm/artifacts/**/*.ex",
+            "test/agent_wasm/artifacts/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Artifacts, Manifests, Schemas, and Registries"
+      },
+      {
+        "file": ".spec/specs/atomic_commit.spec.md",
+        "id": "agent_wasm.atomic_commit",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.atomic_durable_effects",
+            "agent_wasm.decision.host_owned_authority"
+          ],
+          "id": "agent_wasm.atomic_commit",
+          "kind": "workflow",
+          "status": "active",
+          "summary": "Atomic snapshot, journal, lifecycle, and outbox commit with conflict recovery.",
+          "surface": [
+            "lib/agent_wasm/atomic_commit/**/*.ex",
+            "test/agent_wasm/atomic_commit/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Atomic Commit and Directive Outbox"
+      },
+      {
+        "file": ".spec/specs/capability_policy.spec.md",
+        "id": "agent_wasm.capability_policy",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.host_owned_authority",
+            "agent_wasm.decision.least_authority_credential_custody"
+          ],
+          "id": "agent_wasm.capability_policy",
+          "kind": "policy",
+          "status": "active",
+          "summary": "Host-owned policy decisions, attenuation, approvals, cache invalidation, limits, and enforcement points.",
+          "surface": [
+            "lib/agent_wasm/capability_policy/**/*.ex",
+            "test/agent_wasm/capability_policy/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Capability Policy and Attenuation"
+      },
+      {
+        "file": ".spec/specs/child_lifecycle.spec.md",
+        "id": "agent_wasm.child_lifecycle",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.atomic_durable_effects",
+            "agent_wasm.decision.host_owned_authority",
+            "agent_wasm.decision.logical_identity_disposable_placement"
+          ],
+          "id": "agent_wasm.child_lifecycle",
+          "kind": "workflow",
+          "status": "active",
+          "summary": "Durable child creation, lifecycle events, monitoring, cancellation propagation, hard stop, and restart policy.",
+          "surface": [
+            "lib/agent_wasm/child_lifecycle/**/*.ex",
+            "test/agent_wasm/child_lifecycle/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Child Lifecycle, Cancellation, Monitoring, and Restart"
+      },
+      {
+        "file": ".spec/specs/conformance_vocabulary.spec.md",
+        "id": "agent_wasm.conformance_vocabulary",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.specification_authority",
+            "agent_wasm.decision.evidence_gated_conformance"
+          ],
+          "id": "agent_wasm.conformance_vocabulary",
+          "kind": "policy",
+          "status": "active",
+          "summary": "Requirement force, behavior classes, variability, limits, and profiles.",
+          "surface": [],
+          "verification_minimum_strength": null
+        },
+        "title": "Conformance Vocabulary"
+      },
+      {
+        "file": ".spec/specs/context_and_control.spec.md",
+        "id": "agent_wasm.context_and_control",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.atomic_durable_effects",
+            "agent_wasm.decision.least_authority_credential_custody",
+            "agent_wasm.decision.user_owned_external_bindings"
+          ],
+          "id": "agent_wasm.context_and_control",
+          "kind": "contract",
+          "status": "active",
+          "summary": "Durable threads, projections, memory, approvals, quotas, use-only leases, custodians, and receipts.",
+          "surface": [
+            "lib/agent_wasm/context_and_control/**/*.ex",
+            "test/agent_wasm/context_and_control/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Threads, Checkpoints, Memory, Human Control, Quotas, and Credential Use"
+      },
+      {
+        "file": ".spec/specs/crash_acceptance.spec.md",
+        "id": "agent_wasm.crash_acceptance",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.atomic_durable_effects",
+            "agent_wasm.decision.evidence_gated_conformance"
+          ],
+          "id": "agent_wasm.crash_acceptance",
+          "kind": "workflow",
+          "status": "active",
+          "summary": "Crash-boundary invariants, restart reconstruction, ambiguous success, and Milestone 4 acceptance.",
+          "surface": [
+            "test/agent_wasm/crash_acceptance/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Crash Injection and Durable Effects Acceptance"
+      },
+      {
+        "file": ".spec/specs/delegation.spec.md",
+        "id": "agent_wasm.delegation",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.atomic_durable_effects",
+            "agent_wasm.decision.host_owned_authority",
+            "agent_wasm.decision.logical_identity_disposable_placement"
+          ],
+          "id": "agent_wasm.delegation",
+          "kind": "workflow",
+          "status": "active",
+          "summary": "Durable plans, delegated work, bounded concurrency, causal results, aggregation, cancellation, and evidence.",
+          "surface": [
+            "lib/agent_wasm/delegation/**/*.ex",
+            "test/agent_wasm/delegation/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Fan-Out, Fan-In, Delegation, and Aggregation"
+      },
+      {
+        "file": ".spec/specs/developer_toolchain.spec.md",
+        "id": "agent_wasm.developer_toolchain",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.elixir_otp_product_host",
+            "agent_wasm.decision.portable_guest_protocol",
+            "agent_wasm.decision.evidence_gated_conformance"
+          ],
+          "id": "agent_wasm.developer_toolchain",
+          "kind": "contract",
+          "status": "active",
+          "summary": "Developer SDKs, CLI commands, deterministic simulation, templates, fixtures, debugging, compatibility, and offline use.",
+          "surface": [
+            "lib/agent_wasm/developer_toolchain/**/*.ex",
+            "test/agent_wasm/developer_toolchain/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Guest SDK, CLI, Simulator, Templates, Fixtures, and Debugging"
+      },
+      {
+        "file": ".spec/specs/directives.spec.md",
+        "id": "agent_wasm.directives",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.host_owned_authority",
+            "agent_wasm.decision.atomic_durable_effects",
+            "agent_wasm.decision.user_owned_external_bindings"
+          ],
+          "id": "agent_wasm.directives",
+          "kind": "contract",
+          "status": "active",
+          "summary": "External directives as data, serializable strategies, continuations, and terminal behavior.",
+          "surface": [
+            "lib/agent_wasm/directives/**/*.ex",
+            "test/agent_wasm/directives/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Directives, Strategies, Continuations, and Terminal States"
+      },
+      {
+        "file": ".spec/specs/effects.spec.md",
+        "id": "agent_wasm.effects",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.atomic_durable_effects",
+            "agent_wasm.decision.host_owned_authority",
+            "agent_wasm.decision.least_authority_credential_custody"
+          ],
+          "id": "agent_wasm.effects",
+          "kind": "workflow",
+          "status": "active",
+          "summary": "Typed effect dispatch, attempt leases, idempotency, retries, outcomes, and causal result signals.",
+          "surface": [
+            "lib/agent_wasm/effects/**/*.ex",
+            "test/agent_wasm/effects/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Effect Handlers, Attempts, and Result Signals"
+      },
+      {
+        "file": ".spec/specs/guest_protocol.spec.md",
+        "id": "agent_wasm.guest_protocol",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.portable_guest_protocol",
+            "agent_wasm.decision.host_owned_authority"
+          ],
+          "id": "agent_wasm.guest_protocol",
+          "kind": "contract",
+          "status": "active",
+          "summary": "Describe, initialize, reduce, and migrate envelopes over canonical bytes.",
+          "surface": [
+            "lib/agent_wasm/invocation/port_worker.ex",
+            "native/agent_wasm_runner/Cargo.toml",
+            "native/agent_wasm_runner/Cargo.lock",
+            "native/agent_wasm_runner/src/main.rs",
+            "test/agent_wasm/guest_protocol/lifecycle_conformance_test.exs",
+            "test/fixtures/guest_protocol/bootstrap_guest/Cargo.toml",
+            "test/fixtures/guest_protocol/bootstrap_guest/Cargo.lock",
+            "test/fixtures/guest_protocol/bootstrap_guest/src/lib.rs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Guest Protocol and Canonical Encoding"
+      },
+      {
+        "file": ".spec/specs/guest_sandbox.spec.md",
+        "id": "agent_wasm.guest_sandbox",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.host_owned_authority",
+            "agent_wasm.decision.least_authority_credential_custody",
+            "agent_wasm.decision.portable_guest_protocol"
+          ],
+          "id": "agent_wasm.guest_sandbox",
+          "kind": "contract",
+          "status": "active",
+          "summary": "Bounded synchronous host functions, import namespaces, default-no-WASI, instance modes, and residue checks.",
+          "surface": [
+            "lib/agent_wasm/guest_sandbox/**/*.ex",
+            "test/agent_wasm/guest_sandbox/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Synchronous Host Functions, WASI, and Tenant Isolation"
+      },
+      {
+        "file": ".spec/specs/guest_sdk.spec.md",
+        "id": "agent_wasm.guest_sdk",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.portable_guest_protocol",
+            "agent_wasm.decision.evidence_gated_conformance"
+          ],
+          "id": "agent_wasm.guest_sdk",
+          "kind": "contract",
+          "status": "active",
+          "summary": "Language SDK lowering, compiled fixtures, diagnostics, and protocol acceptance.",
+          "surface": [
+            "lib/agent_wasm/guest_sdk/**/*.ex",
+            "test/agent_wasm/guest_sdk/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Guest SDK and Milestone Acceptance"
+      },
+      {
+        "file": ".spec/specs/host_flow.spec.md",
+        "id": "agent_wasm.host_flow",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.elixir_otp_product_host",
+            "agent_wasm.decision.host_owned_authority",
+            "agent_wasm.decision.evidence_gated_conformance"
+          ],
+          "id": "agent_wasm.host_flow",
+          "kind": "workflow",
+          "status": "active",
+          "summary": "End-to-end admission, mailbox, lease, invocation, validation, commit, directive, and evidence flow.",
+          "surface": [
+            "lib/agent_wasm/host_flow/**/*.ex",
+            "test/agent_wasm/host_flow/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Single-Agent Host Flow"
+      },
+      {
+        "file": ".spec/specs/host_platform.spec.md",
+        "id": "agent_wasm.host_platform",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.elixir_otp_product_host",
+            "agent_wasm.decision.host_owned_authority",
+            "agent_wasm.decision.evidence_gated_conformance"
+          ],
+          "id": "agent_wasm.host_platform",
+          "kind": "contract",
+          "status": "active",
+          "summary": "Stable host operations, envelopes, lifecycle, configuration, dependency injection, transports, and packaging.",
+          "surface": [
+            "lib/agent_wasm/host_platform/**/*.ex",
+            "test/agent_wasm/host_platform/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Embedded and Server Host Platform"
+      },
+      {
+        "file": ".spec/specs/identities.spec.md",
+        "id": "agent_wasm.identities",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.portable_guest_protocol",
+            "agent_wasm.decision.evidence_gated_conformance"
+          ],
+          "id": "agent_wasm.identities",
+          "kind": "contract",
+          "status": "active",
+          "summary": "Canonical identities, compatibility negotiation, diagnostics, and implementation limits.",
+          "surface": [
+            "lib/agent_wasm/identities/**/*.ex",
+            "test/agent_wasm/identities/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Stable Identities, Versions, Errors, and Limits"
+      },
+      {
+        "file": ".spec/specs/ingress.spec.md",
+        "id": "agent_wasm.ingress",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.host_owned_authority",
+            "agent_wasm.decision.logical_identity_disposable_placement"
+          ],
+          "id": "agent_wasm.ingress",
+          "kind": "module",
+          "status": "active",
+          "summary": "Authenticated external event sources, schedules, timers, deduplication, and mailbox admission.",
+          "surface": [
+            "lib/agent_wasm/ingress/**/*.ex",
+            "test/agent_wasm/ingress/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Sensors, Schedules, Timers, and Signal Ingress"
+      },
+      {
+        "file": ".spec/specs/invocation.spec.md",
+        "id": "agent_wasm.invocation",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.elixir_otp_product_host",
+            "agent_wasm.decision.host_owned_authority",
+            "agent_wasm.decision.portable_guest_protocol"
+          ],
+          "id": "agent_wasm.invocation",
+          "kind": "module",
+          "status": "active",
+          "summary": "Tenant-isolated artifact resolution, bounded guest invocation, output validation, and disposition.",
+          "surface": [
+            "lib/agent_wasm/invocation/**/*.ex",
+            "test/agent_wasm/invocation/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Extism Invocation Boundary"
+      },
+      {
+        "file": ".spec/specs/mailbox.spec.md",
+        "id": "agent_wasm.mailbox",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.elixir_otp_product_host",
+            "agent_wasm.decision.host_owned_authority",
+            "agent_wasm.decision.logical_identity_disposable_placement"
+          ],
+          "id": "agent_wasm.mailbox",
+          "kind": "module",
+          "status": "active",
+          "summary": "Bounded priority mailboxes, overload behavior, fairness, delivery metadata, leases, and fencing.",
+          "surface": [
+            "lib/agent_wasm/mailbox/**/*.ex",
+            "test/agent_wasm/mailbox/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Mailboxes, Ordering, Fairness, and Turn Leases"
+      },
+      {
+        "file": ".spec/specs/model_gateway.spec.md",
+        "id": "agent_wasm.model_gateway",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.atomic_durable_effects",
+            "agent_wasm.decision.least_authority_credential_custody",
+            "agent_wasm.decision.user_owned_external_bindings"
+          ],
+          "id": "agent_wasm.model_gateway",
+          "kind": "workflow",
+          "status": "active",
+          "summary": "Logical model intent, user-owned bindings, pinned requests, streaming, usage, custody, and receipts.",
+          "surface": [
+            "lib/agent_wasm/model_gateway/**/*.ex",
+            "test/agent_wasm/model_gateway/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Provider-Neutral Model Gateway"
+      },
+      {
+        "file": ".spec/specs/operations.spec.md",
+        "id": "agent_wasm.operations",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.elixir_otp_product_host",
+            "agent_wasm.decision.host_owned_authority",
+            "agent_wasm.decision.evidence_gated_conformance",
+            "agent_wasm.decision.least_authority_credential_custody"
+          ],
+          "id": "agent_wasm.operations",
+          "kind": "contract",
+          "status": "active",
+          "summary": "Metrics, tracing, structured logs, audit, redaction, sampling, retention, health, export, and operator controls.",
+          "surface": [
+            "lib/agent_wasm/operations/**/*.ex",
+            "test/agent_wasm/operations/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Telemetry, Audit, Redaction, Health, and Operator Actions"
+      },
+      {
+        "file": ".spec/specs/package.spec.md",
+        "id": "agent_wasm.package",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.specification_authority",
+            "agent_wasm.decision.elixir_otp_product_host",
+            "agent_wasm.decision.evidence_gated_conformance"
+          ],
+          "id": "agent_wasm.package",
+          "kind": "package",
+          "status": "active",
+          "summary": "Elixir/OTP product boundary and complete normative source mapping.",
+          "surface": [
+            "README.md",
+            "mix.exs",
+            "lib/agent_wasm.ex",
+            "test/agent_wasm/guest_protocol/lifecycle_conformance_test.exs",
+            "test/test_helper.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Agent WASM Package"
+      },
+      {
+        "file": ".spec/specs/planning.spec.md",
+        "id": "agent_wasm.planning",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.host_owned_authority",
+            "agent_wasm.decision.atomic_durable_effects",
+            "agent_wasm.decision.evidence_gated_conformance"
+          ],
+          "id": "agent_wasm.planning",
+          "kind": "workflow",
+          "status": "active",
+          "summary": "Explicit direct, FSM, bounded-loop, and reviewable planning state with budgets and termination.",
+          "surface": [
+            "lib/agent_wasm/planning/**/*.ex",
+            "test/agent_wasm/planning/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Direct, FSM, Tool-Loop, and Planning Strategies"
+      },
+      {
+        "file": ".spec/specs/plugins.spec.md",
+        "id": "agent_wasm.plugins",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.host_owned_authority",
+            "agent_wasm.decision.user_owned_external_bindings",
+            "agent_wasm.decision.least_authority_credential_custody"
+          ],
+          "id": "agent_wasm.plugins",
+          "kind": "contract",
+          "status": "active",
+          "summary": "Plugin manifests, deterministic composition, user configuration, approvals, lifecycle, and trust tiers.",
+          "surface": [
+            "lib/agent_wasm/plugins/**/*.ex",
+            "test/agent_wasm/plugins/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Framework Plugins and Lifecycle"
+      },
+      {
+        "file": ".spec/specs/production_readiness.spec.md",
+        "id": "agent_wasm.production_readiness",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.evidence_gated_conformance",
+            "agent_wasm.decision.elixir_otp_product_host"
+          ],
+          "id": "agent_wasm.production_readiness",
+          "kind": "workflow",
+          "status": "active",
+          "summary": "Maintained examples, operational runbooks, service objectives, evidence, support, risk, ownership, and release gates.",
+          "surface": [
+            "test/agent_wasm/production_readiness/**/*_test.exs",
+            "examples/**/*",
+            "runbooks/**/*"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Examples, Runbooks, SLO Evidence, and Production Acceptance"
+      },
+      {
+        "file": ".spec/specs/profile.spec.md",
+        "id": "agent_wasm.profile",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.portable_guest_protocol",
+            "agent_wasm.decision.host_owned_authority",
+            "agent_wasm.decision.least_authority_credential_custody"
+          ],
+          "id": "agent_wasm.profile",
+          "kind": "contract",
+          "status": "active",
+          "summary": "Host and guest ownership, profiles, model choice, credential custody, and bootstrap boundaries.",
+          "surface": [
+            "lib/agent_wasm/profile/**/*.ex",
+            "test/agent_wasm/profile/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Profiles and Architectural Boundaries"
+      },
+      {
+        "file": ".spec/specs/provenance.spec.md",
+        "id": "agent_wasm.provenance",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.evidence_gated_conformance",
+            "agent_wasm.decision.least_authority_credential_custody"
+          ],
+          "id": "agent_wasm.provenance",
+          "kind": "policy",
+          "status": "active",
+          "summary": "Artifact admission, signatures, dependency provenance, immutable evidence, redaction, and security acceptance.",
+          "surface": [
+            "lib/agent_wasm/provenance/**/*.ex",
+            "test/agent_wasm/provenance/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Provenance, Signing, Audit, and Security Acceptance"
+      },
+      {
+        "file": ".spec/specs/recovery.spec.md",
+        "id": "agent_wasm.recovery",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.atomic_durable_effects",
+            "agent_wasm.decision.logical_identity_disposable_placement"
+          ],
+          "id": "agent_wasm.recovery",
+          "kind": "workflow",
+          "status": "active",
+          "summary": "Durable retry and timer scheduling, replay, hibernation, thaw, migration, and rollback.",
+          "surface": [
+            "lib/agent_wasm/recovery/**/*.ex",
+            "test/agent_wasm/recovery/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Retry, Timer Recovery, Replay, Hibernate, and Migration"
+      },
+      {
+        "file": ".spec/specs/reducer.spec.md",
+        "id": "agent_wasm.reducer",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.host_owned_authority",
+            "agent_wasm.decision.portable_guest_protocol",
+            "agent_wasm.decision.evidence_gated_conformance"
+          ],
+          "id": "agent_wasm.reducer",
+          "kind": "workflow",
+          "status": "active",
+          "summary": "Deterministic resolution from admitted signal and snapshot to validated patch and directives.",
+          "surface": [
+            "lib/agent_wasm/reducer/**/*.ex",
+            "test/agent_wasm/reducer/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Deterministic Reducer"
+      },
+      {
+        "file": ".spec/specs/signals.spec.md",
+        "id": "agent_wasm.signals",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.host_owned_authority",
+            "agent_wasm.decision.portable_guest_protocol"
+          ],
+          "id": "agent_wasm.signals",
+          "kind": "contract",
+          "status": "active",
+          "summary": "Immutable signal envelopes, causality, authorization, routing, delivery, and deduplication.",
+          "surface": [
+            "lib/agent_wasm/signals/**/*.ex",
+            "test/agent_wasm/signals/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Signals, Causality, Routing, and Delivery"
+      },
+      {
+        "file": ".spec/specs/spec_system.spec.md",
+        "id": "spec.system",
+        "meta": {
+          "decisions": null,
+          "id": "spec.system",
+          "kind": "policy",
+          "status": "active",
+          "summary": "Canonical workspace contract for authored specs and generated Spec Led state.",
+          "surface": [
+            ".spec/README.md",
+            ".spec/AGENTS.md",
+            ".spec/decisions/README.md",
+            ".spec/specs/*.spec.md",
+            ".spec/decisions/*.md"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Spec System"
+      },
+      {
+        "file": ".spec/specs/specification_authority.spec.md",
+        "id": "agent_wasm.specification_authority",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.specification_authority",
+            "agent_wasm.decision.evidence_gated_conformance"
+          ],
+          "id": "agent_wasm.specification_authority",
+          "kind": "policy",
+          "status": "active",
+          "summary": "Authority, applicability, traceability, promotion, and conflict handling.",
+          "surface": [],
+          "verification_minimum_strength": null
+        },
+        "title": "Specification Authority"
+      },
+      {
+        "file": ".spec/specs/state_operations.spec.md",
+        "id": "agent_wasm.state_operations",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.host_owned_authority",
+            "agent_wasm.decision.atomic_durable_effects"
+          ],
+          "id": "agent_wasm.state_operations",
+          "kind": "contract",
+          "status": "active",
+          "summary": "Ordered atomic state operations, optimistic revisions, preconditions, paths, and limits.",
+          "surface": [
+            "lib/agent_wasm/state_operations/**/*.ex",
+            "test/agent_wasm/state_operations/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "State Operations, Revisions, and Conflicts"
+      },
+      {
+        "file": ".spec/specs/storage.spec.md",
+        "id": "agent_wasm.storage",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.atomic_durable_effects",
+            "agent_wasm.decision.logical_identity_disposable_placement"
+          ],
+          "id": "agent_wasm.storage",
+          "kind": "contract",
+          "status": "active",
+          "summary": "Durable snapshots, append-only journals, history projections, storage isolation, and migration.",
+          "surface": [
+            "lib/agent_wasm/storage/**/*.ex",
+            "test/agent_wasm/storage/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Revisioned Storage and Journals"
+      },
+      {
+        "file": ".spec/specs/threat_model.spec.md",
+        "id": "agent_wasm.threat_model",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.host_owned_authority",
+            "agent_wasm.decision.least_authority_credential_custody"
+          ],
+          "id": "agent_wasm.threat_model",
+          "kind": "policy",
+          "status": "active",
+          "summary": "Threat actors, protected assets, principal kinds, trust classes, grants, and separated custody.",
+          "surface": [
+            "lib/agent_wasm/security/**/*.ex",
+            "test/agent_wasm/security/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Threat Model, Principals, Trust, and Grants"
+      },
+      {
+        "file": ".spec/specs/tool_runtime.spec.md",
+        "id": "agent_wasm.tool_runtime",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.atomic_durable_effects",
+            "agent_wasm.decision.least_authority_credential_custody",
+            "agent_wasm.decision.user_owned_external_bindings"
+          ],
+          "id": "agent_wasm.tool_runtime",
+          "kind": "workflow",
+          "status": "active",
+          "summary": "Tool catalogs, retrieval, sandboxed code, connectors, durable attempts, authenticated custody, and results.",
+          "surface": [
+            "lib/agent_wasm/tool_runtime/**/*.ex",
+            "test/agent_wasm/tool_runtime/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Tool, Retrieval, Code, and Connector Runtime"
+      },
+      {
+        "file": ".spec/specs/topology.spec.md",
+        "id": "agent_wasm.topology",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.host_owned_authority",
+            "agent_wasm.decision.logical_identity_disposable_placement",
+            "agent_wasm.decision.evidence_gated_conformance"
+          ],
+          "id": "agent_wasm.topology",
+          "kind": "workflow",
+          "status": "active",
+          "summary": "Versioned desired topology, observed status, disposable placement, activation leases, and reconciliation.",
+          "surface": [
+            "lib/agent_wasm/topology/**/*.ex",
+            "test/agent_wasm/topology/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Pod Topology, Placement, Leases, and Reconciliation"
+      },
+      {
+        "file": ".spec/specs/topology_recovery.spec.md",
+        "id": "agent_wasm.topology_recovery",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.atomic_durable_effects",
+            "agent_wasm.decision.logical_identity_disposable_placement",
+            "agent_wasm.decision.evidence_gated_conformance"
+          ],
+          "id": "agent_wasm.topology_recovery",
+          "kind": "workflow",
+          "status": "active",
+          "summary": "Clean-state multi-agent recovery, bounded resources, tenant isolation, lease behavior, and horizontal seams.",
+          "surface": [
+            "lib/agent_wasm/topology_recovery/**/*.ex",
+            "test/agent_wasm/topology_recovery/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Multi-Agent Recovery and Clustering Seams"
+      },
+      {
+        "file": ".spec/specs/workflows.spec.md",
+        "id": "agent_wasm.workflows",
+        "meta": {
+          "decisions": [
+            "agent_wasm.decision.atomic_durable_effects",
+            "agent_wasm.decision.least_authority_credential_custody",
+            "agent_wasm.decision.user_owned_external_bindings",
+            "agent_wasm.decision.evidence_gated_conformance"
+          ],
+          "id": "agent_wasm.workflows",
+          "kind": "workflow",
+          "status": "active",
+          "summary": "Representative AI workflows, provenance, hostile-output validation, budgets, deterministic resume, and Milestone 7 acceptance.",
+          "surface": [
+            "lib/agent_wasm/workflows/**/*.ex",
+            "test/agent_wasm/workflows/**/*_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Agentic Workflows, Provenance, Safety, and Acceptance"
+      }
+    ],
+    "verifications": [
+      {
+        "covers": [
+          "agent_wasm.guest_protocol.exports"
+        ],
+        "execute": true,
+        "file": ".spec/specs/guest_protocol.spec.md",
+        "kind": "command",
+        "subject_id": "agent_wasm.guest_protocol",
+        "target": "mix test test/agent_wasm/guest_protocol/lifecycle_conformance_test.exs --trace"
+      },
+      {
+        "covers": [
+          "agent_wasm.package.product_host"
+        ],
+        "file": ".spec/specs/package.spec.md",
+        "kind": "file",
+        "subject_id": "agent_wasm.package",
+        "target": ".spec/decisions/agent_wasm.decision.elixir_otp_product_host.md"
+      },
+      {
+        "covers": [
+          "agent_wasm.package.source_authority"
+        ],
+        "file": ".spec/specs/package.spec.md",
+        "kind": "file",
+        "subject_id": "agent_wasm.package",
+        "target": ".spec/decisions/agent_wasm.decision.specification_authority.md"
+      },
+      {
+        "covers": [
+          "agent_wasm.package.conformance_gate"
+        ],
+        "file": ".spec/specs/package.spec.md",
+        "kind": "file",
+        "subject_id": "agent_wasm.package",
+        "target": ".spec/decisions/agent_wasm.decision.evidence_gated_conformance.md"
+      },
+      {
+        "covers": [
+          "agent_wasm.package.source_coverage"
+        ],
+        "execute": true,
+        "file": ".spec/specs/package.spec.md",
+        "kind": "command",
+        "subject_id": "agent_wasm.package",
+        "target": "mix spec.validate"
+      },
+      {
+        "covers": [
+          "agent_wasm.package.bootstrap_test"
+        ],
+        "execute": true,
+        "file": ".spec/specs/package.spec.md",
+        "kind": "command",
+        "subject_id": "agent_wasm.package",
+        "target": "mix test"
+      },
+      {
+        "covers": [
+          "spec.workspace.readme_present"
+        ],
+        "file": ".spec/specs/spec_system.spec.md",
+        "kind": "source_file",
+        "subject_id": "spec.system",
+        "target": ".spec/README.md"
+      },
+      {
+        "covers": [
+          "spec.workspace.agents_present",
+          "spec.workspace.agent_prime_context"
+        ],
+        "file": ".spec/specs/spec_system.spec.md",
+        "kind": "source_file",
+        "subject_id": "spec.system",
+        "target": ".spec/AGENTS.md"
+      },
+      {
+        "covers": [
+          "spec.workspace.decisions_readme_present"
+        ],
+        "file": ".spec/specs/spec_system.spec.md",
+        "kind": "source_file",
+        "subject_id": "spec.system",
+        "target": ".spec/decisions/README.md"
+      },
+      {
+        "covers": [
+          "spec.workspace.state_generated"
+        ],
+        "file": ".spec/specs/spec_system.spec.md",
+        "kind": "command",
+        "subject_id": "spec.system",
+        "target": "mix spec.index"
+      },
+      {
+        "covers": [
+          "spec.workspace.state_generated"
+        ],
+        "file": ".spec/specs/spec_system.spec.md",
+        "kind": "command",
+        "subject_id": "spec.system",
+        "target": "mix spec.validate"
+      }
+    ]
+  },
+  "specification_version": "1.0",
+  "summary": {
+    "decision_parse_errors": 0,
+    "decisions": 9,
+    "exceptions": 41,
+    "findings": 0,
+    "requirements": 134,
+    "scenarios": 0,
+    "subjects": 43,
+    "verifications": 11
+  },
+  "verification": {
+    "claims": [
+      {
+        "cover_id": "agent_wasm.guest_protocol.exports",
+        "file": ".spec/specs/guest_protocol.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "agent_wasm.guest_protocol",
+        "target": "mix test test/agent_wasm/guest_protocol/lifecycle_conformance_test.exs --trace",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "agent_wasm.package.product_host",
+        "file": ".spec/specs/package.spec.md",
+        "kind": "file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "agent_wasm.package",
+        "target": ".spec/decisions/agent_wasm.decision.elixir_otp_product_host.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "agent_wasm.package.source_authority",
+        "file": ".spec/specs/package.spec.md",
+        "kind": "file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "agent_wasm.package",
+        "target": ".spec/decisions/agent_wasm.decision.specification_authority.md",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "agent_wasm.package.conformance_gate",
+        "file": ".spec/specs/package.spec.md",
+        "kind": "file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "agent_wasm.package",
+        "target": ".spec/decisions/agent_wasm.decision.evidence_gated_conformance.md",
+        "verification_index": 2
+      },
+      {
+        "cover_id": "agent_wasm.package.source_coverage",
+        "file": ".spec/specs/package.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "agent_wasm.package",
+        "target": "mix spec.validate",
+        "verification_index": 3
+      },
+      {
+        "cover_id": "agent_wasm.package.bootstrap_test",
+        "file": ".spec/specs/package.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "agent_wasm.package",
+        "target": "mix test",
+        "verification_index": 4
+      },
+      {
+        "cover_id": "spec.workspace.readme_present",
+        "file": ".spec/specs/spec_system.spec.md",
+        "kind": "source_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "spec.system",
+        "target": ".spec/README.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "spec.workspace.agent_prime_context",
+        "file": ".spec/specs/spec_system.spec.md",
+        "kind": "source_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "spec.system",
+        "target": ".spec/AGENTS.md",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "spec.workspace.agents_present",
+        "file": ".spec/specs/spec_system.spec.md",
+        "kind": "source_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "spec.system",
+        "target": ".spec/AGENTS.md",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "spec.workspace.decisions_readme_present",
+        "file": ".spec/specs/spec_system.spec.md",
+        "kind": "source_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "spec.system",
+        "target": ".spec/decisions/README.md",
+        "verification_index": 2
+      },
+      {
+        "cover_id": "spec.workspace.state_generated",
+        "file": ".spec/specs/spec_system.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "claimed",
+        "subject_id": "spec.system",
+        "target": "mix spec.index",
+        "verification_index": 3
+      },
+      {
+        "cover_id": "spec.workspace.state_generated",
+        "file": ".spec/specs/spec_system.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "claimed",
+        "subject_id": "spec.system",
+        "target": "mix spec.validate",
+        "verification_index": 4
+      }
+    ],
+    "cli_minimum_strength": null,
+    "default_minimum_strength": "claimed",
+    "strength_summary": {
+      "claimed": 2,
+      "executed": 3,
+      "linked": 7
+    },
+    "threshold_failures": 0
+  },
+  "workspace": {
+    "decision_count": 9,
+    "spec_count": 43
+  }
+}

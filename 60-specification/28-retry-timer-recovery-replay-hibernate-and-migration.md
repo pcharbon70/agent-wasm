@@ -2,7 +2,7 @@
 title: "Retry Timer Recovery Replay Hibernate And Migration"
 kind: specification
 created: "2026-08-09"
-status: draft
+status: normative
 spec_version: "0.1.0"
 tags:
   - milestone-04
@@ -22,7 +22,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 4](../.spec/planning/agentic-system/milestone-04-durable-state-effects-and-recovery/phase-04-retry-timer-recovery-replay-hibernate-and-migration.md)
 of
 [Milestone 4](../.spec/planning/agentic-system/milestone-04-durable-state-effects-and-recovery/README.md)
@@ -64,7 +64,7 @@ Related chapters:
 
 > **Normative definition.**
 A retry is a durable operation that re-attempts a failed directive dispatch
-after a bounded number of attempts with exponential backoff and jitter.
+after a bounded number of attempts with a fixed constant delay and no jitter.
 The host MUST classify retries into the following categories:
 
 1. **Transient**: The failure is likely to resolve on retry (e.g., network error).
@@ -82,7 +82,7 @@ RetryRecord {
   retry_number: u32,
   max_retries: u32,
   backoff_ms: u64,
-  jitter_ms: u64,
+  jitter_ms: u64?,
   next_retry_at: UnixTimestamp,
   deadline: UnixTimestamp?,
   classification: RetryClassification,
@@ -105,9 +105,9 @@ RetryState = Pending | InProgress | Completed | Failed | Cancelled | Expired | T
 | `tenant_id` | TenantId | Yes | Tenant this retry belongs to |
 | `agent_id` | AgentId | Yes | Agent this retry belongs to |
 | `retry_number` | u32 | Yes | Current retry number (starts at 1) |
-| `max_retries` | u32 | Yes | Maximum number of retries |
+| `max_retries` | u32 | Yes | Maximum total dispatch attempts, including the initial attempt |
 | `backoff_ms` | u64 | Yes | Base backoff duration in milliseconds |
-| `jitter_ms` | u64 | Yes | Additional random jitter in milliseconds |
+| `jitter_ms` | u64? | No | Must be absent or zero; non-zero jitter is invalid |
 | `next_retry_at` | UnixTimestamp | Yes | Next retry time |
 | `deadline` | UnixTimestamp? | No | Deadline for all retries (null if no deadline) |
 | `classification` | RetryClassification | Yes | Retry classification |
@@ -122,12 +122,11 @@ If `retry_number` reaches `max_retries` and the attempt fails, the host MUST
 mark the retry as `TerminalFailed` with `retry.max_retries_exceeded`.
 
 > **Normative definition.**
-The `next_retry_at` field is computed as
-`current_time + backoff_ms * 2^(retry_number - 1) + random(jitter_ms)`.
+The `next_retry_at` field is computed as `current_time + backoff_ms`.
 The host MUST use the computed `next_retry_at` for scheduling retries.
-This gives a base delay of `backoff_ms` for the first retry, `2 * backoff_ms` for
-the second, and so on, with up to `jitter_ms` milliseconds of additional random
-jitter applied to each delay.
+The same exact `backoff_ms` delay applies before every retry after the initial
+attempt. `jitter_ms` MUST be absent or zero. Exponential or linear growth,
+random jitter, and any other delay adjustment are prohibited.
 
 > **Normative definition.**
 The `deadline` field is optional.
@@ -202,9 +201,8 @@ field of the `TimerRecord`.
 
 > **Normative definition.**
 The host MUST mark a timer as `MissedFire` with `timer.missed_fire` when the
-timer's `fire_at` time has passed and the timer has not been fired within a
-reasonable grace period. The grace period is implementation-defined but MUST
-be documented in the conformance profile. The host MUST then apply the
+timer's `fire_at` time has passed and the timer has not been fired within
+30 seconds. The host MUST then apply the
 missed-fire policy (fire immediately, skip, or retry) based on the timer's
 configuration.
 
@@ -410,9 +408,9 @@ The host MUST define recovery behavior for the following failure scenarios:
 3. **Incompatible migration path**: If the migration path is incompatible,
    the host MUST reject the migration with `migration.incompatible_path`.
 4. **Expired retry**: If a retry's `next_retry_at` has passed and the retry has
-   not been attempted within a reasonable grace period, the host MUST mark the
+   not been attempted within 30 seconds, the host MUST mark the
    retry as `Expired` with `retry.expired`. This applies when the retry scheduler
-   has not dispatched the retry within a tolerance window after `next_retry_at`.
+   has not dispatched the retry within that fixed window after `next_retry_at`.
 5. **Duplicate timer**: If a duplicate timer is detected, the host MUST
    reject the duplicate with `timer.duplicate`.
 
@@ -454,6 +452,7 @@ hibernate, and migration:
 | `retry.max_retries_exceeded` | Maximum retry attempts exceeded |
 | `retry.deadline_exceeded` | Retry deadline exceeded |
 | `retry.expired` | Retry expired |
+| `retry.malformed` | Retry record omits a required policy value or requests a non-constant or jittered schedule |
 | `timer.expired` | Timer expired |
 | `timer.duplicate` | Duplicate timer detected |
 | `timer.missed_fire` | Timer missed scheduled fire time |
@@ -461,10 +460,13 @@ hibernate, and migration:
 | `replay.snapshot_mismatch` | Reconstructed state does not match snapshot |
 | `hibernate.checkpoint_failed` | Hibernate checkpoint creation failed |
 | `hibernate.thaw_failed` | Thaw activation failed |
+| `hibernate.timeout` | Hibernate did not complete within 30 seconds |
+| `hibernate.thaw_timeout` | Thaw did not complete within 30 seconds |
 | `migration.authorization_required` | Migration requires operator approval |
 | `migration.incompatible_path` | Migration path is incompatible |
 | `migration.checkpoint_failed` | Migration checkpoint creation failed |
 | `migration.rollback_failed` | Migration rollback failed |
+| `migration.timeout` | Migration did not complete within 300 seconds and was rolled back |
 | `artifact.missing` | Required artifact is missing |
 | `storage.snapshot.duplicate` | Snapshot ID already exists (see
   [Revisioned Snapshots Journals History And Storage Contracts](25-revisioned-snapshots-journals-history-and-storage-contracts.md)) |
@@ -481,32 +483,56 @@ boundary without exposing secrets.
 ### Bounded diagnostics
 
 > **Normative definition.**
-The host MUST emit bounded diagnostics for each failure outcome.
-The diagnostics MUST include:
+The host MUST emit bounded diagnostics for each failure outcome using exactly
+the Chapter 04 `Diagnostic` top-level structure. The domain error is `code`,
+`severity` is `error`, and `details` contains `phase`, `contract`, `profile`,
+`failed_boundary`, `context`, `entity_identifiers`, `timestamp`, and
+`retryable`.
 
-1. **Error code**: The specific error code from the table above.
-2. **Context**: The operation that failed (e.g., retry dispatch, timer fire,
-   replay, hibernate, migration).
-3. **Entity identifiers**: The tenant ID, agent ID, or record ID involved
-   (without exposing sensitive data).
-4. **Timestamp**: The time the error occurred.
-5. **Retryable**: Whether the operation can be retried.
+| Family | Domain codes |
+|--------|--------------|
+| `identity.validation.durable_recovery` | `retry.malformed` |
+| `identity.compatibility.durable_recovery` | `replay.snapshot_mismatch`, `migration.incompatible_path`, `artifact.missing` |
+| `identity.authorization.durable_recovery` | `migration.authorization_required` |
+| `identity.conflict.durable_recovery` | `timer.duplicate`, `replay.conflicting_result`, `commit.conflict`, `storage.snapshot.duplicate` |
+| `identity.limit.durable_recovery` | `retry.max_retries_exceeded`, `retry.deadline_exceeded`, `retry.expired`, `timer.expired`, `timer.missed_fire`, `hibernate.timeout`, `hibernate.thaw_timeout`, `migration.timeout` |
+| `identity.resource.durable_recovery` | `hibernate.checkpoint_failed`, `hibernate.thaw_failed`, `migration.checkpoint_failed`, `migration.rollback_failed` |
+| `identity.storage.durable_recovery` | `storage.unavailable` |
+
+No additional top-level diagnostic member is permitted.
 
 > **Normative definition.**
 The host MUST NOT expose internal implementation details, secrets, or
 sensitive data in diagnostics.
 
-### Implementation-defined choices
+### Fixed defaults and deadlines
 
-> **Normative implementation-defined choice.**
-The following choices are implementation-defined and MUST be documented in the
-conformance profile:
+> **Normative definition.**
+Before persisting a `RetryRecord`, the host MUST materialize every required
+policy value. If the operation that creates the record has no explicit retry
+policy, the host MUST materialize three total attempts, `backoff_ms = 1000`, and
+`jitter_ms = 0`. A persisted record that omits `max_retries` or `backoff_ms`, or
+that contains non-zero `jitter_ms`, is malformed and MUST be rejected with
+`retry.malformed`. The constant-delay formula in
+[Retry classification](#retry-classification) remains mandatory.
 
-1. **Retry default policy**: The default retry policy for retries.
-2. **Missed-fire default policy**: The default missed-fire policy for timers.
-3. **Hibernate timeout**: The maximum time allowed for hibernate operations.
-4. **Thaw timeout**: The maximum time allowed for thaw operations.
-5. **Migration timeout**: The maximum time allowed for migration operations.
+> **Normative definition.**
+When a timer omits its missed-fire policy, the host MUST use `Fire immediately`.
+Hibernate and thaw operations MUST each complete within 30 seconds. On expiry,
+the host MUST leave the last durable snapshot active and return
+`hibernate.timeout` or `hibernate.thaw_timeout`, respectively.
+
+> **Normative definition.**
+A migration MUST complete within 300 seconds. On expiry, the host MUST restore
+the rollback snapshot, set the migration state to `RolledBack`, and return
+`migration.timeout`. If restoration fails, it MUST instead return
+`migration.rollback_failed` and MUST NOT expose partially migrated state.
+
+> **Normative definition.**
+State-schema and artifact version storage, comparison, and indexing mechanisms
+are internal. They MUST preserve the exact version strings in every durable
+record and MUST produce identical compatibility, authorization, migration, and
+replay outcomes for the same records.
 
 ### Deferred work
 
@@ -565,13 +591,19 @@ The following tests MUST verify the canonical successful flow:
    operator-intervention and verify the classification.
 2. **Retry dispatch**: Dispatch a retry and verify the attempt state transitions
    from `Pending` to `InProgress` to `Completed`.
-3. **Timer creation**: Create a timer and verify the timer is persisted.
-4. **Timer fire**: Fire a timer and verify the signal is delivered.
-5. **Replay**: Replay a journal and verify the reconstructed state matches the
+3. **Constant retry schedule**: Fail at least three attempts and verify each
+   subsequent attempt is scheduled after exactly `backoff_ms`, with no growth
+   and no jitter.
+4. **Timer creation**: Create a timer and verify the timer is persisted.
+5. **Timer fire**: Fire a timer and verify the signal is delivered.
+6. **Replay**: Replay a journal and verify the reconstructed state matches the
    snapshot.
-6. **Hibernate**: Hibernate an agent and verify the state is preserved.
-7. **Thaw**: Thaw an agent and verify the state is restored.
-8. **Migration**: Migrate an agent and verify the migration is completed.
+7. **Hibernate**: Hibernate an agent and verify the state is preserved.
+8. **Thaw**: Thaw an agent and verify the state is restored.
+9. **Migration**: Migrate an agent and verify the migration is completed.
+10. **Default retry materialization**: Create a retry without an explicit
+    policy and verify that the durable record contains three total attempts,
+    `backoff_ms = 1000`, and `jitter_ms = 0` before its first dispatch.
 
 > **Normative definition.**
 Each test MUST record the following evidence:
@@ -606,24 +638,38 @@ The following tests MUST verify failure handling:
    path and verify the `migration.incompatible_path` error code.
 10. **Artifact missing**: Attempt an operation with a missing artifact and verify
     the `artifact.missing` error code.
+11. **Malformed retry policy**: Persist a retry with a missing required policy
+    value or non-zero jitter and verify `retry.malformed`.
+12. **Expired retry scheduling window**: Leave a pending retry undispatched for
+    30 seconds after `next_retry_at` and verify `retry.expired` and `Expired`.
+13. **Hibernate timeout**: Keep hibernate incomplete for 30 seconds and verify
+    `hibernate.timeout` with the last durable snapshot still active.
+14. **Thaw timeout**: Keep thaw incomplete for 30 seconds and verify
+    `hibernate.thaw_timeout` with the last durable snapshot still active.
+15. **Migration timeout**: Keep migration incomplete for 300 seconds and verify
+    rollback to the rollback snapshot, state `RolledBack`, and
+    `migration.timeout`; force rollback failure and verify
+    `migration.rollback_failed` without partially migrated state.
 
 > **Normative definition.**
-Each test MUST verify that the error code and diagnostic message match the
-expected values.
+Each test MUST verify the exact Chapter 04 diagnostic shape, assigned family,
+domain `code`, `severity: "error"`, message, and required bounded details.
 
 ### Transient failure recovery tests
 
 > **Normative definition.**
 The following tests MUST verify transient failure recovery:
 
-1. **Retry timeout**: Simulate a retry timeout and verify the attempt is marked
-   as `Failed` with `retry.timeout`.
+1. **Retry deadline**: Advance the clock to the retry record's `deadline` while
+   a retry remains pending and verify it is marked `Expired` with
+   `retry.deadline_exceeded`.
 2. **Retry cancellation**: Simulate a retry cancellation and verify the attempt
    is marked as `Cancelled`.
 3. **Storage unavailable**: Simulate a storage unavailability and verify the
    operation is marked as `Failed` with `storage.unavailable`.
 4. **Timer missed fire**: Simulate a timer missed fire and verify the missed-fire
-   policy is applied.
+   policy is applied exactly 30 seconds after `fire_at`, using `Fire immediately`
+   when the timer omitted a policy.
 
 > **Normative definition.**
 Each test MUST verify that no unauthorized or partial state is left after the
@@ -674,13 +720,19 @@ gates.
 
 ## Variability register
 
+The register below summarizes fixed behavior and internal mechanisms governed
+by the linked clauses. It does not independently license variation.
+
+> **Non-normative note.**
+
 | Item | Permission | Recommendation | Constraint |
 |------|------------|----------------|------------|
-| Retry default policy | Implementation-defined | Document in conformance profile | Must not exceed turn timeout |
-| Missed-fire default policy | Implementation-defined | Document in conformance profile | Must be one of fire_immediately, skip, retry |
-| Hibernate timeout | Implementation-defined | Document in conformance profile | Must be bounded |
-| Thaw timeout | Implementation-defined | Document in conformance profile | Must be bounded |
-| Migration timeout | Implementation-defined | Document in conformance profile | Must be bounded |
-| Backoff strategy | Implementation-defined | Exponential backoff | Must be bounded |
-| State schema versioning | Implementation-defined | Document in conformance profile | Must support migration |
-| Artifact versioning | Implementation-defined | Document in conformance profile | Must support migration |
+| [Retry policy materialization](#fixed-defaults-and-deadlines) | Required | Materialize three attempts, 1000 ms constant delay, and no jitter when the creator supplies no policy | Persisted records must contain required values and use zero jitter |
+| [Missed-fire default policy](#fixed-defaults-and-deadlines) | Required | Fire immediately | Per-timer configuration may select another defined policy |
+| [Missed-fire grace period](#missed-fire-policy) | Required | 30 seconds | Apply `timer.missed_fire` after the fixed window |
+| [Hibernate timeout](#fixed-defaults-and-deadlines) | Required | 30 seconds | Fail closed with `hibernate.timeout` |
+| [Thaw timeout](#fixed-defaults-and-deadlines) | Required | 30 seconds | Fail closed with `hibernate.thaw_timeout` |
+| [Migration timeout](#fixed-defaults-and-deadlines) | Required | 300 seconds | Roll back and return `migration.timeout` |
+| [Backoff strategy](#retry-classification) | Required | Exact constant `backoff_ms` | No growth algorithm or non-zero jitter |
+| [State schema versioning](#fixed-defaults-and-deadlines) | Internal mechanism | Preserve exact version strings | Must preserve migration and replay outcomes |
+| [Artifact versioning](#fixed-defaults-and-deadlines) | Internal mechanism | Preserve exact version strings | Must preserve migration and replay outcomes |

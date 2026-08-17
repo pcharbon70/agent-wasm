@@ -3,7 +3,7 @@ title: "Extism Invocation Boundary Instances And Output Validation"
 kind: specification
 created: "2026-08-08"
 status: normative
-spec_version: "0.1.0"
+spec_version: "1.0.0"
 tags:
   - milestone-03
   - phase-01
@@ -19,7 +19,7 @@ aliases:
 
 ## Status and authority
 
-This chapter is a draft specification produced by
+This chapter is a normative specification produced by
 [Phase 1](../.spec/planning/agentic-system/milestone-03-host-actor-runtime-and-lifecycle/phase-01-extism-invocation-boundary-instances-and-output-validation.md)
 of
 [Milestone 3](../.spec/planning/agentic-system/milestone-03-host-actor-runtime-and-lifecycle/README.md)
@@ -60,7 +60,7 @@ trace context.
 ```
 InvocationInput {
   auth_context: AuthContext,
-  artifact_digest: Digest,
+  artifact_digest: ArtifactDigest,
   manifest: AgentManifest,
   state_snapshot: StateSnapshot,
   grants: Grant[],
@@ -74,10 +74,7 @@ AuthContext {
   scope: Scope
 }
 
-Digest {
-  algorithm: HashAlgorithm,
-  value: Bytes
-}
+ArtifactDigest = string
 
 InvocationLimits {
   max_memory_bytes: u64,
@@ -99,13 +96,15 @@ TraceContext {
 `Grant` is defined in
 [Turn Lifecycle Protocols And Canonical Encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md#grants).
 
-`Subject`, `Scope`, `HashAlgorithm`, and `UnixTimestamp` are defined in
+`Subject`, `Scope`, and `UnixTimestamp` are defined in
 [Stable Identities Versions Errors And Limits](02-stable-identities-versions-errors-and-limits.md).
+`ArtifactDigest` is the canonical `artifact:sha256:<hex>` identity defined by
+[Artifact digests](03-agent-manifests-artifacts-schemas-and-registries.md#artifact-digests).
 
 | Field | Type | Required | Purpose |
 |-------|------|----------|---------|
 | `auth_context` | AuthContext | Yes | Authentication and authorization context |
-| `artifact_digest` | Digest | Yes | Hash of the compiled WebAssembly artifact |
+| `artifact_digest` | ArtifactDigest | Yes | Canonical identity of the admitted artifact |
 | `manifest` | AgentManifest | Yes | Agent manifest with reducer configuration |
 | `state_snapshot` | StateSnapshot | Yes | Current state revision for the turn |
 | `grants` | Grant[] | Yes | Granted capabilities for this invocation |
@@ -144,6 +143,10 @@ The `limits` field constrains the Extism instance configuration:
 `max_duration_ms` sets the execution timeout,
 `max_host_calls` sets the host function call limit,
 `max_input_bytes` and `max_output_bytes` constrain guest memory usage.
+These values MUST equal the effective named ceilings for
+`memory.max_pages` multiplied by 65,536, `time.turn_ms`,
+`host_calls.max_count`, `input.max_bytes`, and `output.max_bytes`,
+respectively. Their exhaustion diagnostics use those limit identifiers.
 
 ### Compiled artifact caching
 
@@ -155,7 +158,7 @@ instance creation and reuse.
 
 ```
 ArtifactCache {
-  digest: Digest,
+  digest: ArtifactDigest,
   compiled_module: CompiledModule,
   created_at: UnixTimestamp,
   last_used_at: UnixTimestamp,
@@ -170,15 +173,15 @@ CompiledModule {
 
 | Field | Type | Required | Purpose |
 |-------|------|----------|---------|
-| `digest` | Digest | Yes | Hash identifying the artifact |
+| `digest` | ArtifactDigest | Yes | Canonical identity of the artifact |
 | `compiled_module` | CompiledModule | Yes | Pre-compiled WebAssembly module |
 | `created_at` | UnixTimestamp | Yes | Cache entry creation time |
 | `last_used_at` | UnixTimestamp | Yes | Last invocation time |
 | `usage_count` | u64 | Yes | Number of times the cache entry was reused |
 
 > **Normative definition.**
-The host MAY evict cache entries using a least-recently-used policy when the
-cache exceeds its configured size limit.
+When the cache exceeds its configured size limit, the host MUST evict
+least-recently-used entries until the cache is within the limit.
 Cache entries MUST be validated against their digest on every access.
 If a cached artifact's digest does not match, the host MUST recompile and
 update the cache entry.
@@ -240,10 +243,12 @@ Instances MUST be disposed after each invocation completes, whether successfully
 or with a trap.
 
 > **Normative definition.**
-The `cancellation_token` MUST be checked periodically during long-running
-invocations.
-If the token is cancelled, the host MUST terminate the instance and return
-`extism.invocation.cancelled`.
+The host MUST observe the `cancellation_token` before entering guest code, at
+every host-function boundary, and before validating guest output. If the token
+is cancelled at any of those points, or runtime interruption reports the
+cancellation earlier, the host MUST terminate the instance and return
+`extism.instance.cancelled`. It MUST NOT publish successful output, state
+changes, or directives from that invocation.
 
 > **Normative definition.**
 Host functions MUST be registered with explicit signatures.
@@ -297,12 +302,22 @@ InvocationUsage {
 ```
 
 > **Normative definition.**
-The host MUST invoke exports in the following order for each turn:
+The adapter uses exports according to operation lifecycle, not as a four-call
+sequence around each turn:
 
-1. **Describe** (optional): Query the reducer's capabilities and configuration.
-2. **Initialize**: Initialize the reducer with the current state and grants.
-3. **Reduce**: Execute the turn with the provided signals and instructions.
-4. **Migrate** (optional): Migrate state to a new schema version if needed.
+1. **Describe** MAY run during artifact admission and MAY be served from a
+   validated cache.
+2. **Initialize** runs exactly once when creating fresh state for one agent
+   instance. It MUST NOT run before an ordinary turn.
+3. **Migrate** runs only on a separately authorized maintenance request and
+   completes before a turn may load the migrated revision.
+4. **Reduce** runs exactly once for each accepted turn attempt and is the only
+   guest export invoked in the ordinary turn path.
+
+For an agent lifecycle, successful initialization precedes any migration or
+turn, each migration precedes turns using its target schema, and reductions
+follow mailbox order. No adapter may invoke initialize or migrate
+transparently in response to a reduce failure.
 
 > **Normative definition.**
 The host MUST capture the following metrics for each invocation:
@@ -314,7 +329,7 @@ The host MUST capture the following metrics for each invocation:
 
 > **Normative definition.**
 If any export invocation fails with a trap, the host MUST capture the trap
-information and proceed to output validation.
+information, skip output validation, and return `extism.instance.trap`.
 Traps MUST NOT leak guest memory or implementation details.
 
 ### Output validation
@@ -338,10 +353,13 @@ InvocationResult {
 `StatePatch` is defined in
 [Turn Lifecycle Protocols And Canonical Encoding](04-turn-lifecycle-protocols-and-canonical-encoding.md#state-patch).
 
-`Directive`, `DirectiveKindName`, `CausalMetadata`, `CapabilityRef`, `RetryClass`, and `ResultContract` are defined in
-[Directives Strategies Continuations And Terminal States](13-directives-strategies-continuations-and-terminal-states.md#directive).
-The chapter 13 definition supersedes the simpler chapter 04 definition for
-this chapter.
+The `Directive`, `RetryClass`, and `ResultContract` wire structures are defined
+in [Directives](04-turn-lifecycle-protocols-and-canonical-encoding.md#directives).
+`DirectiveKindName`, host-derived `CausalMetadata`, and descriptor-only
+`CapabilityRef` are defined by
+[Directive](13-directives-strategies-continuations-and-terminal-states.md#directive).
+Chapter 13 adds validation, commit, and execution semantics without replacing
+the chapter 04 wire structure.
 
 > **Normative definition.**
 
@@ -372,11 +390,13 @@ StatusKind {
 The host MUST perform the following validation steps in order:
 
 1. **Byte validation**: Verify output bytes are within `max_output_bytes` limit.
-2. **Encoding validation**: Verify output is valid UTF-8 or canonical JSON.
+2. **Encoding validation**: Verify output is valid UTF-8 and canonical JSON.
 3. **Schema validation**: Validate output against the expected schema.
-4. **Semantic validation**: Verify state patch semantics (revision, operations).
-5. **Revision validation**: Verify state patch revision matches expected revision.
-6. **Directives validation**: Validate directive structure and capabilities per [Directives Strategies Continuations And Terminal States](13-directives-strategies-continuations-and-terminal-states.md).
+4. **Semantic validation**: Verify state patch operation and resulting-state semantics.
+5. **Revision validation**: Verify `TurnResult.expected_state_revision`
+   matches the request and loaded snapshot.
+6. **Directives validation**: Validate directive structure and capabilities per
+   [Directive processing](13-directives-strategies-continuations-and-terminal-states.md#directive-processing).
 7. **Limits validation**: Verify all usage metrics are within configured limits.
 
 > **Normative definition.**
@@ -385,9 +405,9 @@ diagnostic with the appropriate error code.
 The host MUST NOT expose the invalid output to host state logic.
 
 > **Normative definition.**
-The host MUST validate that the `state_patch` revision matches the expected
-revision from the `state_snapshot`.
-If the revision does not match, the host MUST reject with
+The host MUST validate that `TurnResult.expected_state_revision` matches the
+request and the integer `state_snapshot.revision`; `StatePatch` contains no
+revision field. If the result value does not match, the host MUST reject with
 `extism.output.revision_mismatch`.
 
 ### Instance disposal
@@ -445,8 +465,9 @@ The host MUST quarantine instances in the following cases:
 
 > **Normative definition.**
 Quarantined instances MUST NOT be reused.
-The host MUST log the quarantine event with the reason and retain the instance
-for debugging purposes.
+The host MUST record the quarantine event and reason, capture bounded debugging
+evidence, and then dispose the instance. Disposal MUST complete before the host
+accepts another invocation for the same agent.
 
 ## 1.3 Failure Evidence And Operational Notes
 
@@ -460,9 +481,9 @@ and output validation:
 |------|-------------|------------|------------|
 | Malformed | Invalid invocation input structure | Failed JSON parsing or schema validation | `extism.invocation.malformed` |
 | Incompatible | Reducer incompatible with invocation | Profile version mismatch | `extism.invocation.incompatible` |
-| Conflicting | Concurrent invocations on same revision | Same state revision targeted | `state.revision.conflict` |
+| Conflicting | Invocation lacks the current turn lease | Another worker owns the agent lease | `mailbox.turn_lease.conflict` |
 | Unauthorized | Missing capability for host function | Required capability not granted | `extism.invocation.unauthorized` |
-| Exhausted | Resource limits exceeded | Timeout, memory, or iteration limit | `extism.invocation.exhausted` |
+| Exhausted | Named limit exceeded | Input, output, memory, duration, or host-call limit | `identity.limit.<limit_identifier>` |
 | Unavailable | Artifact or dependency unavailable | Artifact not found or cache miss | `extism.invocation.unavailable` |
 | ArtifactDigestMismatch | Cached artifact digest does not match | Artifact updated without cache invalidation | `extism.invocation.artifact_digest_mismatch` |
 | HostFunctionInvalid | Host function called with invalid signature | Signature mismatch | `extism.invocation.host_function_invalid` |
@@ -486,27 +507,21 @@ without exposing secrets or implementation internal state.
 
 | Family | Purpose | Example codes |
 |--------|---------|---------------|
-| `extism.invocation` | Invocation failures | `malformed`, `incompatible`, `unauthorized`, `exhausted`, `unavailable`, `artifact_digest_mismatch`, `host_function_invalid` |
-| `extism.output` | Output validation failures | `encoding_invalid`, `schema_invalid`, `semantic_invalid`, `revision_mismatch`, `limits_exceeded` |
-| `extism.instance` | Instance lifecycle failures | `trap`, `timeout`, `cancelled`, `quarantined` |
+| `extism.invocation` | Invocation failures independent of named limits | `malformed`, `incompatible`, `unauthorized`, `unavailable`, `artifact_digest_mismatch`, `host_function_invalid` |
+| `extism.output` | Output validation failures | `encoding_invalid`, `schema_invalid`, `semantic_invalid`, `revision_mismatch` |
+| `extism.instance` | Instance lifecycle failures independent of named limits | `trap`, `cancelled`, `quarantined` |
+| `identity.limit` | Named invocation-limit exhaustion | `input.max_bytes`, `output.max_bytes`, `memory.max_pages`, `time.turn_ms` |
 
-### Implementation-defined choices
+### Internal mechanisms and fixed behavior
 
-> **Normative implementation-defined choice.**
-The following implementation-defined choices do not create conformance obligations.
-The Variability register below catalogs all such choices.
-
-> **Normative implementation-defined choice.**
-Cache eviction policy: The host MAY choose the cache eviction policy. The policy MUST be documented in the conformance profile. This implementation-defined choice is not a conformance obligation.
-
-> **Normative implementation-defined choice.**
-Host function registration: The host MAY choose how to register and validate host functions. The mechanism is implementation-defined. This implementation-defined choice is not a conformance obligation.
-
-> **Normative implementation-defined choice.**
-Cancellation polling: The host MAY choose how frequently to check the cancellation token. The frequency MUST be documented in the conformance profile. This implementation-defined choice is not a conformance obligation.
-
-> **Normative implementation-defined choice.**
-Quarantine retention: The host MAY choose how long to retain quarantined instances. The retention period MUST be documented in the conformance profile. This implementation-defined choice is not a conformance obligation.
+> **Normative definition.**
+The cache storage layout, host-function registration adapter, cancellation
+delivery mechanism, and quarantine storage are internal mechanisms. Every such
+mechanism MUST be observationally equivalent with respect to digest
+validation, cache eviction order, registered signatures, cancellation status,
+diagnostics, validated output, state changes, directives, and instance reuse.
+An internal mechanism MUST NOT change whether an invocation is accepted,
+cancelled, trapped, quarantined, or reported as successful.
 
 ### Deferred work
 
@@ -584,13 +599,16 @@ Expected behavior:
 ### Negative: exhausted resources
 
 > **Normative definition.**
-The negative exhausted resources test validates that resource limit violations are rejected.
+The negative exhausted resources test validates that named invocation limits
+use their canonical diagnostics.
 
 Expected behavior:
 
-- Input: invocation that exceeds the configured timeout or memory limit.
+- Input: separate invocations that exceed the configured turn-duration and
+  memory-page limits.
 - Expected output: null.
-- Expected error: `extism.invocation.exhausted`.
+- Expected errors: `identity.limit.time.turn_ms` and
+  `identity.limit.memory.max_pages`, respectively.
 
 ### Negative: unavailable artifact
 
@@ -615,15 +633,16 @@ Expected behavior:
 - Expected output: null.
 - Expected error: `extism.invocation.host_function_invalid`.
 
-### Negative: output revision mismatch
+### Negative: result revision mismatch
 
 > **Normative definition.**
-The negative output revision mismatch test validates that state patches with
-mismatched revisions are rejected.
+The negative output revision mismatch test validates that a
+`TurnResult.expected_state_revision` mismatch is rejected.
 
 Expected behavior:
 
-- Input: invocation producing state patch with revision that does not match the expected revision.
+- Input: invocation whose `TurnResult.expected_state_revision` differs from
+  both the request and `state_snapshot.revision`.
 - Expected output: null.
 - Expected error: `extism.output.revision_mismatch`.
 
@@ -636,7 +655,7 @@ Expected behavior:
 
 - Input: invocation producing output that exceeds `max_output_bytes`.
 - Expected output: null.
-- Expected error: `extism.output.limits_exceeded`.
+- Expected error: `identity.limit.output.max_bytes`.
 
 ### Negative: instance trap
 
@@ -658,7 +677,7 @@ Expected behavior:
 
 - Input: invocation that exceeds the configured timeout.
 - Expected output: null.
-- Expected error: `extism.instance.timeout`.
+- Expected error: `identity.limit.time.turn_ms`.
 
 ### Negative: instance cancellation
 
@@ -670,6 +689,23 @@ Expected behavior:
 - Input: invocation that is cancelled via the cancellation token.
 - Expected output: null.
 - Expected error: `extism.instance.cancelled`.
+
+### Fixed mechanism conformance
+
+> **Normative definition.**
+The Phase 1 integration tests MUST verify the fixed behavior independently of
+private implementation structure:
+
+1. Configure a cache for three equal-sized entries, fill it, access the oldest
+   entry, insert a fourth entry, and verify that the least-recently-used entry
+   is evicted while the accessed entry remains.
+2. Cancel an invocation before guest entry, during a host-function call, and
+   after guest return but before output validation; each case MUST publish no
+   successful output, state change, or directive and MUST return the
+   cancellation diagnostic.
+3. Produce uncertain host callback state and verify that the instance is never
+   reused, bounded quarantine evidence is captured, and disposal completes
+   before another invocation for the same agent is accepted.
 
 ### Cross-milestone fixture regression
 
@@ -694,17 +730,20 @@ Any approved variability MUST be documented in the Milestone 3 exit report.
 
 ## Variability register
 
-| Clause | Type | Selection |
-|--------|------|-----------|
-| Invocation input structure | Required | Fields fixed by this chapter |
-| Artifact caching | Required | Separate from instance creation, fixed by this chapter |
-| Fresh instance creation | Required | Per-invocation, fixed by this chapter |
-| Invocation order | Required | describe, initialize, reduce, migrate, fixed by this chapter |
-| Output validation | Required | 7-step validation pipeline, fixed by this chapter |
-| Instance disposal | Required | Dispose or quarantine, fixed by this chapter |
+The register summarizes fixed behavior and internal mechanisms. It does not
+independently license variation.
 
-The remaining variability choices are documented in the
-section on host-defined selections.
+| Clause | Type | Selection | Constraint |
+|--------|------|-----------|------------|
+| Invocation input structure | Required | Fields fixed by this chapter | Validate before instance creation |
+| [Artifact caching](#compiled-artifact-caching) | Required | Least-recently-used eviction | Validate the digest on every access |
+| [Host-function registration](#fresh-instance-reference-behavior) | Internal mechanism | No profile selection | Preserve signatures, authorization, traps, and diagnostics |
+| Fresh instance creation | Required | Per invocation | Never reuse an instance across turns |
+| [Export lifecycle](#invocation-execution) | Required | Describe at admission, initialize once, migrate only under maintenance, reduce once per turn | Never wrap an ordinary reduce with initialize or migrate |
+| Output validation | Required | Seven-step validation pipeline | Reject before exposing invalid output |
+| [Invocation limit diagnostics](#failure-modes) | Required | `identity.limit.<limit_identifier>` | Map adapter limits to the canonical named ceilings |
+| [Cancellation delivery](#fresh-instance-reference-behavior) | Internal mechanism | No profile selection | Observe cancellation at every specified boundary and publish no success after cancellation |
+| [Quarantine storage](#instance-disposal) | Internal mechanism | No profile selection | Capture bounded evidence, never reuse, and dispose before the next invocation for the agent |
 
 ## Rationale and evidence (non-normative)
 
@@ -716,7 +755,7 @@ and the operational needs of a multi-tenant, multi-agent system.
 The invocation boundary provides:
 
 - A host-owned boundary that resolves artifacts and creates constrained instances.
-- A clear invocation order from describe through migrate.
+- A clear operation-specific lifecycle for describe, initialize, migrate, and reduce.
 - A comprehensive output validation pipeline.
 - Instance disposal and quarantine for safety.
 
