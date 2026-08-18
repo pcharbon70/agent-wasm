@@ -2,12 +2,14 @@
 
 Package the runtime as an operable framework platform with stable host APIs, SDKs, local tooling, observability, upgrades, deployment guidance, and production acceptance evidence.
 
-Current status: Phase 5 complete; all phases and tasks are complete.
+Specification-plan status: phases 1-3 and 5 complete; phase 4 pending; milestone
+plan incomplete. Runtime implementation and conformance are tracked separately
+in the [package-local SpecLed workspace](../../../../src/.spec/README.md).
 
 ## Purpose
 
-Provide the ordered, section-sized implementation work and evidence needed to
-satisfy this milestone without selecting language-specific internals.
+Provide the ordered, section-sized specification work and evidence requirements
+needed to define this milestone without selecting language-specific internals.
 
 ## What belongs here
 
@@ -36,10 +38,11 @@ Only phase plans and milestone-wide assumptions for production platform and deve
 
 - Phases use `N`; sections use `N.M`; tasks use `N.M.K`; subtasks use
   `N.M.K.L`.
-- Every checklist item remains unchecked until implementation evidence exists.
+- Every checklist item remains unchecked until its specification artifact and
+  traceability record exist.
 - Every phase, section, and task has an immediate description.
-- Every phase ends in a final integration-testing section.
-- Implement and commit one section at a time.
+- Every phase ends in a final integration-scenario section.
+- Author and commit one section at a time.
 
 ## Shared Assumptions And Defaults
 
@@ -52,6 +55,9 @@ Only phase plans and milestone-wide assumptions for production platform and deve
 All five phase integration sections pass together, their evidence is retained,
 and no unresolved failure changes an earlier contract or trust assumption.
 
+This is a runtime and conformance gate; the specification-plan status above
+does not claim that it has passed.
+
 ## Index
 
 ### Subdirectories
@@ -60,11 +66,11 @@ and no unresolved failure changes an earlier contract or trust assumption.
 
 ### Documents
 
-- [Phase 1 - Embedded And Server Host APIs Configuration And Packaging](phase-01-embedded-and-server-host-apis-configuration-and-packaging.md) — implements and verifies this ordered phase.
-- [Phase 2 - Guest SDK CLI Simulator Templates Fixtures And Debugging](phase-02-guest-sdk-cli-simulator-templates-fixtures-and-debugging.md) — implements and verifies this ordered phase.
-- [Phase 3 - Telemetry Tracing Audit Redaction Health And Operator Actions](phase-03-telemetry-tracing-audit-redaction-health-and-operator-actions.md) — implements and verifies this ordered phase.
-- [Phase 4 - Compatibility Upgrades Migrations Deployment And Horizontal Coordination](phase-04-compatibility-upgrades-migrations-deployment-and-horizontal-coordination.md) — implements and verifies this ordered phase.
-- [Phase 5 - Examples Runbooks SLO Evidence And Production Acceptance](phase-05-examples-runbooks-slo-evidence-and-production-acceptance.md) — implements and verifies this ordered phase.
+- [Phase 1 - Embedded And Server Host APIs Configuration And Packaging](phase-01-embedded-and-server-host-apis-configuration-and-packaging.md) — defines and traces this ordered phase.
+- [Phase 2 - Guest SDK CLI Simulator Templates Fixtures And Debugging](phase-02-guest-sdk-cli-simulator-templates-fixtures-and-debugging.md) — defines and traces this ordered phase.
+- [Phase 3 - Telemetry Tracing Audit Redaction Health And Operator Actions](phase-03-telemetry-tracing-audit-redaction-health-and-operator-actions.md) — defines and traces this ordered phase.
+- [Phase 4 - Compatibility Upgrades Migrations Deployment And Horizontal Coordination](phase-04-compatibility-upgrades-migrations-deployment-and-horizontal-coordination.md) — defines and traces this ordered phase.
+- [Phase 5 - Examples Runbooks SLO Evidence And Production Acceptance](phase-05-examples-runbooks-slo-evidence-and-production-acceptance.md) — defines and traces this ordered phase.
 
 ## Maintaining This Index
 

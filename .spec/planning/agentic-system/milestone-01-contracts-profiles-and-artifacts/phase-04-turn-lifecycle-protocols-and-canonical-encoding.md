@@ -5,8 +5,8 @@ Back to milestone: [README](./README.md)
 - [x] 4 Phase - Specify the complete bytes-in/bytes-out lifecycle for description, initialization, reduction, and migration.
 
   This phase is complete only when its contracts, behavior, failure semantics,
-  and integration evidence are reviewable without relying on a host-language
-  implementation detail.
+  and integration evidence requirements are reviewable without relying on a
+  host-language implementation detail.
 
 ## 4.1 Section - Contract And Data Model
 
@@ -17,7 +17,7 @@ Back to milestone: [README](./README.md)
 
   - [x] 4.1.1 Task - Complete the contract and data model work.
 
-    This task is the section-sized implementation and commit boundary.
+    This task is the section-sized specification-authoring and commit boundary.
 
     - [x] 4.1.1.1 Subtask - Define describe, initialize, reduce, and migrate exports as versioned request/result exchanges over Extism memory.
     - [x] 4.1.1.2 Subtask - Define TurnRequest fields for invocation, agent identity, expected revision, signal, optional instruction, state, strategy state, grants, deadline, and trace context.
@@ -32,7 +32,7 @@ Back to milestone: [README](./README.md)
 
   - [x] 4.2.1 Task - Complete the behavior and integration work.
 
-    This task is the section-sized implementation and commit boundary.
+    This task is the section-sized specification-authoring and commit boundary.
 
     - [x] 4.2.1.1 Subtask - Define MigrationRequest and MigrationResult with source/target schema versions and separately authorized maintenance context.
     - [x] 4.2.1.2 Subtask - Specify canonical JSON rules for numbers, bytes, timestamps, identifiers, ordering, duplicate keys, UTF-8, and rejected unknown authority fields.
@@ -47,7 +47,7 @@ Back to milestone: [README](./README.md)
 
   - [x] 4.3.1 Task - Complete the failure evidence and operational notes work.
 
-    This task is the section-sized implementation and commit boundary.
+    This task is the section-sized specification-authoring and commit boundary.
 
     - [x] 4.3.1.1 Subtask - Define malformed, incompatible, conflicting, unauthorized, exhausted, and unavailable outcomes relevant to turn lifecycle protocols and canonical encoding.
     - [x] 4.3.1.2 Subtask - Emit bounded diagnostics and evidence that identify the phase contract, profile, and failed boundary without exposing secrets.
@@ -55,18 +55,18 @@ Back to milestone: [README](./README.md)
 
 ## 4.4 Section - Phase 4 Integration Tests
 
-- [x] 4.4 Section - Verify turn lifecycle protocols and canonical encoding across its real dependency boundaries.
+- [x] 4.4 Section - Define integrated verification for turn lifecycle protocols and canonical encoding across its real dependency boundaries.
 
-  This section proves the phase works as an integrated behavior and preserves
-  reproducible evidence for later milestone and release gates.
+  This section defines the integrated-behavior scenarios and reproducible
+  evidence required by later milestone and release gates.
 
-  - [x] 4.4.1 Task - Run the phase integration scenarios.
+  - [x] 4.4.1 Task - Define the phase integration scenarios.
 
     The scenarios must exercise observable contracts rather than private
     implementation structure.
 
-    - [x] 4.4.1.1 Subtask - Verify the canonical successful flow and retained evidence for turn lifecycle protocols and canonical encoding.
-    - [x] 4.4.1.2 Subtask - Verify malformed, incompatible, stale, duplicate, and boundary-limit inputs fail with stable diagnostics where applicable.
-    - [x] 4.4.1.3 Subtask - Verify timeout, cancellation, unavailable dependency, and retry behavior leave no unauthorized or partial state.
-    - [x] 4.4.1.4 Subtask - Run all earlier milestone fixtures affected by this phase and record regressions or approved variability.
+    - [x] 4.4.1.1 Subtask - Define a scenario for the canonical successful flow and retained evidence for turn lifecycle protocols and canonical encoding.
+    - [x] 4.4.1.2 Subtask - Define scenarios in which malformed, incompatible, stale, duplicate, and boundary-limit inputs fail with stable diagnostics where applicable.
+    - [x] 4.4.1.3 Subtask - Define scenarios in which timeout, cancellation, unavailable dependency, and retry behavior leave no unauthorized or partial state.
+    - [x] 4.4.1.4 Subtask - Identify all earlier milestone fixtures affected by this phase and define how to record regressions or approved variability.
 

@@ -16,6 +16,21 @@ WebAssembly and Extism.
 Milestone indexes and phase plans for the agent protocol, decision semantics,
 host runtime, durability, security, coordination, AI, assurance, and operations.
 
+## Status semantics
+
+These checklists record **specification-plan completion**. A checked item means
+that its contract, behavior, failure, or integration-scenario requirements and
+traceability artifacts are reviewable. It does not claim that the corresponding
+runtime behavior exists or has passed executable conformance tests.
+Imperative verbs in checklist text name requirements to specify; they do not
+assert that the described runtime action has occurred.
+
+Runtime implementation status is tracked by requirements, exceptions, and
+verification in the
+[package-local SpecLed workspace](../../../src/.spec/README.md). A product
+milestone is implemented only when its applicable exceptions are removed and
+its executable exit evidence passes.
+
 ## Milestone Order
 
 1. [Milestone 1 - Contracts, Profiles, And Artifacts](milestone-01-contracts-profiles-and-artifacts/README.md) — Establish the language-neutral vocabulary, compatibility rules, artifact model, and byte-level host–guest protocol on which every later runtime feature depends.
@@ -43,10 +58,12 @@ cross-runtime and release gates.
 - Numbering resets inside each milestone.
 - Phases use `N`, sections use `N.M`, tasks use `N.M.K`, and subtasks use
   `N.M.K.L`.
-- Every phase, section, task, and subtask uses an unchecked Markdown checkbox.
+- Every phase, section, task, and subtask starts with an unchecked Markdown
+  checkbox and is checked when its specification-plan artifact and traceability
+  record are complete.
 - Every phase, section, and task starts with a short description paragraph.
-- Every phase ends with a final integration-testing section.
-- One section is the intended implementation and commit boundary.
+- Every phase ends with a final integration-scenario section.
+- One section is the intended specification-authoring and commit boundary.
 - Plans define behavior and interfaces without selecting a host language,
   database, transport, deployment platform, or AI provider.
 
@@ -77,6 +94,9 @@ The roadmap is complete only when the supported profiles have reproducible
 cross-runtime evidence, durable failure recovery, tenant isolation, bounded
 resource behavior, operable deployment surfaces, and representative direct,
 FSM, multi-agent, and tool-using workflows.
+
+Completed specification-plan checklists do not by themselves satisfy this
+system-wide completion definition.
 
 ## Maintaining This Roadmap
 
