@@ -2,12 +2,14 @@
 
 Implement the portable Jido-inspired decision vocabulary and deterministic reducer semantics independently of host scheduling and external effects.
 
-Current status: phase 1-5 complete; milestone 2 complete.
+Specification-plan status: phases 1-5 complete. Runtime implementation and
+conformance are tracked separately in the
+[package-local SpecLed workspace](../../../../src/.spec/README.md).
 
 ## Purpose
 
-Provide the ordered, section-sized implementation work and evidence needed to
-satisfy this milestone without selecting language-specific internals.
+Provide the ordered, section-sized specification work and evidence requirements
+needed to define this milestone without selecting language-specific internals.
 
 ## What belongs here
 
@@ -36,10 +38,11 @@ Only phase plans and milestone-wide assumptions for signals, actions, state, and
 
 - Phases use `N`; sections use `N.M`; tasks use `N.M.K`; subtasks use
   `N.M.K.L`.
-- Every checklist item remains unchecked until implementation evidence exists.
+- Every checklist item remains unchecked until its specification artifact and
+  traceability record exist.
 - Every phase, section, and task has an immediate description.
-- Every phase ends in a final integration-testing section.
-- Implement and commit one section at a time.
+- Every phase ends in a final integration-scenario section.
+- Author and commit one section at a time.
 
 ## Shared Assumptions And Defaults
 
@@ -52,6 +55,9 @@ Only phase plans and milestone-wide assumptions for signals, actions, state, and
 All five phase integration sections pass together, their evidence is retained,
 and no unresolved failure changes an earlier contract or trust assumption.
 
+This is a runtime and conformance gate; the specification-plan status above
+does not claim that it has passed.
+
 ## Index
 
 ### Subdirectories
@@ -60,11 +66,11 @@ and no unresolved failure changes an earlier contract or trust assumption.
 
 ### Documents
 
-- [Phase 1 - Signal Envelopes Causality Routing And Delivery Vocabulary](phase-01-signal-envelopes-causality-routing-and-delivery-vocabulary.md) — implements and verifies this ordered phase.
-- [Phase 2 - Actions Instructions Validation Plans And Results](phase-02-actions-instructions-validation-plans-and-results.md) — implements and verifies this ordered phase.
-- [Phase 3 - State Operations Patches Revisions And Conflicts](phase-03-state-operations-patches-revisions-and-conflicts.md) — implements and verifies this ordered phase.
-- [Phase 4 - Directives Strategies Continuations And Terminal States](phase-04-directives-strategies-continuations-and-terminal-states.md) — implements and verifies this ordered phase.
-- [Phase 5 - Deterministic Reducer Semantics And Milestone Acceptance](phase-05-deterministic-reducer-semantics-and-milestone-acceptance.md) — implements and verifies this ordered phase.
+- [Phase 1 - Signal Envelopes Causality Routing And Delivery Vocabulary](phase-01-signal-envelopes-causality-routing-and-delivery-vocabulary.md) — defines and traces this ordered phase.
+- [Phase 2 - Actions Instructions Validation Plans And Results](phase-02-actions-instructions-validation-plans-and-results.md) — defines and traces this ordered phase.
+- [Phase 3 - State Operations Patches Revisions And Conflicts](phase-03-state-operations-patches-revisions-and-conflicts.md) — defines and traces this ordered phase.
+- [Phase 4 - Directives Strategies Continuations And Terminal States](phase-04-directives-strategies-continuations-and-terminal-states.md) — defines and traces this ordered phase.
+- [Phase 5 - Deterministic Reducer Semantics And Milestone Acceptance](phase-05-deterministic-reducer-semantics-and-milestone-acceptance.md) — defines and traces this ordered phase.
 
 ## Maintaining This Index
 

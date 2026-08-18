@@ -2,12 +2,14 @@
 
 Add host-owned authorization, composable framework plugins, artifact trust, resource governance, and defensible tenant isolation around untrusted guest code.
 
-Current status: phase 1-5 complete; milestone 5 complete.
+Specification-plan status: phases 1-5 complete. Runtime implementation and
+conformance are tracked separately in the
+[package-local SpecLed workspace](../../../../src/.spec/README.md).
 
 ## Purpose
 
-Provide the ordered, section-sized implementation work and evidence needed to
-satisfy this milestone without selecting language-specific internals.
+Provide the ordered, section-sized specification work and evidence requirements
+needed to define this milestone without selecting language-specific internals.
 
 ## What belongs here
 
@@ -36,10 +38,11 @@ Only phase plans and milestone-wide assumptions for capabilities, plugins, secur
 
 - Phases use `N`; sections use `N.M`; tasks use `N.M.K`; subtasks use
   `N.M.K.L`.
-- Every checklist item remains unchecked until implementation evidence exists.
+- Every checklist item remains unchecked until its specification artifact and
+  traceability record exist.
 - Every phase, section, and task has an immediate description.
-- Every phase ends in a final integration-testing section.
-- Implement and commit one section at a time.
+- Every phase ends in a final integration-scenario section.
+- Author and commit one section at a time.
 
 ## Shared Assumptions And Defaults
 
@@ -52,6 +55,9 @@ Only phase plans and milestone-wide assumptions for capabilities, plugins, secur
 All five phase integration sections pass together, their evidence is retained,
 and no unresolved failure changes an earlier contract or trust assumption.
 
+This is a runtime and conformance gate; the specification-plan status above
+does not claim that it has passed.
+
 ## Index
 
 ### Subdirectories
@@ -60,11 +66,11 @@ and no unresolved failure changes an earlier contract or trust assumption.
 
 ### Documents
 
-- [Phase 1 - Threat Model Principals Trust Classes And Grant Vocabulary](phase-01-threat-model-principals-trust-classes-and-grant-vocabulary.md) — implements and verifies this ordered phase.
-- [Phase 2 - Capability Policy Attenuation Limits And Enforcement](phase-02-capability-policy-attenuation-limits-and-enforcement.md) — implements and verifies this ordered phase.
-- [Phase 3 - Framework Plugin Manifests Composition And Lifecycle Hooks](phase-03-framework-plugin-manifests-composition-and-lifecycle-hooks.md) — implements and verifies this ordered phase.
-- [Phase 4 - Synchronous Host Functions WASI Restrictions And Tenant Isolation](phase-04-synchronous-host-functions-wasi-restrictions-and-tenant-isolation.md) — implements and verifies this ordered phase.
-- [Phase 5 - Provenance Signing Audit Security And Milestone Acceptance](phase-05-provenance-signing-audit-security-and-milestone-acceptance.md) — implements and verifies this ordered phase.
+- [Phase 1 - Threat Model Principals Trust Classes And Grant Vocabulary](phase-01-threat-model-principals-trust-classes-and-grant-vocabulary.md) — defines and traces this ordered phase.
+- [Phase 2 - Capability Policy Attenuation Limits And Enforcement](phase-02-capability-policy-attenuation-limits-and-enforcement.md) — defines and traces this ordered phase.
+- [Phase 3 - Framework Plugin Manifests Composition And Lifecycle Hooks](phase-03-framework-plugin-manifests-composition-and-lifecycle-hooks.md) — defines and traces this ordered phase.
+- [Phase 4 - Synchronous Host Functions WASI Restrictions And Tenant Isolation](phase-04-synchronous-host-functions-wasi-restrictions-and-tenant-isolation.md) — defines and traces this ordered phase.
+- [Phase 5 - Provenance Signing Audit Security And Milestone Acceptance](phase-05-provenance-signing-audit-security-and-milestone-acceptance.md) — defines and traces this ordered phase.
 
 ## Maintaining This Index
 
